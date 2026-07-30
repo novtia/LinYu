@@ -1,0 +1,31 @@
+# Dependencies & builds
+node_modules/
+frontend/node_modules/
+frontend/dist/
+dist/
+dist-ssr/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+.env.*
+
+# Local data & uploads
+*.db
+*.sqlite3
+backend/uploads/
+uploads/
+
+# Logs & editor
+logs/
+*.log
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.local
+*.sw?
