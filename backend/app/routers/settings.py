@@ -7,12 +7,11 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import get_admin_user
-from ..models import Delivery, Order, OrderItem, Product, User
+from ..models import Delivery, Order, Product, User
 from ..schemas import (
     DashboardOut,
     OrderItemOut,
     OrderOut,
-    PaySettings,
     PublicSettingsOut,
     SettingsOut,
     SiteSettings,
@@ -55,17 +54,7 @@ def get_settings(
     db: Session = Depends(get_db),
 ):
     s = load_settings(db)
-    return SettingsOut(pay=s["pay"], sys=s["sys"], site=s["site"])
-
-
-@router.put("/settings/pay", response_model=SettingsOut)
-def update_pay(
-    body: PaySettings,
-    _: User = Depends(get_admin_user),
-    db: Session = Depends(get_db),
-):
-    s = save_settings(db, pay=body)
-    return SettingsOut(pay=s["pay"], sys=s["sys"], site=s["site"])
+    return SettingsOut(sys=s["sys"], site=s["site"])
 
 
 @router.put("/settings/sys", response_model=SettingsOut)
@@ -75,7 +64,7 @@ def update_sys(
     db: Session = Depends(get_db),
 ):
     s = save_settings(db, sys=body)
-    return SettingsOut(pay=s["pay"], sys=s["sys"], site=s["site"])
+    return SettingsOut(sys=s["sys"], site=s["site"])
 
 
 @router.put("/settings/site", response_model=SettingsOut)
@@ -85,7 +74,7 @@ def update_site(
     db: Session = Depends(get_db),
 ):
     s = save_settings(db, site=body)
-    return SettingsOut(pay=s["pay"], sys=s["sys"], site=s["site"])
+    return SettingsOut(sys=s["sys"], site=s["site"])
 
 
 @router.get("/dashboard", response_model=DashboardOut)

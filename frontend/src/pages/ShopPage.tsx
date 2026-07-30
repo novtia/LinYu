@@ -184,7 +184,7 @@ export function ShopPage() {
 
       <footer className="border-t border-[var(--line)] py-6">
         <div className="wrap flex flex-wrap items-center justify-between gap-3 text-[0.85rem] text-ink-mute">
-          <span>© 2026 领匣 Lingxia · Demo</span>
+          <span>© 2026 领匣 Lingxia</span>
           <div className="flex gap-4">
             <a href="#shop">商品</a>
             <a href="#trust">保障</a>

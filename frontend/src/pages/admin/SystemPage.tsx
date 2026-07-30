@@ -25,7 +25,7 @@ export function SystemPage() {
           <Field label="通知 Webhook" value={sys.notify} onChange={(v) => setSys({ ...sys, notify: v })} />
         </div>
       </div>
-      <SwitchRow title="自动发货" desc="付款成功后立即写入领取匣" on={sys.autoDeliver} onToggle={() => setSys({ ...sys, autoDeliver: !sys.autoDeliver })} />
+      <SwitchRow title="自动发货" desc="付款成功后立即发放卡密 / 文件到订单" on={sys.autoDeliver} onToggle={() => setSys({ ...sys, autoDeliver: !sys.autoDeliver })} />
       <SwitchRow title="开放注册" desc="关闭后仅管理员可登录" on={sys.allowReg} onToggle={() => setSys({ ...sys, allowReg: !sys.allowReg })} />
       <SwitchRow title="维护模式" desc="开启后暂停下单" on={sys.maintain} onToggle={() => setSys({ ...sys, maintain: !sys.maintain })} />
       <div className="flex justify-end bg-paper px-[18px] py-3.5">

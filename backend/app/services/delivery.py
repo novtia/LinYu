@@ -12,20 +12,10 @@ def _rand(n: int) -> str:
     return "".join(random.choice(chars) for _ in range(n))
 
 
-GENERATORS = {
-    "pro-suite": lambda: "LX-PRO-" + _rand(4) + "-" + _rand(4) + "-" + _rand(4),
-    "vpn-month": lambda: "vpn://" + _rand(8) + "." + _rand(8),
-    "stream-gift": lambda: "REDEEM-" + _rand(6).upper(),
-    "game-topup": lambda: "GP-" + _rand(5).upper() + "-" + _rand(5).upper(),
-}
-
-
 def generate_payload(product: Optional[Product], product_id: str, product_type: str = "key") -> str:
+    """按商品类型生成发货内容（文件商品返回文件名，卡密/兑换码即时生成）。"""
     if product and product.type == "file" and product.file_path:
         return product.file_name or "下载文件"
-    gen = GENERATORS.get(product_id)
-    if gen:
-        return gen()
     if product_type == "file":
         return "文件待上传，请联系客服"
     if product_type == "code":

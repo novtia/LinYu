@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../lib/api'
 import type { Order } from '../../types'
+import { orderStatusLabel } from '../../lib/orderStatus'
 import { PanelTable, Tag } from './ProductsPage'
 
 function fmtTime(iso: string) {
@@ -25,7 +26,13 @@ export function OrdersPage() {
           <td className="whitespace-nowrap px-[18px] py-3.5">{o.items.map((i) => i.name).join('、')}</td>
           <td className="whitespace-nowrap px-[18px] py-3.5">¥{o.total}</td>
           <td className="whitespace-nowrap px-[18px] py-3.5">
-            <Tag green>已完成</Tag>
+            {o.status === 'completed' || o.status === 'paid' ? (
+              <Tag green>{orderStatusLabel(o.status)}</Tag>
+            ) : o.status === 'pending' ? (
+              <Tag>{orderStatusLabel(o.status)}</Tag>
+            ) : (
+              <Tag red>{orderStatusLabel(o.status)}</Tag>
+            )}
           </td>
           <td className="whitespace-nowrap px-[18px] py-3.5">{fmtTime(o.created_at)}</td>
           <td className="whitespace-nowrap px-[18px] py-3.5">

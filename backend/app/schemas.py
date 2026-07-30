@@ -101,6 +101,7 @@ class CartItemIn(BaseModel):
 
 class CheckoutIn(BaseModel):
     items: List[CartItemIn] = Field(min_length=1)
+    payment_method_id: str = Field(min_length=1, description="公开支付方式 ID：{channel_id}:{method}")
 
 
 class DeliveryOut(BaseModel):
@@ -131,13 +132,18 @@ class OrderOut(BaseModel):
     username: str
     total: float
     status: str
+    payment_method: Optional[str] = None
+    payment_provider: Optional[str] = None
+    trade_no: Optional[str] = None
+    paid_at: Optional[datetime] = None
     created_at: datetime
     items: List[OrderItemOut]
 
 
 class CheckoutOut(BaseModel):
     order: OrderOut
-    deliveries: List[DeliveryOut]
+    pay_url: str
+    deliveries: List[DeliveryOut] = Field(default_factory=list)
 
 
 class DashboardOut(BaseModel):
@@ -148,20 +154,9 @@ class DashboardOut(BaseModel):
     recent_orders: List[OrderOut]
 
 
-class PaySettings(BaseModel):
-    alipay: bool = True
-    wechat: bool = False
-    usdt: bool = False
-    alipayPid: str = ""
-    alipayKey: str = ""
-    wechatMch: str = ""
-    wechatKey: str = ""
-    usdtAddr: str = ""
-
-
 class SysSettings(BaseModel):
     name: str = "领匣"
-    email: str = "support@lingxia.demo"
+    email: str = "support@lingxia.com"
     notify: str = ""
     autoDeliver: bool = True
     allowReg: bool = True
@@ -171,12 +166,11 @@ class SysSettings(BaseModel):
 class SiteSettings(BaseModel):
     title: str = "领匣 · 虚拟商品在线售卖"
     keywords: str = "虚拟商品,卡密,兑换码,自动发货"
-    desc: str = "卡密、兑换码与数字文件一站售卖。付款后写入领取匣，即时交付。"
-    notice: str = "演示站点，支付与发货均为模拟流程。"
+    desc: str = "卡密、兑换码与数字文件一站售卖。付款成功后自动发货，订单内随时查看。"
+    notice: str = "欢迎选购。支付成功后将自动发货，内容可在「我的订单」查看。"
 
 
 class SettingsOut(BaseModel):
-    pay: PaySettings
     sys: SysSettings
     site: SiteSettings
 

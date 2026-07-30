@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 import uuid
-import zipfile
 from pathlib import Path
 from typing import Optional, Set
 
@@ -97,18 +96,3 @@ def cover_public_url(relative: Optional[str]) -> Optional[str]:
     if not relative:
         return None
     return "/uploads/" + relative.replace("\\", "/").lstrip("/")
-
-
-def create_demo_zip(product_id: str, display_name: str, note: str) -> tuple:
-    """Create a small demo zip for seeded file products."""
-    ensure_upload_dir()
-    original = safe_filename(display_name)
-    stored = f"{product_id}_demo_{original}"
-    dest = FILE_DIR / stored
-    if not dest.exists():
-        tmp = FILE_DIR / f"_tmp_{uuid.uuid4().hex}.txt"
-        tmp.write_text(note, encoding="utf-8")
-        with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as zf:
-            zf.write(tmp, arcname="readme.txt")
-        tmp.unlink(missing_ok=True)
-    return f"files/{stored}", original

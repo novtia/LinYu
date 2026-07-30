@@ -54,8 +54,18 @@ export interface Order {
   username: string
   total: number
   status: string
+  payment_method?: string | null
+  payment_provider?: string | null
+  trade_no?: string | null
+  paid_at?: string | null
   created_at: string
   items: OrderItem[]
+}
+
+export interface CheckoutResult {
+  order: Order
+  pay_url: string
+  deliveries: Delivery[]
 }
 
 export interface Delivery {
@@ -75,17 +85,6 @@ export interface PublicSettings {
   allowReg: boolean
   maintain: boolean
   name: string
-}
-
-export interface PaySettings {
-  alipay: boolean
-  wechat: boolean
-  usdt: boolean
-  alipayPid: string
-  alipayKey: string
-  wechatMch: string
-  wechatKey: string
-  usdtAddr: string
 }
 
 export interface EzpayConfig {
@@ -155,7 +154,6 @@ export interface SiteSettings {
 }
 
 export interface Settings {
-  pay: PaySettings
   sys: SysSettings
   site: SiteSettings
 }

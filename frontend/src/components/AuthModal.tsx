@@ -197,7 +197,7 @@ export function AuthModal() {
               >
                 登录
               </button>
-              <div className="text-center text-[0.78rem] leading-relaxed text-ink-mute">管理员演示账号：admin / admin123</div>
+              <div className="text-center text-[0.78rem] leading-relaxed text-ink-mute">还没有账号？切换到注册页创建</div>
             </form>
           ) : (
             <form className="grid gap-3.5" onSubmit={onRegister} autoComplete="off">

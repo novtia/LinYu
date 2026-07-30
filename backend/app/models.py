@@ -45,7 +45,12 @@ class Order(Base):
     user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.id"))
     username: Mapped[str] = mapped_column(String(64))
     total: Mapped[float] = mapped_column(Float)
-    status: Mapped[str] = mapped_column(String(16), default="completed")
+    status: Mapped[str] = mapped_column(String(16), default="pending")  # pending | paid | completed | failed | cancelled
+    payment_channel_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    payment_method: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    payment_provider: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    trade_no: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     user: Mapped["User"] = relationship(back_populates="orders")

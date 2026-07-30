@@ -219,7 +219,7 @@ export function PaymentChannelFormPage() {
 
         <SwitchRow
           title="启用渠道"
-          desc="启用后可在结算流程中使用该支付通道（正式下单对接后续完成）"
+          desc="启用后，买家结算时可选择该通道完成真实支付"
           on={enabled}
           onToggle={() => setEnabled((v) => !v)}
         />
@@ -261,12 +261,14 @@ export function PaymentChannelFormPage() {
                 value={config.notify_url}
                 onChange={(v) => setConfig({ ...config, notify_url: v })}
                 placeholder="https://你的域名/api/pay/ezpay/notify"
+                hint="可留空自动填充；必须是公网可访问地址，否则无法自动发货"
               />
               <Field
                 label="跳转通知 return_url"
                 value={config.return_url}
                 onChange={(v) => setConfig({ ...config, return_url: v })}
-                placeholder="https://你的域名/orders"
+                placeholder="https://你的域名/api/pay/ezpay/return"
+                hint="可留空，系统自动使用当前站点回调地址；公网需可被易支付访问"
               />
             </div>
 

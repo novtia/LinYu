@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ApiError, api } from '../lib/api'
+import { orderStatusClass, orderStatusLabel } from '../lib/orderStatus'
 import { useAuth } from '../context/AuthContext'
+import { usePurchaseResult } from '../context/PurchaseResultContext'
 import { useToast } from '../context/ToastContext'
 import type { Order } from '../types'
 
@@ -12,12 +14,16 @@ function fmtTime(iso: string) {
 
 export function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const fromPay = searchParams.get('pay') === '1'
   const { user, loading, openAuth } = useAuth()
   const { showToast } = useToast()
+  const { showPurchaseResult } = usePurchaseResult()
   const [order, setOrder] = useState<Order | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(true)
   const navigate = useNavigate()
+  const resultShown = useRef(false)
 
   useEffect(() => {
     if (loading) return
@@ -27,12 +33,87 @@ export function OrderDetailPage() {
       return
     }
     if (!id) return
+    let alive = true
     api
       .get<Order>(`/api/orders/${id}`)
-      .then(setOrder)
-      .catch((e) => setError(e instanceof ApiError ? e.message : '加载失败'))
-      .finally(() => setBusy(false))
+      .then((o) => {
+        if (alive) setOrder(o)
+      })
+      .catch((e) => {
+        if (alive) setError(e instanceof ApiError ? e.message : '加载失败')
+      })
+      .finally(() => {
+        if (alive) setBusy(false)
+      })
+    return () => {
+      alive = false
+    }
   }, [id, user, loading, openAuth])
+
+  // 支付回跳：轮询直到完成或超时
+  useEffect(() => {
+    if (!fromPay || !id || !user || !order) return
+    if (order.status === 'completed' || order.status === 'paid') {
+      if (!resultShown.current) {
+        resultShown.current = true
+        showPurchaseResult({
+          status: 'success',
+          orderId: order.id,
+          message: '支付成功，商品已自动发货，可在下方查看发放内容。',
+        })
+        setSearchParams({}, { replace: true })
+      }
+      return
+    }
+    if (order.status === 'failed' || order.status === 'cancelled') {
+      if (!resultShown.current) {
+        resultShown.current = true
+        showPurchaseResult({
+          status: 'failure',
+          orderId: order.id,
+          message: '支付未完成，请重新下单或联系客服。',
+        })
+        setSearchParams({}, { replace: true })
+      }
+      return
+    }
+
+    let tries = 0
+    const timer = window.setInterval(async () => {
+      tries += 1
+      try {
+        const next = await api.get<Order>(`/api/orders/${id}`)
+        setOrder(next)
+        if (next.status === 'completed' || next.status === 'paid') {
+          window.clearInterval(timer)
+          if (!resultShown.current) {
+            resultShown.current = true
+            showPurchaseResult({
+              status: 'success',
+              orderId: next.id,
+              message: '支付成功，商品已自动发货，可在下方查看发放内容。',
+            })
+            setSearchParams({}, { replace: true })
+          }
+        } else if (tries >= 20) {
+          window.clearInterval(timer)
+          if (!resultShown.current) {
+            resultShown.current = true
+            showPurchaseResult({
+              status: 'failure',
+              orderId: next.id,
+              message: '暂未确认支付结果，请稍后刷新订单页，或确认是否已完成付款。',
+            })
+            setSearchParams({}, { replace: true })
+          }
+        }
+      } catch {
+        /* ignore transient errors while polling */
+      }
+    }, 2000)
+
+    return () => window.clearInterval(timer)
+  }, [fromPay, id, user, order, showPurchaseResult, setSearchParams])
 
   if (!loading && !user) return <Navigate to="/" replace />
 
@@ -49,6 +130,9 @@ export function OrderDetailPage() {
     )
   }
 
+  const delivered = order.status === 'completed' || order.status === 'paid'
+  const waitingPay = order.status === 'pending'
+
   return (
     <main className="pb-20 pt-8">
       <div className="wrap max-w-3xl">
@@ -62,8 +146,8 @@ export function OrderDetailPage() {
               <h1 className="font-[family-name:var(--font-display)] text-2xl font-extrabold tracking-tight">订单详情</h1>
               <p className="mt-1 font-[family-name:var(--font-mono)] text-[0.85rem] text-ink-mute">{order.id}</p>
             </div>
-            <span className="inline-flex rounded-md bg-[rgba(15,110,92,.12)] px-2.5 py-1 text-[0.78rem] font-semibold text-teal">
-              已完成
+            <span className={`inline-flex rounded-md px-2.5 py-1 text-[0.78rem] font-semibold ${orderStatusClass(order.status)}`}>
+              {orderStatusLabel(order.status)}
             </span>
           </div>
           <div className="grid gap-3 text-[0.92rem] sm:grid-cols-3">
@@ -71,6 +155,11 @@ export function OrderDetailPage() {
             <Meta label="买家" value={order.username} />
             <Meta label="合计" value={`¥${order.total}`} />
           </div>
+          {waitingPay && (
+            <p className="mt-4 rounded-xl bg-[rgba(196,165,116,.16)] px-3.5 py-3 text-[0.86rem] text-[#8a6a2f]">
+              订单待支付。若你已完成付款，请稍候刷新本页；支付结果确认后将自动发货。
+            </p>
+          )}
         </div>
 
         <div className="overflow-hidden rounded-[22px] border border-[var(--line)] bg-white">
@@ -84,45 +173,51 @@ export function OrderDetailPage() {
                   <strong className="text-[0.98rem]">{it.name}</strong>
                   <span className="font-semibold text-teal">¥{it.price}</span>
                 </div>
-                <div className="flex items-center gap-3 rounded-xl bg-paper px-3.5 py-3">
-                  <div
-                    className={`min-w-0 flex-1 font-[family-name:var(--font-mono)] text-[0.82rem] text-ink ${
-                      it.download_url ? 'truncate' : 'break-all'
-                    }`}
-                  >
-                    {it.download_url ? it.file_name || it.payload || '已购文件' : it.payload || '未发放'}
+                {!delivered ? (
+                  <div className="rounded-xl bg-paper px-3.5 py-3 text-[0.86rem] text-ink-mute">
+                    {waitingPay ? '支付成功后自动发放' : '尚未发放'}
                   </div>
-                  {it.download_url ? (
-                    <button
-                      type="button"
-                      className="shrink-0 text-[0.82rem] font-semibold text-teal hover:underline"
-                      onClick={async () => {
-                        try {
-                          await api.download(it.download_url!, it.file_name || it.payload || undefined)
-                        } catch (e) {
-                          showToast(e instanceof ApiError ? e.message : '下载失败')
-                        }
-                      }}
+                ) : (
+                  <div className="flex items-center gap-3 rounded-xl bg-paper px-3.5 py-3">
+                    <div
+                      className={`min-w-0 flex-1 font-[family-name:var(--font-mono)] text-[0.82rem] text-ink ${
+                        it.download_url ? 'truncate' : 'break-all'
+                      }`}
                     >
-                      下载文件
-                    </button>
-                  ) : it.payload ? (
-                    <button
-                      type="button"
-                      className="shrink-0 text-[0.82rem] font-semibold text-teal hover:underline"
-                      onClick={async () => {
-                        try {
-                          await navigator.clipboard.writeText(it.payload || '')
-                          showToast('已复制到剪贴板')
-                        } catch {
-                          showToast('复制失败')
-                        }
-                      }}
-                    >
-                      复制
-                    </button>
-                  ) : null}
-                </div>
+                      {it.download_url ? it.file_name || it.payload || '已购文件' : it.payload || '未发放'}
+                    </div>
+                    {it.download_url ? (
+                      <button
+                        type="button"
+                        className="shrink-0 text-[0.82rem] font-semibold text-teal hover:underline"
+                        onClick={async () => {
+                          try {
+                            await api.download(it.download_url!, it.file_name || it.payload || undefined)
+                          } catch (e) {
+                            showToast(e instanceof ApiError ? e.message : '下载失败')
+                          }
+                        }}
+                      >
+                        下载文件
+                      </button>
+                    ) : it.payload ? (
+                      <button
+                        type="button"
+                        className="shrink-0 text-[0.82rem] font-semibold text-teal hover:underline"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(it.payload || '')
+                            showToast('已复制到剪贴板')
+                          } catch {
+                            showToast('复制失败')
+                          }
+                        }}
+                      >
+                        复制
+                      </button>
+                    ) : null}
+                  </div>
+                )}
               </div>
             ))}
           </div>

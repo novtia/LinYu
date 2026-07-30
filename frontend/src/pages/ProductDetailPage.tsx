@@ -10,7 +10,7 @@ import { PageBreadcrumb } from '../components/PageBreadcrumb'
 import { PaymentMethodPicker } from '../components/PaymentMethodPicker'
 import { ProductDeliveryPanel, type DeliveryUnlock } from '../components/ProductDeliveryPanel'
 import { ProductMedia } from '../components/ProductMedia'
-import type { Delivery, Order, Product, PublicPaymentMethod } from '../types'
+import type { CheckoutResult, Order, Product, PublicPaymentMethod } from '../types'
 
 const TYPE_LABEL: Record<string, string> = {
   key: '卡密 / 激活码',
@@ -109,8 +109,8 @@ export function ProductDetailPage() {
   }
 
   function ensurePayment(): boolean {
-    if (paymentRequired && !payment) {
-      showToast('请选择购买渠道')
+    if (!payment) {
+      showToast(paymentRequired ? '请选择购买渠道' : '暂无可用支付方式，请稍后再试')
       return false
     }
     return true
@@ -123,7 +123,7 @@ export function ProductDetailPage() {
     showToast(`已加入购物车：${product.name}`)
   }
 
-  /** 购买：直接购买当前商品，不经过购物车 */
+  /** 购买：创建待支付订单并跳转易支付 */
   async function handleBuyNow() {
     if (!product) return
     if (!ensurePayment()) return
@@ -138,23 +138,19 @@ export function ProductDetailPage() {
     }
     setBuying(true)
     try {
-      const res = await api.post<{ order: Order; deliveries: Delivery[] }>('/api/orders/checkout', {
+      const res = await api.post<CheckoutResult>('/api/orders/checkout', {
         items: [{ id: product.id, name: product.name, price: product.price }],
+        payment_method_id: payment!.id,
       })
-      const d = res.deliveries.find((x) => x.product_id === product.id) || res.deliveries[0]
-      setUnlock({
-        unlocked: true,
-        productType: product.type,
-        hasFile: product.has_file,
-        fileName: d?.file_name || product.file_name,
-        downloadUrl: d?.download_url,
-        payload: d?.payload,
-      })
-      showPurchaseResult({
-        status: 'success',
-        orderId: res.order.id,
-        message: payment ? `已通过 ${payment.label} 完成支付，内容已解锁。` : '支付完成，内容已解锁，可在订单详情中查看。',
-      })
+      if (!res.pay_url) {
+        showPurchaseResult({
+          status: 'failure',
+          message: '未能生成支付链接，请稍后重试。',
+          orderId: res.order.id,
+        })
+        return
+      }
+      window.location.href = res.pay_url
     } catch (e) {
       showPurchaseResult({
         status: 'failure',
@@ -240,7 +236,7 @@ export function ProductDetailPage() {
                       className="h-12 rounded-xl bg-teal text-[0.95rem] font-semibold text-white transition hover:bg-teal-deep disabled:opacity-60"
                       onClick={handleBuyNow}
                     >
-                      {buying ? '处理中…' : '购买'}
+                      {buying ? '跳转支付中…' : '购买'}
                     </button>
                   </div>
 

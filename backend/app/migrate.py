@@ -16,6 +16,13 @@ def migrate_schema(engine: Engine) -> None:
             ("file_path", "VARCHAR(512)"),
             ("file_name", "VARCHAR(255)"),
         ],
+        "orders": [
+            ("payment_channel_id", "VARCHAR(64)"),
+            ("payment_method", "VARCHAR(32)"),
+            ("payment_provider", "VARCHAR(32)"),
+            ("trade_no", "VARCHAR(128)"),
+            ("paid_at", "DATETIME"),
+        ],
     }
     with engine.begin() as conn:
         for table, cols in alterations.items():

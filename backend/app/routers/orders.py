@@ -2,21 +2,23 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import List
+from urllib.parse import urljoin
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import get_admin_user, get_current_user
-from ..models import Delivery, Order, OrderItem, Product, User
+from ..models import Order, OrderItem, Product, User
+from ..payment.providers import get_provider
+from ..payment.service import get_channel, list_public_methods, parse_config
 from ..schemas import CheckoutIn, CheckoutOut, DeliveryOut, OrderItemOut, OrderOut
 from ..seed import load_settings
-from ..services.delivery import generate_payload, random_id
 
 router = APIRouter(prefix="/api/orders", tags=["orders"])
 
 
-def _delivery_out(d: Delivery) -> DeliveryOut:
+def _delivery_out(d) -> DeliveryOut:
     download_url = f"/api/downloads/{d.id}" if d.file_path else None
     return DeliveryOut(
         id=d.id,
@@ -32,7 +34,7 @@ def _delivery_out(d: Delivery) -> DeliveryOut:
 
 def _order_out(order: Order, include_payload: bool = False) -> OrderOut:
     delivery_by_product = {}
-    if include_payload:
+    if include_payload and order.status in ("paid", "completed"):
         for d in order.deliveries:
             delivery_by_product[d.product_id] = d
     items = []
@@ -61,14 +63,45 @@ def _order_out(order: Order, include_payload: bool = False) -> OrderOut:
         username=order.username,
         total=order.total,
         status=order.status,
+        payment_method=order.payment_method,
+        payment_provider=order.payment_provider,
+        trade_no=order.trade_no,
+        paid_at=order.paid_at,
         created_at=order.created_at,
         items=items,
     )
 
 
+def _public_base(request: Request) -> str:
+    # 优先 X-Forwarded-*，便于反向代理；否则用请求自身
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host")
+    if host:
+        return f"{proto}://{host}".rstrip("/")
+    return str(request.base_url).rstrip("/")
+
+
+def _resolve_payment(db: Session, payment_method_id: str):
+    methods = list_public_methods(db).methods
+    hit = next((m for m in methods if m.id == payment_method_id), None)
+    if not hit:
+        raise HTTPException(status_code=400, detail="支付方式不可用，请重新选择")
+    channel = get_channel(db, hit.channel_id)
+    if not channel.enabled:
+        raise HTTPException(status_code=400, detail="支付渠道已停用")
+    adapter = get_provider(channel.provider)
+    if not adapter:
+        raise HTTPException(status_code=400, detail="暂不支持该支付渠道")
+    config = parse_config(channel.config_json)
+    if not adapter.is_ready(config):
+        raise HTTPException(status_code=400, detail="支付渠道配置不完整")
+    return hit, channel, adapter, config
+
+
 @router.post("/checkout", response_model=CheckoutOut)
 def checkout(
     body: CheckoutIn,
+    request: Request,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -76,60 +109,70 @@ def checkout(
     if settings["sys"].maintain:
         raise HTTPException(status_code=400, detail="站点维护中，暂停下单")
 
+    payment_method_id = (body.payment_method_id or "").strip()
+    if not payment_method_id:
+        raise HTTPException(status_code=400, detail="请选择支付方式")
+
+    hit, channel, adapter, config = _resolve_payment(db, payment_method_id)
+
+    # 以服务端商品为准计价
+    lines = []
+    for raw in body.items:
+        product = db.query(Product).filter(Product.id == raw.id).first()
+        if not product or product.status != "on":
+            raise HTTPException(status_code=400, detail=f"商品不可用：{raw.name or raw.id}")
+        if product.type == "file" and not product.file_path:
+            raise HTTPException(status_code=400, detail=f"商品文件未就绪：{product.name}")
+        lines.append(product)
+
+    if not lines:
+        raise HTTPException(status_code=400, detail="请选择商品")
+
+    total = round(sum(p.price for p in lines), 2)
     order_id = "LX" + str(int(datetime.utcnow().timestamp() * 1000))
-    total = sum(it.price for it in body.items)
     order = Order(
         id=order_id,
         user_id=user.id,
         username=user.username,
         total=total,
-        status="completed",
+        status="pending",
+        payment_channel_id=channel.id,
+        payment_method=hit.method,
+        payment_provider=channel.provider,
         created_at=datetime.utcnow(),
     )
     db.add(order)
-
-    deliveries = []
-    for it in body.items:
+    for p in lines:
         db.add(
             OrderItem(
                 order_id=order_id,
-                product_id=it.id,
-                name=it.name,
-                price=it.price,
+                product_id=p.id,
+                name=p.name,
+                price=p.price,
             )
         )
-        product = db.query(Product).filter(Product.id == it.id).first()
-        ptype = product.type if product else "key"
-        payload = generate_payload(product, it.id, ptype)
-        file_path = None
-        file_name = None
-        if product and product.type == "file" and product.file_path:
-            file_path = product.file_path
-            file_name = product.file_name
-            payload = file_name or "下载文件"
-        if settings["sys"].autoDeliver:
-            delivery = Delivery(
-                id="d_" + random_id(),
-                order_id=order_id,
-                product_id=it.id,
-                product_name=it.name,
-                payload=payload,
-                file_path=file_path,
-                file_name=file_name,
-                created_at=datetime.utcnow(),
-            )
-            db.add(delivery)
-            deliveries.append(delivery)
-
     db.commit()
     db.refresh(order)
-    for d in deliveries:
-        db.refresh(d)
 
-    return CheckoutOut(
-        order=_order_out(order, include_payload=True),
-        deliveries=[_delivery_out(d) for d in deliveries],
+    base = _public_base(request)
+    notify_url = (config.get("notify_url") or "").strip() or urljoin(base + "/", "api/pay/ezpay/notify")
+    return_url = (config.get("return_url") or "").strip() or urljoin(base + "/", "api/pay/ezpay/return")
+
+    product_name = lines[0].name if len(lines) == 1 else f"{lines[0].name} 等{len(lines)}件"
+    if not hasattr(adapter, "build_pay_url"):
+        raise HTTPException(status_code=400, detail="该渠道暂不支持在线支付")
+
+    pay_url = adapter.build_pay_url(
+        config,
+        money=total,
+        name=product_name[:120],
+        out_trade_no=order_id,
+        pay_type=hit.method,
+        notify_url=notify_url,
+        return_url=return_url,
     )
+
+    return CheckoutOut(order=_order_out(order, include_payload=False), pay_url=pay_url, deliveries=[])
 
 
 @router.get("/mine", response_model=List[OrderOut])

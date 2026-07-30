@@ -81,7 +81,7 @@ function PurchaseResultModal({
         </div>
 
         <div className="mt-5 border-t border-[var(--line)] px-5 py-4">
-          {ok && result.orderId ? (
+          {result.orderId ? (
             <Link
               to={orderHref}
               onClick={onClose}

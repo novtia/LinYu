@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { ApiError, api } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
+import { orderStatusClass, orderStatusLabel } from '../lib/orderStatus'
 import type { Order } from '../types'
 
 function fmtTime(iso: string) {
@@ -72,8 +73,8 @@ export function OrdersListPage() {
                 </div>
                 <div className="mb-2 font-semibold text-ink">{o.items.map((i) => i.name).join('、')}</div>
                 <div className="flex items-center justify-between">
-                  <span className="inline-flex rounded-md bg-[rgba(15,110,92,.12)] px-2 py-1 text-[0.75rem] font-semibold text-teal">
-                    已完成
+                  <span className={`inline-flex rounded-md px-2 py-1 text-[0.75rem] font-semibold ${orderStatusClass(o.status)}`}>
+                    {orderStatusLabel(o.status)}
                   </span>
                   <strong className="font-[family-name:var(--font-display)] text-lg">¥{o.total}</strong>
                 </div>

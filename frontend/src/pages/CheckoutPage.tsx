@@ -7,7 +7,7 @@ import { usePurchaseResult } from '../context/PurchaseResultContext'
 import { useToast } from '../context/ToastContext'
 import { PageBreadcrumb } from '../components/PageBreadcrumb'
 import { PaymentMethodPicker } from '../components/PaymentMethodPicker'
-import type { Order, PublicPaymentMethod } from '../types'
+import type { CheckoutResult, PublicPaymentMethod } from '../types'
 
 export function CheckoutPage() {
   const { items, replaceWithDelivered } = useCart()
@@ -46,8 +46,8 @@ export function CheckoutPage() {
 
   async function submit() {
     if (!pending.length) return
-    if (paymentRequired && !payment) {
-      showToast('请选择支付方式')
+    if (!payment) {
+      showToast(paymentRequired ? '请选择支付方式' : '暂无可用支付方式，请稍后再试')
       return
     }
     if (publicSettings?.maintain) {
@@ -56,17 +56,20 @@ export function CheckoutPage() {
     }
     setSubmitting(true)
     try {
-      const res = await api.post<{ order: Order }>('/api/orders/checkout', {
+      const res = await api.post<CheckoutResult>('/api/orders/checkout', {
         items: pending.map((it) => ({ id: it.id, name: it.name, price: it.price })),
+        payment_method_id: payment.id,
       })
       replaceWithDelivered([])
-      showPurchaseResult({
-        status: 'success',
-        orderId: res.order.id,
-        message: payment
-          ? `已通过 ${payment.label} 完成支付，商品将自动发货。`
-          : '支付完成，商品已自动发货，可在订单详情中查看。',
-      })
+      if (!res.pay_url) {
+        showPurchaseResult({
+          status: 'failure',
+          message: '未能生成支付链接，请稍后重试。',
+          orderId: res.order.id,
+        })
+        return
+      }
+      window.location.href = res.pay_url
     } catch (e) {
       showPurchaseResult({
         status: 'failure',
@@ -133,7 +136,7 @@ export function CheckoutPage() {
               onClick={submit}
               className="h-12 w-full rounded-xl bg-teal text-[0.95rem] font-semibold text-white hover:bg-teal-deep disabled:opacity-60"
             >
-              {submitting ? '支付处理中…' : '确认支付'}
+              {submitting ? '正在跳转支付…' : '去支付'}
             </button>
 
             <p className="mt-4 text-[0.78rem] leading-relaxed text-ink-mute">

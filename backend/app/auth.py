@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime, timedelta
 from typing import Optional
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-SECRET_KEY = "lingxia-demo-secret-change-in-production"
+SECRET_KEY = os.getenv("JWT_SECRET", "lingxia-change-me-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 72
 
