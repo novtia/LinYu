@@ -4,8 +4,6 @@ import { api } from '../../lib/api'
 import { useToast } from '../../context/ToastContext'
 import type { Product } from '../../types'
 
-const TYPE_LABEL: Record<string, string> = { key: '卡密', file: '文件', code: '兑换码' }
-
 export function ProductsPage() {
   const { showToast } = useToast()
   const [products, setProducts] = useState<Product[]>([])
@@ -20,7 +18,7 @@ export function ProductsPage() {
     load().catch(() => setProducts([]))
   }, [])
 
-  async function toggle(id: string) {
+  async function toggle(id: number) {
     const p = await api.patch<Product>(`/api/products/${id}/toggle`)
     await load()
     showToast(p.status === 'on' ? '已上架' : '已下架')
@@ -36,7 +34,7 @@ export function ProductsPage() {
           新增商品
         </Link>
       </div>
-      <PanelTable headers={['封面', 'ID', '名称', '类型', '文件', '价格', '状态', '操作']} empty={!products.length}>
+      <PanelTable headers={['封面', 'ID', '名称', '分类', '价格', '状态', '操作']} empty={!products.length}>
         {products.map((p) => (
           <tr key={p.id} className="border-t border-[var(--line)] hover:bg-[rgba(232,241,238,.4)]">
             <td className="px-[18px] py-3">
@@ -58,10 +56,7 @@ export function ProductsPage() {
                 {p.name}
               </button>
             </td>
-            <td className="whitespace-nowrap px-[18px] py-3.5">{TYPE_LABEL[p.type] || p.type}</td>
-            <td className="max-w-[160px] truncate px-[18px] py-3.5 text-[0.82rem] text-ink-mute">
-              {p.has_file ? p.file_name : '—'}
-            </td>
+            <td className="whitespace-nowrap px-[18px] py-3.5 text-ink-soft">{p.category_name || '未分类'}</td>
             <td className="whitespace-nowrap px-[18px] py-3.5">¥{p.price}</td>
             <td className="whitespace-nowrap px-[18px] py-3.5">
               <Tag green={p.status === 'on'}>{p.status === 'on' ? '在售' : '下架'}</Tag>

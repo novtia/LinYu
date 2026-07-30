@@ -9,7 +9,7 @@ interface CartContextValue {
   toggleCart: () => void
   addProduct: (p: Product, payment?: PublicPaymentMethod | null, options?: { openDrawer?: boolean }) => void
   removeAt: (index: number) => void
-  markDelivered: (payloads: { id: string; payload: string }[]) => void
+  markDelivered: (payloads: { id: number; payload: string }[]) => void
   clearUndelivered: () => void
   replaceWithDelivered: (items: CartItem[]) => void
 }
@@ -48,7 +48,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setItems((prev) => prev.filter((_, i) => i !== index))
   }, [])
 
-  const markDelivered = useCallback((payloads: { id: string; payload: string }[]) => {
+  const markDelivered = useCallback((payloads: { id: number; payload: string }[]) => {
     setItems((prev) => {
       const queue = [...payloads]
       return prev.map((it) => {

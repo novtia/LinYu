@@ -5,6 +5,7 @@ import { orderStatusClass, orderStatusLabel } from '../lib/orderStatus'
 import { useAuth } from '../context/AuthContext'
 import { usePurchaseResult } from '../context/PurchaseResultContext'
 import { useToast } from '../context/ToastContext'
+import { MarkdownContent } from '../components/MarkdownContent'
 import type { Order } from '../types'
 
 function fmtTime(iso: string) {
@@ -178,44 +179,49 @@ export function OrderDetailPage() {
                     {waitingPay ? '支付成功后自动发放' : '尚未发放'}
                   </div>
                 ) : (
-                  <div className="flex items-center gap-3 rounded-xl bg-paper px-3.5 py-3">
-                    <div
-                      className={`min-w-0 flex-1 font-[family-name:var(--font-mono)] text-[0.82rem] text-ink ${
-                        it.download_url ? 'truncate' : 'break-all'
-                      }`}
-                    >
-                      {it.download_url ? it.file_name || it.payload || '已购文件' : it.payload || '未发放'}
-                    </div>
-                    {it.download_url ? (
-                      <button
-                        type="button"
-                        className="shrink-0 text-[0.82rem] font-semibold text-teal hover:underline"
-                        onClick={async () => {
-                          try {
-                            await api.download(it.download_url!, it.file_name || it.payload || undefined)
-                          } catch (e) {
-                            showToast(e instanceof ApiError ? e.message : '下载失败')
-                          }
-                        }}
-                      >
-                        下载文件
-                      </button>
-                    ) : it.payload ? (
-                      <button
-                        type="button"
-                        className="shrink-0 text-[0.82rem] font-semibold text-teal hover:underline"
-                        onClick={async () => {
-                          try {
-                            await navigator.clipboard.writeText(it.payload || '')
-                            showToast('已复制到剪贴板')
-                          } catch {
-                            showToast('复制失败')
-                          }
-                        }}
-                      >
-                        复制
-                      </button>
-                    ) : null}
+                  <div className="rounded-xl bg-paper px-3.5 py-3">
+                    {it.payload ? (
+                      <>
+                        <div className="mb-3 min-w-0">
+                          <MarkdownContent content={it.payload} />
+                        </div>
+                        <button
+                          type="button"
+                          className="text-[0.82rem] font-semibold text-teal hover:underline"
+                          onClick={async () => {
+                            try {
+                              await navigator.clipboard.writeText(it.payload || '')
+                              showToast('已复制到剪贴板')
+                            } catch {
+                              showToast('复制失败')
+                            }
+                          }}
+                        >
+                          复制原文
+                        </button>
+                      </>
+                    ) : it.download_url ? (
+                      <div className="flex items-center gap-3">
+                        <div className="min-w-0 flex-1 truncate font-[family-name:var(--font-mono)] text-[0.82rem] text-ink">
+                          {it.file_name || '已购文件'}
+                        </div>
+                        <button
+                          type="button"
+                          className="shrink-0 text-[0.82rem] font-semibold text-teal hover:underline"
+                          onClick={async () => {
+                            try {
+                              await api.download(it.download_url!, it.file_name || undefined)
+                            } catch (e) {
+                              showToast(e instanceof ApiError ? e.message : '下载失败')
+                            }
+                          }}
+                        >
+                          下载文件
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="text-[0.86rem] text-ink-mute">未发放</div>
+                    )}
                   </div>
                 )}
               </div>

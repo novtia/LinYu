@@ -7,6 +7,7 @@ import { usePurchaseResult } from '../context/PurchaseResultContext'
 import { useToast } from '../context/ToastContext'
 import { PageBreadcrumb } from '../components/PageBreadcrumb'
 import { PaymentMethodPicker } from '../components/PaymentMethodPicker'
+import { resolveCheckoutResult } from '../lib/checkout'
 import type { CheckoutResult, PublicPaymentMethod } from '../types'
 
 export function CheckoutPage() {
@@ -44,9 +45,11 @@ export function CheckoutPage() {
     )
   }
 
+  const debugMode = !!publicSettings?.debugMode
+
   async function submit() {
     if (!pending.length) return
-    if (!payment) {
+    if (!debugMode && !payment) {
       showToast(paymentRequired ? '请选择支付方式' : '暂无可用支付方式，请稍后再试')
       return
     }
@@ -58,18 +61,27 @@ export function CheckoutPage() {
     try {
       const res = await api.post<CheckoutResult>('/api/orders/checkout', {
         items: pending.map((it) => ({ id: it.id, name: it.name, price: it.price })),
-        payment_method_id: payment.id,
+        payment_method_id: payment?.id || '',
       })
       replaceWithDelivered([])
-      if (!res.pay_url) {
+      const outcome = resolveCheckoutResult(res)
+      if (outcome === 'paid') {
         showPurchaseResult({
-          status: 'failure',
-          message: '未能生成支付链接，请稍后重试。',
+          status: 'success',
+          message: debugMode ? '调试模式：已跳过支付并完成发货' : '订单已生成，商品已发货。',
           orderId: res.order.id,
         })
         return
       }
-      window.location.href = res.pay_url
+      if (outcome === 'redirect') {
+        window.location.href = res.pay_url
+        return
+      }
+      showPurchaseResult({
+        status: 'failure',
+        message: '未能生成支付链接，请稍后重试。',
+        orderId: res.order.id,
+      })
     } catch (e) {
       showPurchaseResult({
         status: 'failure',
@@ -117,14 +129,20 @@ export function CheckoutPage() {
               <span className="font-[family-name:var(--font-display)] text-[2rem] font-bold tracking-tight">¥{total}</span>
             </div>
 
-            <PaymentMethodPicker
-              className="mb-5"
-              value={payment?.id || null}
-              onChange={setPayment}
-              onAvailabilityChange={setPaymentRequired}
-            />
+            {debugMode ? (
+              <div className="mb-5 rounded-xl border border-[rgba(196,165,116,.45)] bg-[rgba(196,165,116,.12)] px-3.5 py-3 text-[0.82rem] text-[#8b6b3d]">
+                调试模式已开启：将跳过真实支付并直接发货
+              </div>
+            ) : (
+              <PaymentMethodPicker
+                className="mb-5"
+                value={payment?.id || null}
+                onChange={setPayment}
+                onAvailabilityChange={setPaymentRequired}
+              />
+            )}
 
-            {payment && (
+            {!debugMode && payment && (
               <p className="mb-4 text-[0.78rem] text-ink-mute">
                 将使用：{payment.label} · {payment.channel_name}
               </p>
@@ -136,11 +154,19 @@ export function CheckoutPage() {
               onClick={submit}
               className="h-12 w-full rounded-xl bg-teal text-[0.95rem] font-semibold text-white hover:bg-teal-deep disabled:opacity-60"
             >
-              {submitting ? '正在跳转支付…' : '去支付'}
+              {submitting
+                ? debugMode
+                  ? '处理中…'
+                  : '正在跳转支付…'
+                : debugMode
+                  ? '调试购买'
+                  : '去支付'}
             </button>
 
             <p className="mt-4 text-[0.78rem] leading-relaxed text-ink-mute">
-              支付成功后将自动发货。卡密 / 文件可在订单详情中查看与下载。
+              {debugMode
+                ? '调试模式下不会发起真实支付，订单会立即完成并发货。'
+                : '支付成功后将自动发货，内容可在订单详情中查看。'}
             </p>
           </section>
         </div>

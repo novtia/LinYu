@@ -29,6 +29,12 @@ class BasePaymentProvider(ABC):
         """渠道是否具备对外收款的最小配置（公开接口只返回 ready 的渠道方式）。"""
         return True
 
+    def default_notify_path(self) -> str:
+        return f"api/pay/{self.id}/notify"
+
+    def default_return_path(self) -> str:
+        return f"api/pay/{self.id}/return"
+
     def public_meta(self) -> Dict[str, Any]:
         return {
             "id": self.id,

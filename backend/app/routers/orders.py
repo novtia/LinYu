@@ -14,6 +14,7 @@ from ..payment.providers import get_provider
 from ..payment.service import get_channel, list_public_methods, parse_config
 from ..schemas import CheckoutIn, CheckoutOut, DeliveryOut, OrderItemOut, OrderOut
 from ..seed import load_settings
+from ..services.fulfillment import fulfill_order
 
 router = APIRouter(prefix="/api/orders", tags=["orders"])
 
@@ -109,11 +110,8 @@ def checkout(
     if settings["sys"].maintain:
         raise HTTPException(status_code=400, detail="站点维护中，暂停下单")
 
+    debug_mode = bool(settings["sys"].debugMode)
     payment_method_id = (body.payment_method_id or "").strip()
-    if not payment_method_id:
-        raise HTTPException(status_code=400, detail="请选择支付方式")
-
-    hit, channel, adapter, config = _resolve_payment(db, payment_method_id)
 
     # 以服务端商品为准计价
     lines = []
@@ -121,8 +119,6 @@ def checkout(
         product = db.query(Product).filter(Product.id == raw.id).first()
         if not product or product.status != "on":
             raise HTTPException(status_code=400, detail=f"商品不可用：{raw.name or raw.id}")
-        if product.type == "file" and not product.file_path:
-            raise HTTPException(status_code=400, detail=f"商品文件未就绪：{product.name}")
         lines.append(product)
 
     if not lines:
@@ -130,6 +126,44 @@ def checkout(
 
     total = round(sum(p.price for p in lines), 2)
     order_id = "LX" + str(int(datetime.utcnow().timestamp() * 1000))
+
+    if debug_mode:
+        order = Order(
+            id=order_id,
+            user_id=user.id,
+            username=user.username,
+            total=total,
+            status="pending",
+            payment_channel_id=None,
+            payment_method="debug",
+            payment_provider="debug",
+            trade_no="DEBUG-" + order_id,
+            created_at=datetime.utcnow(),
+        )
+        db.add(order)
+        for p in lines:
+            db.add(
+                OrderItem(
+                    order_id=order_id,
+                    product_id=p.id,
+                    name=p.name,
+                    price=p.price,
+                )
+            )
+        db.commit()
+        db.refresh(order)
+        deliveries = fulfill_order(db, order, trade_no=order.trade_no, force=True)
+        return CheckoutOut(
+            order=_order_out(order, include_payload=True),
+            pay_url="",
+            deliveries=[_delivery_out(d) for d in deliveries],
+        )
+
+    if not payment_method_id:
+        raise HTTPException(status_code=400, detail="请选择支付方式")
+
+    hit, channel, adapter, config = _resolve_payment(db, payment_method_id)
+
     order = Order(
         id=order_id,
         user_id=user.id,
@@ -155,8 +189,10 @@ def checkout(
     db.refresh(order)
 
     base = _public_base(request)
-    notify_url = (config.get("notify_url") or "").strip() or urljoin(base + "/", "api/pay/ezpay/notify")
-    return_url = (config.get("return_url") or "").strip() or urljoin(base + "/", "api/pay/ezpay/return")
+    notify_path = adapter.default_notify_path() if hasattr(adapter, "default_notify_path") else "api/pay/ezpay/notify"
+    return_path = adapter.default_return_path() if hasattr(adapter, "default_return_path") else "api/pay/ezpay/return"
+    notify_url = (config.get("notify_url") or "").strip() or urljoin(base + "/", notify_path)
+    return_url = (config.get("return_url") or "").strip() or urljoin(base + "/", return_path)
 
     product_name = lines[0].name if len(lines) == 1 else f"{lines[0].name} 等{len(lines)}件"
     if not hasattr(adapter, "build_pay_url"):

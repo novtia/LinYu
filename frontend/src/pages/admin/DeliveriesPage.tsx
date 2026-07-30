@@ -29,13 +29,28 @@ export function DeliveriesPage() {
           </td>
           <td className="whitespace-nowrap px-[18px] py-3.5">{fmtTime(d.created_at)}</td>
           <td className="whitespace-nowrap px-[18px] py-3.5">
-            {d.download_url ? (
+            {d.payload ? (
               <button
                 type="button"
                 className="text-[0.82rem] font-semibold text-teal hover:underline"
                 onClick={async () => {
                   try {
-                    await api.download(d.download_url!, d.file_name || d.payload)
+                    await navigator.clipboard.writeText(d.payload)
+                    showToast('已复制')
+                  } catch {
+                    showToast('复制失败')
+                  }
+                }}
+              >
+                复制
+              </button>
+            ) : d.download_url ? (
+              <button
+                type="button"
+                className="text-[0.82rem] font-semibold text-teal hover:underline"
+                onClick={async () => {
+                  try {
+                    await api.download(d.download_url!, d.file_name || undefined)
                   } catch (e) {
                     showToast(e instanceof ApiError ? e.message : '下载失败')
                   }

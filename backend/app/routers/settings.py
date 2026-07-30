@@ -45,6 +45,7 @@ def public_settings(db: Session = Depends(get_db)):
         allowReg=s["sys"].allowReg,
         maintain=s["sys"].maintain,
         name=s["sys"].name,
+        debugMode=s["sys"].debugMode,
     )
 
 

@@ -27,6 +27,7 @@ export function Field({
   placeholder,
   type = 'text',
   hint,
+  autoComplete,
 }: {
   label: string
   value: string
@@ -34,18 +35,20 @@ export function Field({
   placeholder?: string
   type?: string
   hint?: string
+  autoComplete?: string
 }) {
   return (
-    <label className="grid gap-1.5">
+    <label className="grid grid-rows-[auto_auto_1.1em] gap-1.5 content-start">
       <span className="text-[0.82rem] font-semibold text-ink-soft">{label}</span>
       <input
         type={type}
-        className="h-11 rounded-xl border border-[var(--line-strong)] bg-white px-3.5"
+        autoComplete={autoComplete}
+        className="box-border h-11 w-full rounded-xl border border-[var(--line-strong)] bg-white px-3.5 outline-none focus:border-teal"
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
       />
-      {hint ? <span className="text-[0.75rem] text-ink-mute">{hint}</span> : null}
+      <span className="text-[0.75rem] leading-[1.1em] text-ink-mute">{hint || '\u00a0'}</span>
     </label>
   )
 }

@@ -14,6 +14,7 @@ class User(Base):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     username: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    email: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(16), default="user")
     disabled: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -22,20 +23,43 @@ class User(Base):
     orders: Mapped[List["Order"]] = relationship(back_populates="user")
 
 
+class EmailCode(Base):
+    __tablename__ = "email_codes"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    email: Mapped[str] = mapped_column(String(128), index=True)
+    purpose: Mapped[str] = mapped_column(String(32), default="reset")
+    code: Mapped[str] = mapped_column(String(16))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    used: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class Category(Base):
+    __tablename__ = "categories"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(64), unique=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    products: Mapped[List["Product"]] = relationship(back_populates="category")
+
+
 class Product(Base):
     __tablename__ = "products"
 
-    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(128))
-    type: Mapped[str] = mapped_column(String(16))  # key | file | code
     price: Mapped[float] = mapped_column(Float)
     desc: Mapped[str] = mapped_column(Text, default="")
+    delivery_content: Mapped[str] = mapped_column(Text, default="")
     cover: Mapped[str] = mapped_column(String(16), default="p1")
     cover_image: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
-    tag: Mapped[str] = mapped_column(String(64), default="")
     status: Mapped[str] = mapped_column(String(8), default="on")  # on | off
-    file_path: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
-    file_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    category_id: Mapped[Optional[int]] = mapped_column(ForeignKey("categories.id"), nullable=True)
+
+    category: Mapped[Optional["Category"]] = relationship(back_populates="products")
 
 
 class Order(Base):
@@ -63,7 +87,7 @@ class OrderItem(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     order_id: Mapped[str] = mapped_column(String(64), ForeignKey("orders.id"))
-    product_id: Mapped[str] = mapped_column(String(64))
+    product_id: Mapped[int] = mapped_column(Integer)
     name: Mapped[str] = mapped_column(String(128))
     price: Mapped[float] = mapped_column(Float)
 
@@ -75,7 +99,7 @@ class Delivery(Base):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     order_id: Mapped[str] = mapped_column(String(64), ForeignKey("orders.id"))
-    product_id: Mapped[str] = mapped_column(String(64))
+    product_id: Mapped[int] = mapped_column(Integer)
     product_name: Mapped[str] = mapped_column(String(128))
     payload: Mapped[str] = mapped_column(Text)
     file_path: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)

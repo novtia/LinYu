@@ -1,29 +1,35 @@
-export type ProductType = 'key' | 'file' | 'code'
-
 export interface User {
   id: string
   username: string
+  email?: string | null
   role: 'admin' | 'user'
   disabled: boolean
   created_at: string
 }
 
-export interface Product {
-  id: string
+export interface Category {
+  id: number
   name: string
-  type: ProductType
+  sort_order: number
+  enabled: boolean
+  created_at: string
+}
+
+export interface Product {
+  id: number
+  name: string
   price: number
   desc: string
   cover: string
   cover_url?: string | null
-  tag: string
   status: 'on' | 'off'
-  file_name?: string | null
-  has_file?: boolean
+  category_id?: number | null
+  category_name?: string | null
+  delivery_content?: string | null
 }
 
 export interface CartItem {
-  id: string
+  id: number
   name: string
   price: number
   delivered?: boolean
@@ -41,7 +47,7 @@ export interface CartItem {
 }
 
 export interface OrderItem {
-  product_id: string
+  product_id: number
   name: string
   price: number
   payload?: string | null
@@ -71,7 +77,7 @@ export interface CheckoutResult {
 export interface Delivery {
   id: string
   order_id: string
-  product_id: string
+  product_id: number
   product_name: string
   payload: string
   file_name?: string | null
@@ -85,6 +91,7 @@ export interface PublicSettings {
   allowReg: boolean
   maintain: boolean
   name: string
+  debugMode?: boolean
 }
 
 export interface EzpayConfig {
@@ -101,6 +108,18 @@ export interface EzpayConfig {
   }
 }
 
+export interface AlipayPageConfig {
+  app_id: string
+  app_private_key: string
+  alipay_public_key: string
+  sandbox: boolean
+  notify_url: string
+  return_url: string
+  methods: {
+    alipay: boolean
+  }
+}
+
 export interface PaymentChannel {
   id: string
   name: string
@@ -108,7 +127,8 @@ export interface PaymentChannel {
   enabled: boolean
   config: Record<string, unknown> & {
     pid?: string
-    methods?: Partial<EzpayConfig['methods']>
+    app_id?: string
+    methods?: Partial<EzpayConfig['methods']> & Partial<AlipayPageConfig['methods']>
   }
   created_at: string
   updated_at: string
@@ -137,6 +157,17 @@ export interface PublicPaymentMethods {
   methods: PublicPaymentMethod[]
 }
 
+export interface MailSettings {
+  enabled: boolean
+  app_key: string
+  alias: string
+  reply_to: string
+  template_buyer: string
+  template_admin_order: string
+  template_reset: string
+  template_contact: string
+}
+
 export interface SysSettings {
   name: string
   email: string
@@ -144,6 +175,8 @@ export interface SysSettings {
   autoDeliver: boolean
   allowReg: boolean
   maintain: boolean
+  debugMode: boolean
+  mail: MailSettings
 }
 
 export interface SiteSettings {

@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
+from .alipay_page import AlipayPageProvider
 from .base import BasePaymentProvider
 from .ezpay import EzpayProvider
 
 _REGISTRY: List[BasePaymentProvider] = [
+    AlipayPageProvider(),
     EzpayProvider(),
 ]
 

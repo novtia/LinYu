@@ -12,6 +12,7 @@ from ..database import BASE_DIR
 UPLOAD_DIR = BASE_DIR / "uploads"
 COVER_DIR = UPLOAD_DIR / "covers"
 FILE_DIR = UPLOAD_DIR / "files"
+ASSET_DIR = UPLOAD_DIR / "assets"
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50MB
 MAX_COVER_BYTES = 5 * 1024 * 1024  # 5MB
 COVER_EXTENSIONS: Set[str] = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}
@@ -21,6 +22,7 @@ def ensure_upload_dir() -> Path:
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     COVER_DIR.mkdir(parents=True, exist_ok=True)
     FILE_DIR.mkdir(parents=True, exist_ok=True)
+    ASSET_DIR.mkdir(parents=True, exist_ok=True)
     return UPLOAD_DIR
 
 
@@ -67,6 +69,15 @@ async def save_cover(file: UploadFile, product_id: str) -> tuple:
     await _save_to(file, dest, MAX_COVER_BYTES)
     return f"covers/{stored}", original
 
+
+async def save_asset(file: UploadFile) -> tuple:
+    """Save markdown attachment; returns (relative_path, original_filename)."""
+    ensure_upload_dir()
+    original = safe_filename(file.filename or "file.bin")
+    stored = f"{uuid.uuid4().hex[:12]}_{original}"
+    dest = ASSET_DIR / stored
+    await _save_to(file, dest, MAX_UPLOAD_BYTES)
+    return f"assets/{stored}", original
 
 def resolve_stored_path(relative: str) -> Path:
     ensure_upload_dir()

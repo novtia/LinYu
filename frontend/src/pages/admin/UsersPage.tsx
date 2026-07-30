@@ -22,10 +22,11 @@ export function UsersPage() {
   }, [])
 
   return (
-    <PanelTable headers={['用户名', '角色', '注册时间', '状态', '操作']} empty={!users.length}>
+    <PanelTable headers={['用户名', '邮箱', '角色', '注册时间', '状态', '操作']} empty={!users.length}>
       {users.map((u) => (
         <tr key={u.id} className="border-t border-[var(--line)] hover:bg-[rgba(232,241,238,.4)]">
           <td className="whitespace-nowrap px-[18px] py-3.5">{u.username}</td>
+          <td className="max-w-[180px] truncate px-[18px] py-3.5 text-[0.85rem] text-ink-soft">{u.email || '—'}</td>
           <td className="whitespace-nowrap px-[18px] py-3.5">
             {u.role === 'admin' ? <Tag gold>管理员</Tag> : '用户'}
           </td>

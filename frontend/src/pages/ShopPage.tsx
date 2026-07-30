@@ -1,74 +1,29 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
 import { ProductMedia } from '../components/ProductMedia'
-import type { Product, ProductType } from '../types'
-
-const FILTERS: { id: 'all' | ProductType; label: string; full?: string; icon: ReactNode }[] = [
-  {
-    id: 'all',
-    label: '全部',
-    icon: (
-      <svg viewBox="0 0 24 24">
-        <rect x="4" y="4" width="7" height="7" rx="1.5" />
-        <rect x="13" y="4" width="7" height="7" rx="1.5" />
-        <rect x="4" y="13" width="7" height="7" rx="1.5" />
-        <rect x="13" y="13" width="7" height="7" rx="1.5" />
-      </svg>
-    ),
-  },
-  {
-    id: 'key',
-    label: '卡密',
-    full: ' / 激活码',
-    icon: (
-      <svg viewBox="0 0 24 24">
-        <circle cx="8" cy="14" r="3.5" />
-        <path d="M11 14h9v3M17 14v3" />
-      </svg>
-    ),
-  },
-  {
-    id: 'file',
-    label: '数字文件',
-    icon: (
-      <svg viewBox="0 0 24 24">
-        <path d="M7 3.5h7l4 4V20.5H7z" />
-        <path d="M14 3.5V8h4" />
-      </svg>
-    ),
-  },
-  {
-    id: 'code',
-    label: '兑换码',
-    icon: (
-      <svg viewBox="0 0 24 24">
-        <path d="M8 8l-4 4 4 4M16 8l4 4-4 4M13 6l-2 12" />
-      </svg>
-    ),
-  },
-]
+import type { Category, Product } from '../types'
 
 export function ShopPage() {
   const [products, setProducts] = useState<Product[]>([])
-  const [filter, setFilter] = useState<'all' | ProductType>('all')
+  const [categories, setCategories] = useState<Category[]>([])
+  const [filter, setFilter] = useState<number | 'all'>('all')
   const { addProduct } = useCart()
   const { showToast } = useToast()
   const { publicSettings } = useAuth()
 
   useEffect(() => {
     api.get<Product[]>('/api/products').then(setProducts).catch(() => setProducts([]))
+    api.get<Category[]>('/api/categories').then(setCategories).catch(() => setCategories([]))
   }, [])
 
   const visible = useMemo(
-    () => (filter === 'all' ? products : products.filter((p) => p.type === filter)),
+    () => (filter === 'all' ? products : products.filter((p) => p.category_id === filter)),
     [products, filter],
   )
-
-  const unit = (t: string) => (t === 'file' ? '包' : '码')
 
   return (
     <>
@@ -84,21 +39,26 @@ export function ShopPage() {
           <div className="wrap">
             <div className="mb-7 flex flex-wrap items-center gap-2 rounded-[14px] border border-[var(--line)] bg-white/62 p-3">
               <div className="flex flex-1 flex-wrap gap-2" role="tablist" aria-label="商品分类">
-                {FILTERS.map((f) => (
-                    <button
-                      key={f.id}
-                      type="button"
-                      onClick={() => setFilter(f.id)}
-                      className={`inline-flex h-[38px] items-center gap-2 rounded-[10px] px-3.5 text-[0.9rem] font-medium transition ${
-                        filter === f.id ? 'bg-ink text-white' : 'text-ink-soft hover:bg-paper hover:text-ink'
-                      }`}
-                    >
-                      <span className="grid h-[18px] w-[18px] place-items-center [&>svg]:h-4 [&>svg]:w-4 [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:stroke-[1.8]">
-                        {f.icon}
-                      </span>
-                      {f.label}
-                      {f.full && <span className="cat-full">{f.full}</span>}
-                    </button>
+                <button
+                  type="button"
+                  onClick={() => setFilter('all')}
+                  className={`inline-flex h-[38px] items-center gap-2 rounded-[10px] px-3.5 text-[0.9rem] font-medium transition ${
+                    filter === 'all' ? 'bg-ink text-white' : 'text-ink-soft hover:bg-paper hover:text-ink'
+                  }`}
+                >
+                  全部
+                </button>
+                {categories.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setFilter(c.id)}
+                    className={`inline-flex h-[38px] items-center gap-2 rounded-[10px] px-3.5 text-[0.9rem] font-medium transition ${
+                      filter === c.id ? 'bg-ink text-white' : 'text-ink-soft hover:bg-paper hover:text-ink'
+                    }`}
+                  >
+                    {c.name}
+                  </button>
                 ))}
               </div>
             </div>
@@ -111,7 +71,7 @@ export function ShopPage() {
                   style={{ animation: `riseIn .7s var(--ease) both`, animationDelay: `${(i % 3) * 0.08}s` }}
                 >
                   <Link to={`/product/${p.id}`} className="block overflow-hidden">
-                    <ProductMedia cover={p.cover} coverUrl={p.cover_url} tag={p.tag} />
+                    <ProductMedia cover={p.cover} coverUrl={p.cover_url} tag={p.category_name || undefined} />
                   </Link>
                   <div className="flex flex-1 flex-col gap-2.5 p-5 pb-[18px]">
                     <Link to={`/product/${p.id}`}>
@@ -121,7 +81,6 @@ export function ShopPage() {
                     <div className="mt-1 flex items-center justify-between gap-3">
                       <div className="font-[family-name:var(--font-display)] text-[1.35rem] font-bold tracking-tight">
                         ¥{p.price}
-                        <small className="ml-0.5 text-[0.78rem] font-medium text-ink-mute">/{unit(p.type)}</small>
                       </div>
                       <div className="flex gap-2">
                         <Link
@@ -147,6 +106,10 @@ export function ShopPage() {
                 </article>
               ))}
             </div>
+
+            {!visible.length && (
+              <div className="mt-10 text-center text-ink-mute">暂无商品</div>
+            )}
           </div>
         </section>
 
@@ -158,14 +121,14 @@ export function ShopPage() {
                   付款即发，买得放心
                 </h2>
                 <p className="text-ink-soft leading-relaxed">
-                  卡密、兑换码、数字文件一站选购。支付成功后内容会立刻送到你的订单，随时查看、随时下载。
+                  虚拟商品一站选购。支付成功后内容会立刻送到你的订单，随时查看、随时下载。
                 </p>
               </div>
               <ul className="grid gap-3">
                 {[
                   '支付成功立即发货，无需等待人工处理',
-                  '卡密与兑换码仅你可见，隐私有保障',
-                  '已购文件可在「我的订单」随时下载',
+                  '发货内容仅你可见，隐私有保障',
+                  '已购内容可在「我的订单」随时查看',
                 ].map((t) => (
                   <li key={t} className="flex items-center gap-3 text-[0.95rem] text-ink-soft">
                     <i className="grid h-7 w-7 place-items-center rounded-full bg-[rgba(15,110,92,.12)] text-teal">
@@ -188,6 +151,7 @@ export function ShopPage() {
           <div className="flex gap-4">
             <a href="#shop">商品</a>
             <a href="#trust">保障</a>
+            <Link to="/contact">联系我们</Link>
             <a href="#top">回到顶部</a>
           </div>
         </div>

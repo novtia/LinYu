@@ -3,27 +3,11 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ApiError, api } from '../../lib/api'
 import { useToast } from '../../context/ToastContext'
 import { CoverCropModal } from '../../components/CoverCropModal'
-import type { Product, ProductType } from '../../types'
+import { MarkdownEditor } from '../../components/MarkdownEditor'
+import type { Category, Product } from '../../types'
 
 const COVERS = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6']
-const TAG_HINT: Record<ProductType, string> = {
-  key: 'KEY · AUTO',
-  file: 'FILE · ZIP',
-  code: 'CODE · REDEEM',
-}
-const MAX_FILE_BYTES = 50 * 1024 * 1024
 const MAX_COVER_BYTES = 5 * 1024 * 1024
-
-function formatSize(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
-}
-
-function fileExt(name: string) {
-  const i = name.lastIndexOf('.')
-  return i >= 0 ? name.slice(i + 1).toUpperCase() : 'FILE'
-}
 
 function isImageName(name: string) {
   return /\.(png|jpe?g|gif|webp|bmp)$/i.test(name)
@@ -34,30 +18,24 @@ export function ProductFormPage() {
   const isEdit = Boolean(id)
   const navigate = useNavigate()
   const { showToast } = useToast()
-  const fileRef = useRef<HTMLInputElement>(null)
   const coverRef = useRef<HTMLInputElement>(null)
 
+  const [categories, setCategories] = useState<Category[]>([])
   const [form, setForm] = useState({
-    id: '',
     name: '',
-    type: 'key' as ProductType,
     price: '',
     cover: 'p1',
     cover_url: '' as string,
-    tag: '',
     desc: '',
+    delivery_content: '',
     status: 'on',
-    file_name: '',
-    has_file: false,
+    category_id: '' as string,
   })
-  const [pendingFile, setPendingFile] = useState<File | null>(null)
   const [pendingCover, setPendingCover] = useState<File | null>(null)
-  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null)
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(isEdit)
-  const [draggingFile, setDraggingFile] = useState(false)
   const [draggingCover, setDraggingCover] = useState(false)
   const [cropSrc, setCropSrc] = useState<string | null>(null)
   const [cropName, setCropName] = useState('cover.jpg')
@@ -67,16 +45,6 @@ export function ProductFormPage() {
       if (cropSrc) URL.revokeObjectURL(cropSrc)
     }
   }, [cropSrc])
-
-  useEffect(() => {
-    if (!pendingFile || !isImageName(pendingFile.name)) {
-      setFilePreviewUrl(null)
-      return
-    }
-    const url = URL.createObjectURL(pendingFile)
-    setFilePreviewUrl(url)
-    return () => URL.revokeObjectURL(url)
-  }, [pendingFile])
 
   useEffect(() => {
     if (!pendingCover) {
@@ -89,39 +57,31 @@ export function ProductFormPage() {
   }, [pendingCover])
 
   useEffect(() => {
+    api
+      .get<Category[]>('/api/categories/admin')
+      .then(setCategories)
+      .catch(() => setCategories([]))
+  }, [])
+
+  useEffect(() => {
     if (!id) return
     api
       .get<Product>(`/api/products/admin/${id}`)
       .then((p) => {
         setForm({
-          id: p.id,
           name: p.name,
-          type: p.type,
           price: String(p.price),
           cover: p.cover || 'p1',
           cover_url: p.cover_url || '',
-          tag: p.tag,
           desc: p.desc,
+          delivery_content: p.delivery_content || '',
           status: p.status,
-          file_name: p.file_name || '',
-          has_file: !!p.has_file,
+          category_id: p.category_id != null ? String(p.category_id) : '',
         })
       })
       .catch((e) => setError(e instanceof ApiError ? e.message : '加载失败'))
       .finally(() => setLoading(false))
   }, [id])
-
-  function pickFile(file: File | null) {
-    if (!file) return
-    if (file.size > MAX_FILE_BYTES) {
-      setError('文件过大，最大 50MB')
-      return
-    }
-    setError('')
-    setPendingFile(file)
-    setForm((prev) => ({ ...prev, type: 'file', file_name: file.name }))
-    if (fileRef.current) fileRef.current.value = ''
-  }
 
   function pickCover(file: File | null) {
     if (!file) return
@@ -159,32 +119,23 @@ export function ProductFormPage() {
       setError('请填写完整且有效的信息')
       return
     }
-    if (form.id && !/^[a-zA-Z0-9_-]{2,64}$/.test(form.id)) {
-      setError('商品 ID 需为 2-64 位字母、数字、下划线或短横线')
-      return
-    }
-    if (form.type === 'file' && !form.has_file && !pendingFile) {
-      setError('数字文件商品请先选择要上传的文件')
-      return
-    }
     setSaving(true)
     setError('')
     try {
-      const saved = await api.post<Product>('/api/products', {
-        id: form.id.trim() || undefined,
+      const body = {
         name: form.name.trim(),
-        type: form.type,
         price,
         cover: form.cover,
-        tag: form.tag.trim() || undefined,
         desc: form.desc.trim(),
+        delivery_content: form.delivery_content,
         status: form.status,
-      })
+        category_id: form.category_id ? Number(form.category_id) : null,
+      }
+      const saved = isEdit
+        ? await api.put<Product>(`/api/products/${id}`, body)
+        : await api.post<Product>('/api/products', body)
       if (pendingCover) {
         await api.upload(`/api/products/${saved.id}/cover`, pendingCover)
-      }
-      if (pendingFile) {
-        await api.upload(`/api/products/${saved.id}/file`, pendingFile)
       }
       showToast(isEdit ? '商品已更新' : '商品已创建')
       navigate('/admin/products')
@@ -195,30 +146,14 @@ export function ProductFormPage() {
     }
   }
 
-  async function removeFile() {
-    if (!form.id || !isEdit) {
-      setPendingFile(null)
-      setForm({ ...form, has_file: false, file_name: '' })
-      return
-    }
-    try {
-      await api.delete(`/api/products/${form.id}/file`)
-      setPendingFile(null)
-      setForm({ ...form, has_file: false, file_name: '' })
-      showToast('已删除文件')
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : '删除失败')
-    }
-  }
-
   async function removeCover() {
-    if (!form.id || !isEdit || !form.cover_url) {
+    if (!isEdit || !form.cover_url) {
       setPendingCover(null)
       setForm({ ...form, cover_url: '' })
       return
     }
     try {
-      await api.delete(`/api/products/${form.id}/cover`)
+      await api.delete(`/api/products/${id}/cover`)
       setPendingCover(null)
       setForm({ ...form, cover_url: '' })
       showToast('已删除封面')
@@ -229,8 +164,6 @@ export function ProductFormPage() {
 
   if (loading) return <div className="text-ink-mute">加载中…</div>
 
-  const hasSelectedFile = Boolean(form.has_file || pendingFile)
-  const displayName = pendingFile ? pendingFile.name : form.file_name
   const coverSrc = coverPreviewUrl || form.cover_url || ''
 
   return (
@@ -238,7 +171,7 @@ export function ProductFormPage() {
       <div className="mb-5 flex items-center justify-between gap-3">
         <div>
           <h2 className="font-[family-name:var(--font-display)] text-xl font-bold">{isEdit ? '编辑商品' : '新增商品'}</h2>
-          <p className="mt-1 text-[0.85rem] text-ink-mute">支持上传封面图与数字源文件</p>
+          <p className="mt-1 text-[0.85rem] text-ink-mute">发货内容支持 Markdown，可插入图片与附件</p>
         </div>
         <Link to="/admin/products" className="text-[0.88rem] font-semibold text-teal hover:underline">
           返回列表
@@ -253,19 +186,8 @@ export function ProductFormPage() {
               className="h-11 rounded-xl border border-[var(--line-strong)] bg-white px-3.5"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="例如：Pro Suite 年卡激活码"
+              placeholder="例如：Pro Suite 年卡"
               required
-            />
-          </label>
-
-          <label className="grid gap-1.5">
-            <span className="text-[0.82rem] font-semibold text-ink-soft">商品 ID {isEdit ? '' : '（可选）'}</span>
-            <input
-              className="h-11 rounded-xl border border-[var(--line-strong)] bg-white px-3.5 font-[family-name:var(--font-mono)] text-[0.9rem] disabled:bg-paper"
-              value={form.id}
-              disabled={isEdit}
-              onChange={(e) => setForm({ ...form, id: e.target.value })}
-              placeholder="留空自动生成，如 ui-kit"
             />
           </label>
 
@@ -283,26 +205,22 @@ export function ProductFormPage() {
           </label>
 
           <label className="grid gap-1.5">
-            <span className="text-[0.82rem] font-semibold text-ink-soft">类型</span>
+            <span className="text-[0.82rem] font-semibold text-ink-soft">商品分类</span>
             <select
               className="h-11 rounded-xl border border-[var(--line-strong)] bg-white px-3"
-              value={form.type}
-              onChange={(e) => {
-                const type = e.target.value as ProductType
-                setForm({
-                  ...form,
-                  type,
-                  tag: form.tag && !Object.values(TAG_HINT).includes(form.tag) ? form.tag : TAG_HINT[type],
-                })
-              }}
+              value={form.category_id}
+              onChange={(e) => setForm({ ...form, category_id: e.target.value })}
             >
-              <option value="key">卡密</option>
-              <option value="file">文件</option>
-              <option value="code">兑换码</option>
+              <option value="">未分类</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}{c.enabled ? '' : '（已停用）'}
+                </option>
+              ))}
             </select>
           </label>
 
-          <label className="grid gap-1.5">
+          <label className="grid gap-1.5 md:col-span-2">
             <span className="text-[0.82rem] font-semibold text-ink-soft">上架状态</span>
             <select
               className="h-11 rounded-xl border border-[var(--line-strong)] bg-white px-3"
@@ -312,16 +230,6 @@ export function ProductFormPage() {
               <option value="on">在售</option>
               <option value="off">下架</option>
             </select>
-          </label>
-
-          <label className="grid gap-1.5 md:col-span-2">
-            <span className="text-[0.82rem] font-semibold text-ink-soft">标签</span>
-            <input
-              className="h-11 rounded-xl border border-[var(--line-strong)] bg-white px-3.5 font-[family-name:var(--font-mono)] text-[0.9rem]"
-              value={form.tag}
-              onChange={(e) => setForm({ ...form, tag: e.target.value })}
-              placeholder={TAG_HINT[form.type]}
-            />
           </label>
 
           <div className="md:col-span-2">
@@ -428,88 +336,18 @@ export function ProductFormPage() {
               className="min-h-28 rounded-xl border border-[var(--line-strong)] bg-white px-3.5 py-3"
               value={form.desc}
               onChange={(e) => setForm({ ...form, desc: e.target.value })}
-              placeholder="介绍交付方式、使用说明等"
+              placeholder="前台展示的商品介绍（支持纯文本）"
             />
           </label>
 
-          {(form.type === 'file' || form.has_file || pendingFile) && (
-            <div className="md:col-span-2">
-              <div className="mb-2 text-[0.82rem] font-semibold text-ink-soft">数字文件（最大 50MB）</div>
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={() => fileRef.current?.click()}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    fileRef.current?.click()
-                  }
-                }}
-                onDragOver={(e: DragEvent) => {
-                  e.preventDefault()
-                  setDraggingFile(true)
-                }}
-                onDragLeave={(e: DragEvent) => {
-                  e.preventDefault()
-                  setDraggingFile(false)
-                }}
-                onDrop={(e: DragEvent) => {
-                  e.preventDefault()
-                  setDraggingFile(false)
-                  pickFile(e.dataTransfer.files?.[0] || null)
-                }}
-                className={`cursor-pointer rounded-xl border-2 border-dashed px-4 py-7 text-center transition ${
-                  draggingFile
-                    ? 'border-teal bg-[rgba(15,110,92,.08)]'
-                    : 'border-[var(--line-strong)] bg-paper/60 hover:border-teal hover:bg-[rgba(15,110,92,.04)]'
-                }`}
-              >
-                <div className="mb-1 text-[0.95rem] font-semibold text-ink">拖拽文件到此处上传</div>
-                <div className="text-[0.82rem] text-ink-mute">也可点击选择本地文件</div>
-              </div>
-
-              {hasSelectedFile && (
-                <ul className="mt-3 grid gap-2">
-                  <li className="flex items-center gap-3 rounded-xl border border-[var(--line)] bg-white p-3">
-                    <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-lg bg-paper">
-                      {filePreviewUrl ? (
-                        <img src={filePreviewUrl} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="text-[0.65rem] font-bold tracking-wide text-teal">{fileExt(displayName)}</div>
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-semibold text-ink" title={displayName}>
-                        {displayName}
-                      </div>
-                      <div className="mt-1 text-[0.78rem] text-ink-mute">
-                        {pendingFile ? formatSize(pendingFile.size) : '已保存到服务器'}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className="shrink-0 rounded-lg border border-[var(--line)] px-3 py-1.5 text-[0.8rem] font-semibold text-danger hover:border-danger"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        removeFile()
-                      }}
-                    >
-                      移除
-                    </button>
-                  </li>
-                </ul>
-              )}
-
-              <input
-                ref={fileRef}
-                type="file"
-                className="hidden"
-                onChange={(e) => {
-                  pickFile(e.target.files?.[0] || null)
-                }}
-              />
-            </div>
-          )}
+          <MarkdownEditor
+            label="发货内容（Markdown）"
+            value={form.delivery_content}
+            onChange={(v) => setForm({ ...form, delivery_content: v })}
+            placeholder={'付款成功后买家可见，例如：\n\n## 激活码\n\n`XXXX-XXXX`\n\n[下载安装包](链接)'}
+            hint="支持 Markdown；点击「插入附件」上传文件或图片，链接会自动写入内容"
+            minHeightClass="min-h-56"
+          />
         </div>
 
         <div className="flex items-center justify-between gap-3 border-t border-[var(--line)] bg-paper px-5 py-4">

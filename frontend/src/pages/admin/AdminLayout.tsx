@@ -4,6 +4,7 @@ import {
   ChevronRight,
   ClipboardList,
   CreditCard,
+  FolderTree,
   Globe,
   LayoutDashboard,
   Package,
@@ -48,6 +49,7 @@ const NAV_GROUPS: NavGroup[] = [
     icon: Package,
     items: [
       { to: '/admin/products', label: '商品管理', short: '商品', icon: Package },
+      { to: '/admin/categories', label: '分类管理', short: '分类', icon: FolderTree },
       { to: '/admin/users', label: '用户管理', short: '用户', icon: Users },
     ],
   },
@@ -76,6 +78,7 @@ const TITLES: Record<string, string> = {
   '/admin': '概览',
   '/admin/products': '商品管理',
   '/admin/products/new': '新增商品',
+  '/admin/categories': '分类管理',
   '/admin/users': '用户管理',
   '/admin/orders': '订单管理',
   '/admin/deliveries': '发放记录',

@@ -10,11 +10,11 @@ interface AuthContextValue {
   logout: () => void
   refreshMe: () => Promise<void>
   refreshSettings: () => Promise<void>
-  openAuth: (tab?: 'login' | 'register') => void
+  openAuth: (tab?: 'login' | 'register' | 'reset') => void
   closeAuth: () => void
   authOpen: boolean
-  authTab: 'login' | 'register'
-  setAuthTab: (t: 'login' | 'register') => void
+  authTab: 'login' | 'register' | 'reset'
+  setAuthTab: (t: 'login' | 'register' | 'reset') => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -24,7 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [publicSettings, setPublicSettings] = useState<PublicSettings | null>(null)
   const [authOpen, setAuthOpen] = useState(false)
-  const [authTab, setAuthTab] = useState<'login' | 'register'>('login')
+  const [authTab, setAuthTab] = useState<'login' | 'register' | 'reset'>('login')
 
   const refreshSettings = useCallback(async () => {
     try {

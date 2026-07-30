@@ -15,6 +15,7 @@ class TokenOut(BaseModel):
 class UserOut(BaseModel):
     id: str
     username: str
+    email: Optional[str] = None
     role: str
     disabled: bool
     created_at: datetime
@@ -32,7 +33,35 @@ class LoginIn(BaseModel):
 
 class RegisterIn(BaseModel):
     username: str
+    email: str
     password: str
+    captcha_id: str
+    captcha: str
+
+
+class AccountUpdateIn(BaseModel):
+    current_password: str
+    username: Optional[str] = None
+    email: Optional[str] = None
+    new_password: Optional[str] = None
+
+
+class ForgotPasswordIn(BaseModel):
+    account: str  # username or email
+    captcha_id: str
+    captcha: str
+
+
+class ResetPasswordIn(BaseModel):
+    account: str
+    code: str
+    new_password: str
+
+
+class ContactIn(BaseModel):
+    name: str
+    email: str
+    message: str
     captcha_id: str
     captcha: str
 
@@ -42,50 +71,65 @@ class CaptchaOut(BaseModel):
     image: str
 
 
-class ProductOut(BaseModel):
-    id: str
+class CategoryOut(BaseModel):
+    id: int
     name: str
-    type: str
+    sort_order: int
+    enabled: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class CategoryIn(BaseModel):
+    name: str
+    sort_order: int = 0
+    enabled: bool = True
+
+
+class ProductOut(BaseModel):
+    id: int
+    name: str
     price: float
     desc: str
     cover: str
     cover_url: Optional[str] = None
-    tag: str
     status: str
-    file_name: Optional[str] = None
-    has_file: bool = False
+    category_id: Optional[int] = None
+    category_name: Optional[str] = None
+    delivery_content: Optional[str] = None
 
     class Config:
         from_attributes = True
 
     @classmethod
-    def from_orm_product(cls, p) -> "ProductOut":
+    def from_orm_product(cls, p, *, include_delivery: bool = False) -> "ProductOut":
         from .services.files import cover_public_url
 
+        cat = getattr(p, "category", None)
         return cls(
             id=p.id,
             name=p.name,
-            type=p.type,
             price=p.price,
-            desc=p.desc,
+            desc=p.desc or "",
             cover=p.cover or "p1",
             cover_url=cover_public_url(getattr(p, "cover_image", None)),
-            tag=p.tag,
             status=p.status,
-            file_name=p.file_name,
-            has_file=bool(p.file_path),
+            category_id=p.category_id,
+            category_name=cat.name if cat else None,
+            delivery_content=(p.delivery_content or "") if include_delivery else None,
         )
 
 
 class ProductIn(BaseModel):
-    id: Optional[str] = None
     name: str
-    type: str = "key"
     price: float
     desc: str = ""
+    delivery_content: str = ""
     cover: str = "p1"
-    tag: Optional[str] = None
     status: str = "on"
+    category_id: Optional[int] = None
 
 
 class CoverUploadOut(BaseModel):
@@ -93,21 +137,27 @@ class CoverUploadOut(BaseModel):
     message: str = "封面已上传"
 
 
+class AssetUploadOut(BaseModel):
+    url: str
+    file_name: str
+    message: str = "上传成功"
+
+
 class CartItemIn(BaseModel):
-    id: str
+    id: int
     name: str
     price: float
 
 
 class CheckoutIn(BaseModel):
     items: List[CartItemIn] = Field(min_length=1)
-    payment_method_id: str = Field(min_length=1, description="公开支付方式 ID：{channel_id}:{method}")
+    payment_method_id: str = Field(default="", description="公开支付方式 ID：{channel_id}:{method}；调试模式可留空")
 
 
 class DeliveryOut(BaseModel):
     id: str
     order_id: str
-    product_id: str
+    product_id: int
     product_name: str
     payload: str
     file_name: Optional[str] = None
@@ -119,7 +169,7 @@ class DeliveryOut(BaseModel):
 
 
 class OrderItemOut(BaseModel):
-    product_id: str
+    product_id: int
     name: str
     price: float
     payload: Optional[str] = None
@@ -154,6 +204,19 @@ class DashboardOut(BaseModel):
     recent_orders: List[OrderOut]
 
 
+class MailSettings(BaseModel):
+    """AokSend 邮件配置。模板变量见系统设置页说明。"""
+
+    enabled: bool = False
+    app_key: str = ""
+    alias: str = "领匣"
+    reply_to: str = ""
+    template_buyer: str = ""  # 买家发货通知
+    template_admin_order: str = ""  # 管理员新订单
+    template_reset: str = ""  # 找回密码
+    template_contact: str = ""  # 联系表单
+
+
 class SysSettings(BaseModel):
     name: str = "领匣"
     email: str = "support@lingxia.com"
@@ -161,12 +224,14 @@ class SysSettings(BaseModel):
     autoDeliver: bool = True
     allowReg: bool = True
     maintain: bool = False
+    debugMode: bool = False
+    mail: MailSettings = Field(default_factory=MailSettings)
 
 
 class SiteSettings(BaseModel):
     title: str = "领匣 · 虚拟商品在线售卖"
-    keywords: str = "虚拟商品,卡密,兑换码,自动发货"
-    desc: str = "卡密、兑换码与数字文件一站售卖。付款成功后自动发货，订单内随时查看。"
+    keywords: str = "虚拟商品,自动发货"
+    desc: str = "虚拟商品一站售卖。付款成功后自动发货，订单内随时查看。"
     notice: str = "欢迎选购。支付成功后将自动发货，内容可在「我的订单」查看。"
 
 
@@ -181,15 +246,11 @@ class PublicSettingsOut(BaseModel):
     allowReg: bool
     maintain: bool
     name: str
+    debugMode: bool = False
 
 
 class MessageOut(BaseModel):
     message: str
-
-
-class UploadOut(BaseModel):
-    file_name: str
-    has_file: bool = True
 
 
 TokenOut.model_rebuild()

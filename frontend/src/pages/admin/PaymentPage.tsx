@@ -6,6 +6,7 @@ import type { PaymentChannel } from '../../types'
 import { IconBtn, PanelTable, Tag } from './ProductsPage'
 
 const PROVIDER_LABEL: Record<string, string> = {
+  alipay: '支付宝电脑网站支付',
   ezpay: '易支付',
 }
 
@@ -49,7 +50,7 @@ export function PaymentPage() {
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-[0.88rem] text-ink-mute">管理支付渠道商，当前支持易支付页面跳转支付。</p>
+        <p className="text-[0.88rem] text-ink-mute">管理支付渠道商，支持支付宝官方电脑网站支付与易支付。</p>
         <Link
           to="/admin/payment/new"
           className="inline-flex h-9 items-center rounded-[10px] bg-ink px-3.5 text-[0.86rem] font-semibold text-white hover:bg-teal-deep"
@@ -59,7 +60,7 @@ export function PaymentPage() {
       </div>
 
       <PanelTable
-        headers={['名称', '渠道商', '商户 ID', '支付方式', '状态', '操作']}
+        headers={['名称', '渠道商', '商户标识', '支付方式', '状态', '操作']}
         empty={!channels.length}
         emptyText="暂无支付渠道，点击右上角添加"
       >
@@ -70,6 +71,7 @@ export function PaymentPage() {
             methods.wxpay ? '微信' : null,
             methods.qqpay ? 'QQ' : null,
           ].filter(Boolean)
+          const merchantId = String(ch.config?.app_id || ch.config?.pid || '—')
           return (
             <tr key={ch.id} className="border-t border-[var(--line)] hover:bg-[rgba(232,241,238,.4)]">
               <td className="whitespace-nowrap px-[18px] py-3.5">
@@ -85,7 +87,7 @@ export function PaymentPage() {
                 {PROVIDER_LABEL[ch.provider] || ch.provider}
               </td>
               <td className="whitespace-nowrap px-[18px] py-3.5 font-[family-name:var(--font-mono)] text-[0.85rem]">
-                {String(ch.config?.pid || '—')}
+                {merchantId}
               </td>
               <td className="px-[18px] py-3.5 text-[0.85rem] text-ink-soft">
                 {methodLabels.length ? methodLabels.join(' / ') : '—'}

@@ -24,11 +24,19 @@ export function AuthModal() {
   const [loginPass, setLoginPass] = useState('')
   const [loginCaptcha, setLoginCaptcha] = useState('')
   const [regUser, setRegUser] = useState('')
+  const [regEmail, setRegEmail] = useState('')
   const [regPass, setRegPass] = useState('')
   const [regPass2, setRegPass2] = useState('')
   const [regCaptcha, setRegCaptcha] = useState('')
+  const [resetAccount, setResetAccount] = useState('')
+  const [resetCode, setResetCode] = useState('')
+  const [resetPass, setResetPass] = useState('')
+  const [resetPass2, setResetPass2] = useState('')
+  const [resetCaptcha, setResetCaptcha] = useState('')
+  const [resetStep, setResetStep] = useState<'send' | 'confirm'>('send')
   const [loginError, setLoginError] = useState('')
   const [regError, setRegError] = useState('')
+  const [resetError, setResetError] = useState('')
   const [captcha, setCaptcha] = useState<CaptchaRes | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -46,6 +54,8 @@ export function AuthModal() {
       loadCaptcha()
       setLoginError('')
       setRegError('')
+      setResetError('')
+      if (authTab !== 'reset') setResetStep('send')
     }
   }, [authOpen, authTab])
 
@@ -90,6 +100,7 @@ export function AuthModal() {
     try {
       const res = await api.post<AuthRes>('/api/auth/register', {
         username: regUser.trim(),
+        email: regEmail.trim(),
         password: regPass,
         captcha_id: captcha.captcha_id,
         captcha: regCaptcha,
@@ -106,6 +117,57 @@ export function AuthModal() {
     }
   }
 
+  async function onSendResetCode(e: FormEvent) {
+    e.preventDefault()
+    if (!captcha) return
+    setSubmitting(true)
+    setResetError('')
+    try {
+      const res = await api.post<{ message: string }>('/api/auth/forgot-password', {
+        account: resetAccount.trim(),
+        captcha_id: captcha.captcha_id,
+        captcha: resetCaptcha,
+      })
+      showToast(res.message)
+      setResetStep('confirm')
+      setResetCaptcha('')
+      loadCaptcha()
+    } catch (err) {
+      setResetError(err instanceof ApiError ? err.message : '发送失败')
+      setResetCaptcha('')
+      loadCaptcha()
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function onConfirmReset(e: FormEvent) {
+    e.preventDefault()
+    if (resetPass !== resetPass2) {
+      setResetError('两次输入的密码不一致')
+      return
+    }
+    setSubmitting(true)
+    setResetError('')
+    try {
+      const res = await api.post<{ message: string }>('/api/auth/reset-password', {
+        account: resetAccount.trim(),
+        code: resetCode.trim(),
+        new_password: resetPass,
+      })
+      showToast(res.message)
+      setAuthTab('login')
+      setResetStep('send')
+      setResetCode('')
+      setResetPass('')
+      setResetPass2('')
+    } catch (err) {
+      setResetError(err instanceof ApiError ? err.message : '重置失败')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   if (!authOpen) return null
 
   return (
@@ -117,30 +179,30 @@ export function AuthModal() {
     >
       <div className="w-[min(420px,100%)] overflow-hidden rounded-[22px] border border-[var(--line)] bg-fog">
         <div className="flex items-center justify-between px-5 pt-5">
-          <div className="flex gap-1 rounded-[10px] bg-paper p-1">
-            <button
-              type="button"
-              className={`rounded-lg px-4 py-2 text-[0.9rem] font-semibold ${
-                authTab === 'login' ? 'bg-white text-ink shadow-sm' : 'text-ink-soft'
-              }`}
-              onClick={() => setAuthTab('login')}
-            >
-              登录
-            </button>
-            <button
-              type="button"
-              className={`rounded-lg px-4 py-2 text-[0.9rem] font-semibold ${
-                authTab === 'register' ? 'bg-white text-ink shadow-sm' : 'text-ink-soft'
-              }`}
-              onClick={() => setAuthTab('register')}
-            >
-              注册
-            </button>
+          <div className="flex flex-wrap gap-1 rounded-[10px] bg-paper p-1">
+            {(
+              [
+                ['login', '登录'],
+                ['register', '注册'],
+                ['reset', '找回密码'],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                className={`rounded-lg px-3 py-2 text-[0.86rem] font-semibold ${
+                  authTab === id ? 'bg-white text-ink shadow-sm' : 'text-ink-soft'
+                }`}
+                onClick={() => setAuthTab(id)}
+              >
+                {label}
+              </button>
+            ))}
           </div>
           <button
             type="button"
             onClick={closeAuth}
-            className="grid h-9 w-9 place-items-center rounded-[10px] border border-[var(--line)] bg-white"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] border border-[var(--line)] bg-white"
             aria-label="关闭"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -149,7 +211,7 @@ export function AuthModal() {
           </button>
         </div>
         <div className="p-5">
-          {authTab === 'login' ? (
+          {authTab === 'login' && (
             <form className="grid gap-3.5" onSubmit={onLogin} autoComplete="off">
               <Field label="用户名">
                 <input
@@ -170,25 +232,7 @@ export function AuthModal() {
                   required
                 />
               </Field>
-              <Field label="图形验证码">
-                <div className="grid grid-cols-[1fr_110px] gap-2.5">
-                  <input
-                    className="field-input"
-                    value={loginCaptcha}
-                    onChange={(e) => setLoginCaptcha(e.target.value)}
-                    placeholder="输入右侧字符"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={loadCaptcha}
-                    className="relative h-11 overflow-hidden rounded-xl border border-[var(--line-strong)] bg-paper"
-                    title="点击刷新验证码"
-                  >
-                    {captcha ? <img src={captcha.image} alt="验证码" className="h-full w-full object-cover" /> : null}
-                  </button>
-                </div>
-              </Field>
+              <CaptchaField value={loginCaptcha} onChange={setLoginCaptcha} captcha={captcha} onRefresh={loadCaptcha} />
               <div className="min-h-[1.2em] text-[0.82rem] text-danger">{loginError}</div>
               <button
                 type="submit"
@@ -197,9 +241,17 @@ export function AuthModal() {
               >
                 登录
               </button>
-              <div className="text-center text-[0.78rem] leading-relaxed text-ink-mute">还没有账号？切换到注册页创建</div>
+              <button
+                type="button"
+                className="text-center text-[0.78rem] text-teal hover:underline"
+                onClick={() => setAuthTab('reset')}
+              >
+                忘记密码？
+              </button>
             </form>
-          ) : (
+          )}
+
+          {authTab === 'register' && (
             <form className="grid gap-3.5" onSubmit={onRegister} autoComplete="off">
               <Field label="用户名">
                 <input
@@ -207,6 +259,16 @@ export function AuthModal() {
                   value={regUser}
                   onChange={(e) => setRegUser(e.target.value)}
                   placeholder="3-16 位字母、数字或下划线"
+                  required
+                />
+              </Field>
+              <Field label="邮箱">
+                <input
+                  className="field-input"
+                  type="email"
+                  value={regEmail}
+                  onChange={(e) => setRegEmail(e.target.value)}
+                  placeholder="用于收货通知与找回密码"
                   required
                 />
               </Field>
@@ -230,25 +292,7 @@ export function AuthModal() {
                   required
                 />
               </Field>
-              <Field label="图形验证码">
-                <div className="grid grid-cols-[1fr_110px] gap-2.5">
-                  <input
-                    className="field-input"
-                    value={regCaptcha}
-                    onChange={(e) => setRegCaptcha(e.target.value)}
-                    placeholder="输入右侧字符"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={loadCaptcha}
-                    className="relative h-11 overflow-hidden rounded-xl border border-[var(--line-strong)] bg-paper"
-                    title="点击刷新验证码"
-                  >
-                    {captcha ? <img src={captcha.image} alt="验证码" className="h-full w-full object-cover" /> : null}
-                  </button>
-                </div>
-              </Field>
+              <CaptchaField value={regCaptcha} onChange={setRegCaptcha} captcha={captcha} onRefresh={loadCaptcha} />
               <div className="min-h-[1.2em] text-[0.82rem] text-danger">{regError}</div>
               <button
                 type="submit"
@@ -256,6 +300,83 @@ export function AuthModal() {
                 className="h-[46px] rounded-xl bg-teal font-semibold text-white hover:bg-teal-deep disabled:opacity-60"
               >
                 注册
+              </button>
+            </form>
+          )}
+
+          {authTab === 'reset' && resetStep === 'send' && (
+            <form className="grid gap-3.5" onSubmit={onSendResetCode} autoComplete="off">
+              <p className="text-[0.85rem] text-ink-mute">输入用户名或绑定邮箱，我们将发送 6 位验证码。</p>
+              <Field label="用户名或邮箱">
+                <input
+                  className="field-input"
+                  value={resetAccount}
+                  onChange={(e) => setResetAccount(e.target.value)}
+                  placeholder="用户名 / 邮箱"
+                  required
+                />
+              </Field>
+              <CaptchaField value={resetCaptcha} onChange={setResetCaptcha} captcha={captcha} onRefresh={loadCaptcha} />
+              <div className="min-h-[1.2em] text-[0.82rem] text-danger">{resetError}</div>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="h-[46px] rounded-xl bg-teal font-semibold text-white hover:bg-teal-deep disabled:opacity-60"
+              >
+                {submitting ? '发送中…' : '发送验证码'}
+              </button>
+            </form>
+          )}
+
+          {authTab === 'reset' && resetStep === 'confirm' && (
+            <form className="grid gap-3.5" onSubmit={onConfirmReset} autoComplete="off">
+              <p className="text-[0.85rem] text-ink-mute">验证码已发送至绑定邮箱（15 分钟内有效）。</p>
+              <Field label="验证码">
+                <input
+                  className="field-input"
+                  value={resetCode}
+                  onChange={(e) => setResetCode(e.target.value)}
+                  placeholder="6 位数字"
+                  required
+                />
+              </Field>
+              <Field label="新密码">
+                <input
+                  className="field-input"
+                  type="password"
+                  value={resetPass}
+                  onChange={(e) => setResetPass(e.target.value)}
+                  placeholder="至少 6 位"
+                  required
+                />
+              </Field>
+              <Field label="确认新密码">
+                <input
+                  className="field-input"
+                  type="password"
+                  value={resetPass2}
+                  onChange={(e) => setResetPass2(e.target.value)}
+                  placeholder="再次输入新密码"
+                  required
+                />
+              </Field>
+              <div className="min-h-[1.2em] text-[0.82rem] text-danger">{resetError}</div>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="h-[46px] rounded-xl bg-teal font-semibold text-white hover:bg-teal-deep disabled:opacity-60"
+              >
+                {submitting ? '提交中…' : '重置密码'}
+              </button>
+              <button
+                type="button"
+                className="text-center text-[0.78rem] text-ink-mute hover:text-teal"
+                onClick={() => {
+                  setResetStep('send')
+                  loadCaptcha()
+                }}
+              >
+                重新发送验证码
               </button>
             </form>
           )}
@@ -278,5 +399,39 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <span className="text-[0.82rem] font-semibold text-ink-soft">{label}</span>
       {children}
     </label>
+  )
+}
+
+function CaptchaField({
+  value,
+  onChange,
+  captcha,
+  onRefresh,
+}: {
+  value: string
+  onChange: (v: string) => void
+  captcha: CaptchaRes | null
+  onRefresh: () => void
+}) {
+  return (
+    <Field label="图形验证码">
+      <div className="grid grid-cols-[1fr_110px] gap-2.5">
+        <input
+          className="field-input"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="输入右侧字符"
+          required
+        />
+        <button
+          type="button"
+          onClick={onRefresh}
+          className="relative h-11 overflow-hidden rounded-xl border border-[var(--line-strong)] bg-paper"
+          title="点击刷新验证码"
+        >
+          {captcha ? <img src={captcha.image} alt="验证码" className="h-full w-full object-cover" /> : null}
+        </button>
+      </div>
+    </Field>
   )
 }
