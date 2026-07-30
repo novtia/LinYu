@@ -155,12 +155,18 @@ export function ShopPage() {
             <div className="flex flex-col gap-8 rounded-[24px] border border-[var(--line)] bg-white/70 p-8 md:flex-row md:items-center md:justify-between md:p-10">
               <div className="max-w-md">
                 <h2 className="mb-3 font-[family-name:var(--font-display)] text-[clamp(1.6rem,3vw,2.1rem)] tracking-[-0.03em]">
-                  虚拟货也有交付保障
+                  付款即发，买得放心
                 </h2>
-                <p className="text-ink-soft leading-relaxed">演示页展示售卖与自动发货体验。正式环境可对接支付与库存 API。</p>
+                <p className="text-ink-soft leading-relaxed">
+                  卡密、兑换码、数字文件一站选购。支付成功后内容会立刻送到你的订单，随时查看、随时下载。
+                </p>
               </div>
               <ul className="grid gap-3">
-                {['付款成功即锁定库存，避免超卖', '卡密脱敏展示，仅买家可见完整内容', '文件链接可设有效期与下载次数'].map((t) => (
+                {[
+                  '支付成功立即发货，无需等待人工处理',
+                  '卡密与兑换码仅你可见，隐私有保障',
+                  '已购文件可在「我的订单」随时下载',
+                ].map((t) => (
                   <li key={t} className="flex items-center gap-3 text-[0.95rem] text-ink-soft">
                     <i className="grid h-7 w-7 place-items-center rounded-full bg-[rgba(15,110,92,.12)] text-teal">
                       <svg viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current stroke-[2]">

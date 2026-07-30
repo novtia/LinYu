@@ -51,10 +51,14 @@
     min-height: 100%;
     font-family: var(--font-body);
     color: var(--ink);
-    background:
+    background-color: #eef5f2;
+    background-image:
       radial-gradient(1200px 700px at 85% -10%, rgba(127, 212, 184, 0.35), transparent 55%),
       radial-gradient(900px 600px at -5% 20%, rgba(196, 165, 116, 0.18), transparent 50%),
-      linear-gradient(180deg, #f7fbf9 0%, var(--fog) 40%, #eef5f2 100%);
+      linear-gradient(180deg, #f7fbf9 0%, var(--fog) 42%, #eef5f2 100%);
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    background-size: auto, auto, 100% 100%;
     -webkit-font-smoothing: antialiased;
     overflow-x: hidden;
     overflow-y: auto;

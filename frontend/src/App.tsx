@@ -1,6 +1,7 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { CartProvider } from './context/CartContext'
+import { PurchaseResultProvider } from './context/PurchaseResultContext'
 import { ToastProvider } from './context/ToastContext'
 import { ShopLayout } from './components/ShopLayout'
 import { ShopPage } from './pages/ShopPage'
@@ -26,29 +27,31 @@ export default function App() {
       <AuthProvider>
         <CartProvider>
           <ToastProvider>
-            <Routes>
-              <Route element={<ShopLayout />}>
-                <Route path="/" element={<ShopPage />} />
-                <Route path="/product/:id" element={<ProductDetailPage />} />
-                <Route path="/checkout" element={<CheckoutPage />} />
-                <Route path="/orders" element={<OrdersListPage />} />
-                <Route path="/orders/:id" element={<OrderDetailPage />} />
-              </Route>
-              <Route path="/admin" element={<AdminLayout />}>
-                <Route index element={<DashboardPage />} />
-                <Route path="products" element={<ProductsPage />} />
-                <Route path="products/new" element={<ProductFormPage />} />
-                <Route path="products/:id/edit" element={<ProductFormPage />} />
-                <Route path="users" element={<UsersPage />} />
-                <Route path="orders" element={<OrdersPage />} />
-                <Route path="deliveries" element={<DeliveriesPage />} />
-                <Route path="payment" element={<PaymentPage />} />
-                <Route path="payment/new" element={<PaymentChannelFormPage />} />
-                <Route path="payment/:id" element={<PaymentChannelFormPage />} />
-                <Route path="system" element={<SystemPage />} />
-                <Route path="website" element={<WebsitePage />} />
-              </Route>
-            </Routes>
+            <PurchaseResultProvider>
+              <Routes>
+                <Route element={<ShopLayout />}>
+                  <Route path="/" element={<ShopPage />} />
+                  <Route path="/product/:id" element={<ProductDetailPage />} />
+                  <Route path="/checkout" element={<CheckoutPage />} />
+                  <Route path="/orders" element={<OrdersListPage />} />
+                  <Route path="/orders/:id" element={<OrderDetailPage />} />
+                </Route>
+                <Route path="/admin" element={<AdminLayout />}>
+                  <Route index element={<DashboardPage />} />
+                  <Route path="products" element={<ProductsPage />} />
+                  <Route path="products/new" element={<ProductFormPage />} />
+                  <Route path="products/:id/edit" element={<ProductFormPage />} />
+                  <Route path="users" element={<UsersPage />} />
+                  <Route path="orders" element={<OrdersPage />} />
+                  <Route path="deliveries" element={<DeliveriesPage />} />
+                  <Route path="payment" element={<PaymentPage />} />
+                  <Route path="payment/new" element={<PaymentChannelFormPage />} />
+                  <Route path="payment/:id" element={<PaymentChannelFormPage />} />
+                  <Route path="system" element={<SystemPage />} />
+                  <Route path="website" element={<WebsitePage />} />
+                </Route>
+              </Routes>
+            </PurchaseResultProvider>
           </ToastProvider>
         </CartProvider>
       </AuthProvider>

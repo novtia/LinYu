@@ -52,14 +52,6 @@ export function Topbar() {
           <span className="brand-mark" aria-hidden />
           领匣
         </Link>
-        <nav className="hidden items-center gap-7 md:flex" aria-label="主导航">
-          <Link to="/#shop" className="text-[0.92rem] font-medium text-ink-soft hover:text-ink">
-            商品
-          </Link>
-          <Link to="/#trust" className="text-[0.92rem] font-medium text-ink-soft hover:text-ink">
-            交付保障
-          </Link>
-        </nav>
         <div className="relative flex items-center gap-2.5">
           <div className="relative" ref={cartRef}>
             <button
@@ -110,7 +102,7 @@ export function Topbar() {
             {menuOpen && user && (
               <div
                 onClick={(e) => e.stopPropagation()}
-                className="absolute top-[calc(100%+10px)] right-0 z-45 w-[220px] rounded-[14px] border border-[var(--line)] bg-white p-2 shadow-[0_18px_40px_-28px_rgba(20,32,28,.35)]"
+                className="absolute top-[calc(100%+10px)] left-1/2 z-45 w-[220px] -translate-x-1/2 rounded-[14px] border border-[var(--line)] bg-white p-2 shadow-[0_18px_40px_-28px_rgba(20,32,28,.35)]"
               >
                 <div className="mb-1.5 border-b border-[var(--line)] px-3 py-2.5">
                   <strong className="block text-[0.95rem]">{user.username}</strong>

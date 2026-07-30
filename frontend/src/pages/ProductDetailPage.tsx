@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { ApiError, api } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
+import { usePurchaseResult } from '../context/PurchaseResultContext'
 import { useToast } from '../context/ToastContext'
 import { MarkdownContent } from '../components/MarkdownContent'
 import { PageBreadcrumb } from '../components/PageBreadcrumb'
@@ -44,6 +45,7 @@ export function ProductDetailPage() {
   const { addProduct } = useCart()
   const { user, openAuth, publicSettings } = useAuth()
   const { showToast } = useToast()
+  const { showPurchaseResult } = usePurchaseResult()
 
   useEffect(() => {
     if (!id) return
@@ -148,9 +150,16 @@ export function ProductDetailPage() {
         downloadUrl: d?.download_url,
         payload: d?.payload,
       })
-      showToast(payment ? `购买成功 · ${payment.label}` : '购买成功 · 内容已解锁')
+      showPurchaseResult({
+        status: 'success',
+        orderId: res.order.id,
+        message: payment ? `已通过 ${payment.label} 完成支付，内容已解锁。` : '支付完成，内容已解锁，可在订单详情中查看。',
+      })
     } catch (e) {
-      showToast(e instanceof ApiError ? e.message : '购买失败')
+      showPurchaseResult({
+        status: 'failure',
+        message: e instanceof ApiError ? e.message : '购买失败，请稍后重试。',
+      })
     } finally {
       setBuying(false)
     }

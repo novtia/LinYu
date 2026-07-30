@@ -84,14 +84,32 @@ export function OrderDetailPage() {
                   <strong className="text-[0.98rem]">{it.name}</strong>
                   <span className="font-semibold text-teal">¥{it.price}</span>
                 </div>
-                <div className="break-all rounded-xl bg-paper px-3.5 py-3 font-[family-name:var(--font-mono)] text-[0.82rem] text-ink">
-                  {it.payload || '未发放'}
-                </div>
-                <div className="mt-3 flex flex-wrap gap-3">
-                  {it.payload && !it.download_url && (
+                <div className="flex items-center gap-3 rounded-xl bg-paper px-3.5 py-3">
+                  <div
+                    className={`min-w-0 flex-1 font-[family-name:var(--font-mono)] text-[0.82rem] text-ink ${
+                      it.download_url ? 'truncate' : 'break-all'
+                    }`}
+                  >
+                    {it.download_url ? it.file_name || it.payload || '已购文件' : it.payload || '未发放'}
+                  </div>
+                  {it.download_url ? (
                     <button
                       type="button"
-                      className="text-[0.82rem] font-semibold text-teal hover:underline"
+                      className="shrink-0 text-[0.82rem] font-semibold text-teal hover:underline"
+                      onClick={async () => {
+                        try {
+                          await api.download(it.download_url!, it.file_name || it.payload || undefined)
+                        } catch (e) {
+                          showToast(e instanceof ApiError ? e.message : '下载失败')
+                        }
+                      }}
+                    >
+                      下载文件
+                    </button>
+                  ) : it.payload ? (
+                    <button
+                      type="button"
+                      className="shrink-0 text-[0.82rem] font-semibold text-teal hover:underline"
                       onClick={async () => {
                         try {
                           await navigator.clipboard.writeText(it.payload || '')
@@ -103,22 +121,7 @@ export function OrderDetailPage() {
                     >
                       复制
                     </button>
-                  )}
-                  {it.download_url && (
-                    <button
-                      type="button"
-                      className="text-[0.82rem] font-semibold text-teal hover:underline"
-                      onClick={async () => {
-                        try {
-                          await api.download(it.download_url!, it.file_name || it.payload || undefined)
-                        } catch (e) {
-                          showToast(e instanceof ApiError ? e.message : '下载失败')
-                        }
-                      }}
-                    >
-                      下载文件
-                    </button>
-                  )}
+                  ) : null}
                 </div>
               </div>
             ))}

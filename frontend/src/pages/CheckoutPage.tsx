@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { ApiError, api } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
+import { usePurchaseResult } from '../context/PurchaseResultContext'
 import { useToast } from '../context/ToastContext'
 import { PageBreadcrumb } from '../components/PageBreadcrumb'
 import { PaymentMethodPicker } from '../components/PaymentMethodPicker'
@@ -12,7 +13,7 @@ export function CheckoutPage() {
   const { items, replaceWithDelivered } = useCart()
   const { user, loading: authLoading, openAuth, publicSettings } = useAuth()
   const { showToast } = useToast()
-  const navigate = useNavigate()
+  const { showPurchaseResult } = usePurchaseResult()
 
   const pending = useMemo(() => items.filter((it) => !it.delivered), [items])
   const total = pending.reduce((s, it) => s + it.price, 0)
@@ -59,10 +60,18 @@ export function CheckoutPage() {
         items: pending.map((it) => ({ id: it.id, name: it.name, price: it.price })),
       })
       replaceWithDelivered([])
-      showToast(payment ? `支付成功 · ${payment.label}` : '支付成功 · 已自动发货')
-      navigate(`/orders/${res.order.id}`)
+      showPurchaseResult({
+        status: 'success',
+        orderId: res.order.id,
+        message: payment
+          ? `已通过 ${payment.label} 完成支付，商品将自动发货。`
+          : '支付完成，商品已自动发货，可在订单详情中查看。',
+      })
     } catch (e) {
-      showToast(e instanceof ApiError ? e.message : '结算失败')
+      showPurchaseResult({
+        status: 'failure',
+        message: e instanceof ApiError ? e.message : '结算失败，请稍后重试。',
+      })
     } finally {
       setSubmitting(false)
     }
