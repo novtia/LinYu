@@ -5,6 +5,7 @@ import { ToastProvider } from './context/ToastContext'
 import { ShopLayout } from './components/ShopLayout'
 import { ShopPage } from './pages/ShopPage'
 import { ProductDetailPage } from './pages/ProductDetailPage'
+import { CheckoutPage } from './pages/CheckoutPage'
 import { OrdersListPage } from './pages/OrdersListPage'
 import { OrderDetailPage } from './pages/OrderDetailPage'
 import { AdminLayout } from './pages/admin/AdminLayout'
@@ -15,6 +16,7 @@ import { UsersPage } from './pages/admin/UsersPage'
 import { OrdersPage } from './pages/admin/OrdersPage'
 import { DeliveriesPage } from './pages/admin/DeliveriesPage'
 import { PaymentPage } from './pages/admin/PaymentPage'
+import { PaymentChannelFormPage } from './pages/admin/PaymentChannelFormPage'
 import { SystemPage } from './pages/admin/SystemPage'
 import { WebsitePage } from './pages/admin/WebsitePage'
 
@@ -28,6 +30,7 @@ export default function App() {
               <Route element={<ShopLayout />}>
                 <Route path="/" element={<ShopPage />} />
                 <Route path="/product/:id" element={<ProductDetailPage />} />
+                <Route path="/checkout" element={<CheckoutPage />} />
                 <Route path="/orders" element={<OrdersListPage />} />
                 <Route path="/orders/:id" element={<OrderDetailPage />} />
               </Route>
@@ -40,6 +43,8 @@ export default function App() {
                 <Route path="orders" element={<OrdersPage />} />
                 <Route path="deliveries" element={<DeliveriesPage />} />
                 <Route path="payment" element={<PaymentPage />} />
+                <Route path="payment/new" element={<PaymentChannelFormPage />} />
+                <Route path="payment/:id" element={<PaymentChannelFormPage />} />
                 <Route path="system" element={<SystemPage />} />
                 <Route path="website" element={<WebsitePage />} />
               </Route>

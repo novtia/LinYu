@@ -57,6 +57,7 @@ const TITLES: Record<string, string> = {
   '/admin/orders': '订单管理',
   '/admin/deliveries': '发放记录',
   '/admin/payment': '支付接入',
+  '/admin/payment/new': '添加渠道',
   '/admin/system': '系统设置',
   '/admin/website': '网站设置',
 }
@@ -65,6 +66,9 @@ function isItemActive(path: string, item: NavItem) {
   if (item.end) return path === item.to
   if (item.to === '/admin/products') {
     return path === item.to || path.startsWith('/admin/products/')
+  }
+  if (item.to === '/admin/payment') {
+    return path === item.to || path.startsWith('/admin/payment/')
   }
   return path === item.to || path.startsWith(item.to + '/')
 }
@@ -79,6 +83,7 @@ function activeGroupId(path: string) {
 
 function pageTitle(path: string) {
   if (TITLES[path]) return TITLES[path]
+  if (path.startsWith('/admin/payment/') && path !== '/admin/payment/new') return '编辑渠道'
   if (path.includes('/edit')) return '编辑商品'
   return '控制台'
 }
@@ -89,6 +94,11 @@ function breadcrumbCrumbs(path: string) {
   const crumbs: { label: string; to?: string }[] = [{ label: '控制台', to: '/admin' }]
   if (group && group.id !== 'workspace') {
     crumbs.push({ label: group.title, to: group.items[0]?.to })
+  }
+  if (path.startsWith('/admin/payment/') && path !== '/admin/payment') {
+    crumbs.push({ label: '支付接入', to: '/admin/payment' })
+    crumbs.push({ label: title })
+    return crumbs
   }
   if (!(group?.id === 'workspace' && path === '/admin')) {
     crumbs.push({ label: title })

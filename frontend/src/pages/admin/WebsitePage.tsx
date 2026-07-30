@@ -3,7 +3,7 @@ import { api } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
 import type { Settings, SiteSettings } from '../../types'
-import { Field } from './PaymentPage'
+import { Field } from './FormBits'
 
 export function WebsitePage() {
   const { showToast } = useToast()

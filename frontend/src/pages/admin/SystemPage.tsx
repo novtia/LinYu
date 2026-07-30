@@ -3,7 +3,7 @@ import { api } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
 import type { Settings, SysSettings } from '../../types'
-import { Field, SwitchRow } from './PaymentPage'
+import { Field, SwitchRow } from './FormBits'
 
 export function SystemPage() {
   const { showToast } = useToast()

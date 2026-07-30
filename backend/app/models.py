@@ -89,6 +89,18 @@ class Settings(Base):
     site_json: Mapped[str] = mapped_column(Text, default="{}")
 
 
+class PaymentChannel(Base):
+    __tablename__ = "payment_channels"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(128))
+    provider: Mapped[str] = mapped_column(String(32), index=True)  # ezpay
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    config_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class Captcha(Base):
     __tablename__ = "captchas"
 

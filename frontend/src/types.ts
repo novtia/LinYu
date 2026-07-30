@@ -30,6 +30,14 @@ export interface CartItem {
   payload?: string
   file_name?: string | null
   download_url?: string | null
+  payment?: {
+    id: string
+    method: string
+    label: string
+    channel_id: string
+    channel_name: string
+    provider: string
+  } | null
 }
 
 export interface OrderItem {
@@ -78,6 +86,56 @@ export interface PaySettings {
   wechatMch: string
   wechatKey: string
   usdtAddr: string
+}
+
+export interface EzpayConfig {
+  gateway: string
+  pid: string
+  key: string
+  notify_url: string
+  return_url: string
+  sitename: string
+  methods: {
+    alipay: boolean
+    wxpay: boolean
+    qqpay: boolean
+  }
+}
+
+export interface PaymentChannel {
+  id: string
+  name: string
+  provider: string
+  enabled: boolean
+  config: Record<string, unknown> & {
+    pid?: string
+    methods?: Partial<EzpayConfig['methods']>
+  }
+  created_at: string
+  updated_at: string
+}
+
+export interface PaymentProvider {
+  id: string
+  name: string
+  desc: string
+  docs: string
+  default_config: Record<string, unknown>
+}
+
+/** 公开支付方式（结算页可选，不含密钥） */
+export interface PublicPaymentMethod {
+  id: string
+  method: 'alipay' | 'wxpay' | 'qqpay' | string
+  label: string
+  channel_id: string
+  channel_name: string
+  provider: string
+  provider_name: string
+}
+
+export interface PublicPaymentMethods {
+  methods: PublicPaymentMethod[]
 }
 
 export interface SysSettings {

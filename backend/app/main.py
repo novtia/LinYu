@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .database import Base, SessionLocal, engine
 from .migrate import migrate_schema
-from .routers import auth, captcha, deliveries, downloads, orders, products, settings, users
+from .routers import auth, captcha, deliveries, downloads, orders, payment, payment_channels, products, settings, users
 from .seed import seed_if_empty
 from .services.files import UPLOAD_DIR, ensure_upload_dir
 
@@ -54,6 +54,8 @@ app.include_router(users.router)
 app.include_router(deliveries.router)
 app.include_router(downloads.router)
 app.include_router(settings.router)
+app.include_router(payment_channels.router)
+app.include_router(payment.router)
 
 
 @app.get("/api/health")

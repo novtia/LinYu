@@ -135,11 +135,11 @@ export function ShopPage() {
                           className="h-10 rounded-xl bg-ink px-4 text-[0.88rem] font-semibold text-white transition hover:bg-teal-deep"
                           onClick={() => {
                             addProduct(p)
-                            showToast('已加入领取匣：' + p.name)
+                            showToast('已加入购物车：' + p.name)
                           }}
                         >
-                          <span className="buy-full">购买</span>
-                          <span className="buy-short">买</span>
+                          <span className="buy-full">加入购物车</span>
+                          <span className="buy-short">加购</span>
                         </button>
                       </div>
                     </div>

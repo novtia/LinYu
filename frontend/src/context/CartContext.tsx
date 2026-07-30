@@ -1,12 +1,13 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
-import type { CartItem, Product } from '../types'
+import type { CartItem, Product, PublicPaymentMethod } from '../types'
 
 interface CartContextValue {
   items: CartItem[]
   open: boolean
   openCart: () => void
   closeCart: () => void
-  addProduct: (p: Product) => void
+  toggleCart: () => void
+  addProduct: (p: Product, payment?: PublicPaymentMethod | null, options?: { openDrawer?: boolean }) => void
   removeAt: (index: number) => void
   markDelivered: (payloads: { id: string; payload: string }[]) => void
   clearUndelivered: () => void
@@ -19,9 +20,28 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([])
   const [open, setOpen] = useState(false)
 
-  const addProduct = useCallback((p: Product) => {
-    setItems((prev) => [...prev, { id: p.id, name: p.name, price: p.price, delivered: false, payload: '' }])
-    setOpen(true)
+  const addProduct = useCallback((p: Product, payment?: PublicPaymentMethod | null, options?: { openDrawer?: boolean }) => {
+    setItems((prev) => [
+      ...prev,
+      {
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        delivered: false,
+        payload: '',
+        payment: payment
+          ? {
+              id: payment.id,
+              method: payment.method,
+              label: payment.label,
+              channel_id: payment.channel_id,
+              channel_name: payment.channel_name,
+              provider: payment.provider,
+            }
+          : null,
+      },
+    ])
+    if (options?.openDrawer !== false) setOpen(true)
   }, [])
 
   const removeAt = useCallback((index: number) => {
@@ -49,19 +69,24 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setItems(next)
   }, [])
 
+  const openCart = useCallback(() => setOpen(true), [])
+  const closeCart = useCallback(() => setOpen(false), [])
+  const toggleCart = useCallback(() => setOpen((v) => !v), [])
+
   const value = useMemo(
     () => ({
       items,
       open,
-      openCart: () => setOpen(true),
-      closeCart: () => setOpen(false),
+      openCart,
+      closeCart,
+      toggleCart,
       addProduct,
       removeAt,
       markDelivered,
       clearUndelivered,
       replaceWithDelivered,
     }),
-    [items, open, addProduct, removeAt, markDelivered, clearUndelivered, replaceWithDelivered],
+    [items, open, openCart, closeCart, toggleCart, addProduct, removeAt, markDelivered, clearUndelivered, replaceWithDelivered],
   )
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>
