@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .database import Base, SessionLocal, engine
 from .migrate import migrate_schema
-from .routers import auth, captcha, categories, contact, deliveries, downloads, orders, pay, payment, payment_channels, products, settings, users
+from .routers import auth, captcha, categories, deliveries, downloads, orders, pay, payment, payment_channels, products, settings, users
 from .seed import seed_if_empty
 from .services.files import UPLOAD_DIR, ensure_upload_dir
 
@@ -59,7 +59,6 @@ app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 app.include_router(auth.router)
 app.include_router(captcha.router)
-app.include_router(contact.router)
 app.include_router(categories.router)
 app.include_router(products.router)
 app.include_router(orders.router)

@@ -151,7 +151,6 @@ export function ShopPage() {
           <div className="flex gap-4">
             <a href="#shop">商品</a>
             <a href="#trust">保障</a>
-            <Link to="/contact">联系我们</Link>
             <a href="#top">回到顶部</a>
           </div>
         </div>

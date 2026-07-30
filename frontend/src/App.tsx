@@ -7,7 +7,6 @@ import { ShopLayout } from './components/ShopLayout'
 import { ShopPage } from './pages/ShopPage'
 import { ProductDetailPage } from './pages/ProductDetailPage'
 import { CheckoutPage } from './pages/CheckoutPage'
-import { ContactPage } from './pages/ContactPage'
 import { OrdersListPage } from './pages/OrdersListPage'
 import { OrderDetailPage } from './pages/OrderDetailPage'
 import { AdminLayout } from './pages/admin/AdminLayout'
@@ -35,7 +34,6 @@ export default function App() {
                   <Route path="/" element={<ShopPage />} />
                   <Route path="/product/:id" element={<ProductDetailPage />} />
                   <Route path="/checkout" element={<CheckoutPage />} />
-                  <Route path="/contact" element={<ContactPage />} />
                   <Route path="/orders" element={<OrdersListPage />} />
                   <Route path="/orders/:id" element={<OrderDetailPage />} />
                 </Route>

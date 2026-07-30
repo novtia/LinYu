@@ -159,13 +159,14 @@ export interface PublicPaymentMethods {
 
 export interface MailSettings {
   enabled: boolean
-  app_key: string
-  alias: string
+  secret_id: string
+  secret_key: string
+  region: string
+  from_email: string
+  from_alias: string
   reply_to: string
   template_buyer: string
-  template_admin_order: string
   template_reset: string
-  template_contact: string
 }
 
 export interface SysSettings {

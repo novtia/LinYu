@@ -9,13 +9,14 @@ type TokenOut = { access_token: string; user: User }
 
 const EMPTY_MAIL: MailSettings = {
   enabled: false,
-  app_key: '',
-  alias: '领匣',
+  secret_id: '',
+  secret_key: '',
+  region: 'ap-guangzhou',
+  from_email: '',
+  from_alias: '领匣',
   reply_to: '',
   template_buyer: '',
-  template_admin_order: '',
   template_reset: '',
-  template_contact: '',
 }
 
 function normalizeSys(sys: SysSettings): SysSettings {
@@ -111,12 +112,7 @@ export function SystemPage() {
       <div className="overflow-hidden rounded-[18px] border border-[var(--line)] bg-white">
         <div className="grid gap-4 border-b border-[var(--line)] p-[18px] md:grid-cols-2">
           <Field label="站点名称" value={sys.name} onChange={(v) => setSys({ ...sys, name: v })} />
-          <Field
-            label="客服邮箱"
-            value={sys.email}
-            onChange={(v) => setSys({ ...sys, email: v })}
-            hint="接收新订单通知与联系表单留言"
-          />
+          <Field label="客服邮箱" value={sys.email} onChange={(v) => setSys({ ...sys, email: v })} />
           <div className="md:col-span-2">
             <Field label="通知 Webhook" value={sys.notify} onChange={(v) => setSys({ ...sys, notify: v })} />
           </div>
@@ -147,62 +143,79 @@ export function SystemPage() {
 
       <div className="overflow-hidden rounded-[18px] border border-[var(--line)] bg-white">
         <div className="border-b border-[var(--line)] px-[18px] py-3.5">
-          <h3 className="font-[family-name:var(--font-display)] text-[1.05rem] font-bold">邮件服务（AokSend）</h3>
+          <h3 className="font-[family-name:var(--font-display)] text-[1.05rem] font-bold">邮件服务（腾讯云 SES）</h3>
           <p className="mt-1 text-[0.82rem] text-ink-mute">
             接入{' '}
-            <a href="https://www.aoksend.com/api.html" target="_blank" rel="noreferrer" className="text-teal hover:underline">
-              AokSend API
+            <a
+              href="https://cloud.tencent.com/document/product/1288/51034"
+              target="_blank"
+              rel="noreferrer"
+              className="text-teal hover:underline"
+            >
+              腾讯云邮件推送
             </a>
-            ，在后台创建模板后把模板 ID 填到下方。
+            ：先验证发信域名、创建模板并审核通过，再填写下方配置。
           </p>
         </div>
         <SwitchRow
           title="启用邮件"
-          desc="关闭后不发送任何邮件（订单/找回密码/联系表单）"
+          desc="关闭后不发送任何邮件（发货通知 / 找回密码）"
           on={mail.enabled}
           onToggle={() => setMail({ enabled: !mail.enabled })}
         />
         <div className="grid items-start gap-4 border-b border-[var(--line)] p-[18px] md:grid-cols-2">
           <Field
-            label="App Key"
-            value={mail.app_key}
-            onChange={(v) => setMail({ app_key: v })}
+            label="SecretId"
+            value={mail.secret_id}
+            onChange={(v) => setMail({ secret_id: v })}
             type="password"
             autoComplete="off"
-            hint="AokSend 后台 API 密钥"
+            hint="访问管理 CAM 密钥"
           />
-          <Field label="发件人名称 alias" value={mail.alias} onChange={(v) => setMail({ alias: v })} />
-          <div className="md:col-span-2">
-            <Field
-              label="默认回复地址 reply_to"
-              value={mail.reply_to}
-              onChange={(v) => setMail({ reply_to: v })}
-              placeholder="可选"
-            />
-          </div>
+          <Field
+            label="SecretKey"
+            value={mail.secret_key}
+            onChange={(v) => setMail({ secret_key: v })}
+            type="password"
+            autoComplete="off"
+          />
+          <label className="grid grid-rows-[auto_auto_1.1em] gap-1.5 content-start">
+            <span className="text-[0.82rem] font-semibold text-ink-soft">地域 Region</span>
+            <select
+              className="box-border h-11 w-full rounded-xl border border-[var(--line-strong)] bg-white px-3.5 outline-none focus:border-teal"
+              value={mail.region || 'ap-guangzhou'}
+              onChange={(e) => setMail({ region: e.target.value })}
+            >
+              <option value="ap-guangzhou">ap-guangzhou（广州）</option>
+              <option value="ap-hongkong">ap-hongkong（香港）</option>
+            </select>
+            <span className="text-[0.75rem] leading-[1.1em] text-ink-mute">与控制台邮件推送地域一致</span>
+          </label>
+          <Field
+            label="发信地址"
+            value={mail.from_email}
+            onChange={(v) => setMail({ from_email: v })}
+            placeholder="noreply@your-domain.com"
+            hint="须为已验证发信域名下的地址"
+          />
+          <Field label="发件人显示名" value={mail.from_alias} onChange={(v) => setMail({ from_alias: v })} placeholder="领匣" />
+          <Field
+            label="回复地址 reply_to"
+            value={mail.reply_to}
+            onChange={(v) => setMail({ reply_to: v })}
+            placeholder="可选，建议填客服邮箱"
+          />
           <Field
             label="买家发货模板 ID"
             value={mail.template_buyer}
             onChange={(v) => setMail({ template_buyer: v })}
-            hint="变量：site_name, order_id, username, total, products, delivery_content"
-          />
-          <Field
-            label="管理员订单模板 ID"
-            value={mail.template_admin_order}
-            onChange={(v) => setMail({ template_admin_order: v })}
-            hint="变量：site_name, order_id, username, total, products, status"
+            hint="数字 ID；变量 {{site_name}} {{order_id}} {{username}} {{total}} {{products}} {{delivery_content}}"
           />
           <Field
             label="找回密码模板 ID"
             value={mail.template_reset}
             onChange={(v) => setMail({ template_reset: v })}
-            hint="变量：site_name, username, code"
-          />
-          <Field
-            label="联系表单模板 ID"
-            value={mail.template_contact}
-            onChange={(v) => setMail({ template_contact: v })}
-            hint="变量：site_name, name, email, message（收件人为客服邮箱）"
+            hint="数字 ID；变量 {{site_name}} {{username}} {{code}}"
           />
         </div>
         <div className="flex justify-end bg-paper px-[18px] py-3.5">

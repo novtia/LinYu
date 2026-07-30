@@ -58,14 +58,6 @@ class ResetPasswordIn(BaseModel):
     new_password: str
 
 
-class ContactIn(BaseModel):
-    name: str
-    email: str
-    message: str
-    captcha_id: str
-    captcha: str
-
-
 class CaptchaOut(BaseModel):
     captcha_id: str
     image: str
@@ -205,16 +197,17 @@ class DashboardOut(BaseModel):
 
 
 class MailSettings(BaseModel):
-    """AokSend 邮件配置。模板变量见系统设置页说明。"""
+    """腾讯云邮件推送（SES）配置。模板变量见系统设置页说明。"""
 
     enabled: bool = False
-    app_key: str = ""
-    alias: str = "领匣"
+    secret_id: str = ""
+    secret_key: str = ""
+    region: str = "ap-guangzhou"  # ap-guangzhou | ap-hongkong
+    from_email: str = ""
+    from_alias: str = "领匣"
     reply_to: str = ""
-    template_buyer: str = ""  # 买家发货通知
-    template_admin_order: str = ""  # 管理员新订单
-    template_reset: str = ""  # 找回密码
-    template_contact: str = ""  # 联系表单
+    template_buyer: str = ""  # 买家发货通知（数字模板 ID）
+    template_reset: str = ""  # 找回密码（数字模板 ID）
 
 
 class SysSettings(BaseModel):
