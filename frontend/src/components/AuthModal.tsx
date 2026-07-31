@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ApiError, api } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
@@ -27,7 +27,9 @@ export function AuthModal() {
   const [regEmail, setRegEmail] = useState('')
   const [regPass, setRegPass] = useState('')
   const [regPass2, setRegPass2] = useState('')
-  const [regCaptcha, setRegCaptcha] = useState('')
+  const [regCode, setRegCode] = useState('')
+  const [regCodeCooldown, setRegCodeCooldown] = useState(0)
+  const [sendingRegCode, setSendingRegCode] = useState(false)
   const [resetAccount, setResetAccount] = useState('')
   const [resetCode, setResetCode] = useState('')
   const [resetPass, setResetPass] = useState('')
@@ -39,6 +41,7 @@ export function AuthModal() {
   const [resetError, setResetError] = useState('')
   const [captcha, setCaptcha] = useState<CaptchaRes | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const regCooldownTimer = useRef<ReturnType<typeof setInterval> | null>(null)
 
   async function loadCaptcha() {
     try {
@@ -58,6 +61,59 @@ export function AuthModal() {
       if (authTab !== 'reset') setResetStep('send')
     }
   }, [authOpen, authTab])
+
+  useEffect(() => {
+    return () => {
+      if (regCooldownTimer.current) clearInterval(regCooldownTimer.current)
+    }
+  }, [])
+
+  function startRegCodeCooldown(seconds = 60) {
+    setRegCodeCooldown(seconds)
+    if (regCooldownTimer.current) clearInterval(regCooldownTimer.current)
+    regCooldownTimer.current = setInterval(() => {
+      setRegCodeCooldown((n) => {
+        if (n <= 1) {
+          if (regCooldownTimer.current) clearInterval(regCooldownTimer.current)
+          regCooldownTimer.current = null
+          return 0
+        }
+        return n - 1
+      })
+    }, 1000)
+  }
+
+  async function onSendRegisterCode() {
+    if (sendingRegCode || regCodeCooldown > 0) return
+    if (publicSettings && !publicSettings.allowReg) {
+      setRegError('当前已关闭注册，请联系管理员')
+      return
+    }
+    const username = regUser.trim()
+    const email = regEmail.trim()
+    if (!username) {
+      setRegError('请先填写用户名')
+      return
+    }
+    if (!email) {
+      setRegError('请先填写邮箱')
+      return
+    }
+    setSendingRegCode(true)
+    setRegError('')
+    try {
+      const res = await api.post<{ message: string }>('/api/auth/send-register-code', {
+        email,
+        username,
+      })
+      showToast(res.message)
+      startRegCodeCooldown(60)
+    } catch (err) {
+      setRegError(err instanceof ApiError ? err.message : '验证码发送失败')
+    } finally {
+      setSendingRegCode(false)
+    }
+  }
 
   async function onLogin(e: FormEvent) {
     e.preventDefault()
@@ -86,9 +142,16 @@ export function AuthModal() {
 
   async function onRegister(e: FormEvent) {
     e.preventDefault()
-    if (!captcha) return
     if (publicSettings && !publicSettings.allowReg) {
       setRegError('当前已关闭注册，请联系管理员')
+      return
+    }
+    if (!regEmail.trim()) {
+      setRegError('请填写邮箱')
+      return
+    }
+    if (!regCode.trim()) {
+      setRegError('请填写邮箱验证码')
       return
     }
     if (regPass !== regPass2) {
@@ -102,16 +165,13 @@ export function AuthModal() {
         username: regUser.trim(),
         email: regEmail.trim(),
         password: regPass,
-        captcha_id: captcha.captcha_id,
-        captcha: regCaptcha,
+        code: regCode.trim(),
       })
       login(res.access_token, res.user)
       closeAuth()
       showToast('注册成功，已自动登录')
     } catch (err) {
       setRegError(err instanceof ApiError ? err.message : '注册失败')
-      setRegCaptcha('')
-      loadCaptcha()
     } finally {
       setSubmitting(false)
     }
@@ -268,7 +328,7 @@ export function AuthModal() {
                   type="email"
                   value={regEmail}
                   onChange={(e) => setRegEmail(e.target.value)}
-                  placeholder="用于收货通知与找回密码"
+                  placeholder="用于登录验证与发货通知"
                   required
                 />
               </Field>
@@ -292,7 +352,27 @@ export function AuthModal() {
                   required
                 />
               </Field>
-              <CaptchaField value={regCaptcha} onChange={setRegCaptcha} captcha={captcha} onRefresh={loadCaptcha} />
+              <Field label="邮箱验证码">
+                <div className="flex gap-2">
+                  <input
+                    className="field-input min-w-0 flex-1"
+                    value={regCode}
+                    onChange={(e) => setRegCode(e.target.value)}
+                    placeholder="6 位验证码"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    required
+                  />
+                  <button
+                    type="button"
+                    disabled={sendingRegCode || regCodeCooldown > 0}
+                    onClick={onSendRegisterCode}
+                    className="h-11 shrink-0 rounded-xl border border-[var(--line-strong)] bg-white px-3 text-[0.82rem] font-semibold text-ink hover:border-teal hover:text-teal disabled:opacity-60"
+                  >
+                    {regCodeCooldown > 0 ? `${regCodeCooldown}s` : sendingRegCode ? '发送中…' : '发送验证码'}
+                  </button>
+                </div>
+              </Field>
               <div className="min-h-[1.2em] text-[0.82rem] text-danger">{regError}</div>
               <button
                 type="submit"

@@ -167,6 +167,7 @@ export interface MailSettings {
   reply_to: string
   template_buyer: string
   template_reset: string
+  template_register: string
 }
 
 export interface SysSettings {

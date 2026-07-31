@@ -26,8 +26,9 @@ export function ProductDetailPage() {
   const [paymentRequired, setPaymentRequired] = useState(false)
   const [unlock, setUnlock] = useState<DeliveryUnlock | null>(null)
   const [buying, setBuying] = useState(false)
+  const [checkoutEmail, setCheckoutEmail] = useState('')
   const { addProduct } = useCart()
-  const { user, openAuth, publicSettings } = useAuth()
+  const { user, openAuth, publicSettings, refreshMe } = useAuth()
   const { showToast } = useToast()
   const { showPurchaseResult } = usePurchaseResult()
 
@@ -117,12 +118,20 @@ export function ProductDetailPage() {
       showToast('站点维护中，暂停下单')
       return
     }
+    const needEmail = !user.email
+    const email = checkoutEmail.trim()
+    if (needEmail && !email) {
+      showToast('请填写收货邮箱')
+      return
+    }
     setBuying(true)
     try {
       const res = await api.post<CheckoutResult>('/api/orders/checkout', {
         items: [{ id: product.id, name: product.name, price: product.price }],
         payment_method_id: payment?.id || '',
+        ...(needEmail ? { email } : {}),
       })
+      await refreshMe()
       const outcome = resolveCheckoutResult(res)
       if (outcome === 'paid') {
         const hit = res.order.items.find((it) => it.product_id === product.id && it.payload)
@@ -219,6 +228,20 @@ export function ProductDetailPage() {
                       onChange={setPayment}
                       onAvailabilityChange={setPaymentRequired}
                     />
+                  )}
+
+                  {user && !user.email && (
+                    <label className="mb-5 block">
+                      <span className="mb-1.5 block text-[0.82rem] font-semibold text-ink-soft">收货邮箱</span>
+                      <input
+                        className="field-input"
+                        type="email"
+                        value={checkoutEmail}
+                        onChange={(e) => setCheckoutEmail(e.target.value)}
+                        placeholder="用于发货通知，提交后写入账号"
+                        required
+                      />
+                    </label>
                   )}
 
                   <div className="grid grid-cols-2 gap-2.5">

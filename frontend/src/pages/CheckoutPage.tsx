@@ -12,7 +12,7 @@ import type { CheckoutResult, PublicPaymentMethod } from '../types'
 
 export function CheckoutPage() {
   const { items, replaceWithDelivered } = useCart()
-  const { user, loading: authLoading, openAuth, publicSettings } = useAuth()
+  const { user, loading: authLoading, openAuth, publicSettings, refreshMe } = useAuth()
   const { showToast } = useToast()
   const { showPurchaseResult } = usePurchaseResult()
 
@@ -22,6 +22,7 @@ export function CheckoutPage() {
   const [payment, setPayment] = useState<PublicPaymentMethod | null>(null)
   const [paymentRequired, setPaymentRequired] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [checkoutEmail, setCheckoutEmail] = useState('')
 
   useEffect(() => {
     if (!authLoading && !user) openAuth('login')
@@ -57,12 +58,20 @@ export function CheckoutPage() {
       showToast('站点维护中，暂停下单')
       return
     }
+    const needEmail = !!user && !user.email
+    const email = checkoutEmail.trim()
+    if (needEmail && !email) {
+      showToast('请填写收货邮箱')
+      return
+    }
     setSubmitting(true)
     try {
       const res = await api.post<CheckoutResult>('/api/orders/checkout', {
         items: pending.map((it) => ({ id: it.id, name: it.name, price: it.price })),
         payment_method_id: payment?.id || '',
+        ...(needEmail ? { email } : {}),
       })
+      await refreshMe()
       replaceWithDelivered([])
       const outcome = resolveCheckoutResult(res)
       if (outcome === 'paid') {
@@ -146,6 +155,20 @@ export function CheckoutPage() {
               <p className="mb-4 text-[0.78rem] text-ink-mute">
                 将使用：{payment.label} · {payment.channel_name}
               </p>
+            )}
+
+            {user && !user.email && (
+              <label className="mb-5 block">
+                <span className="mb-1.5 block text-[0.82rem] font-semibold text-ink-soft">收货邮箱</span>
+                <input
+                  className="field-input"
+                  type="email"
+                  value={checkoutEmail}
+                  onChange={(e) => setCheckoutEmail(e.target.value)}
+                  placeholder="用于发货通知，提交后写入账号"
+                  required
+                />
+              </label>
             )}
 
             <button

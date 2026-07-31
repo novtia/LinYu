@@ -19,17 +19,19 @@ from ..schemas import (
     MessageOut,
     RegisterIn,
     ResetPasswordIn,
+    SendRegisterCodeIn,
     TokenOut,
     UserOut,
 )
 from ..seed import load_settings
 from ..services.captcha import verify_captcha
 from ..services.delivery import random_id
-from ..services.mail import get_mail_settings, is_valid_email, send_password_reset_code
+from ..services.mail import get_mail_settings, is_valid_email, send_password_reset_code, send_register_code
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 EMAIL_CODE_TTL_MINUTES = 15
+REGISTER_CODE_COOLDOWN_SECONDS = 60
 
 
 @router.post("/login", response_model=TokenOut)
@@ -45,24 +47,106 @@ def login(body: LoginIn, db: Session = Depends(get_db)):
     return TokenOut(access_token=token, user=UserOut.model_validate(user))
 
 
+@router.post("/send-register-code", response_model=MessageOut)
+def send_register_email_code(body: SendRegisterCodeIn, db: Session = Depends(get_db)):
+    settings = load_settings(db)
+    if not settings["sys"].allowReg:
+        raise HTTPException(status_code=400, detail="当前已关闭注册，请联系管理员")
+    mail = get_mail_settings(db)
+    if not mail.enabled:
+        raise HTTPException(status_code=400, detail="邮件服务未启用，暂时无法注册")
+
+    username = (body.username or "").strip()
+    if username and not re.match(r"^[a-zA-Z0-9_]{3,16}$", username):
+        raise HTTPException(status_code=400, detail="用户名需为 3-16 位字母、数字或下划线")
+
+    email = (body.email or "").strip().lower()
+    if not is_valid_email(email):
+        raise HTTPException(status_code=400, detail="请填写有效的邮箱")
+    if db.query(User).filter(User.email == email).first():
+        raise HTTPException(status_code=400, detail="该邮箱已被注册")
+
+    cooldown_cut = datetime.utcnow() - timedelta(seconds=REGISTER_CODE_COOLDOWN_SECONDS)
+    recent = (
+        db.query(EmailCode)
+        .filter(
+            EmailCode.email == email,
+            EmailCode.purpose == "register",
+            EmailCode.created_at >= cooldown_cut,
+        )
+        .order_by(EmailCode.created_at.desc())
+        .first()
+    )
+    if recent:
+        raise HTTPException(status_code=400, detail="验证码发送过于频繁，请稍后再试")
+
+    code = "".join(random.choice(string.digits) for _ in range(6))
+    db.add(
+        EmailCode(
+            id="ec_" + random_id(),
+            email=email,
+            purpose="register",
+            code=code,
+            created_at=datetime.utcnow(),
+            used=False,
+        )
+    )
+    db.commit()
+
+    try:
+        send_register_code(
+            db,
+            to=email,
+            username=username,
+            code=code,
+            expire_minutes=EMAIL_CODE_TTL_MINUTES,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return MessageOut(message="验证码已发送，请查收邮箱")
+
+
 @router.post("/register", response_model=TokenOut)
 def register(body: RegisterIn, db: Session = Depends(get_db)):
     settings = load_settings(db)
     if not settings["sys"].allowReg:
         raise HTTPException(status_code=400, detail="当前已关闭注册，请联系管理员")
+    mail = get_mail_settings(db)
+    if not mail.enabled:
+        raise HTTPException(status_code=400, detail="邮件服务未启用，暂时无法注册")
+
     if not re.match(r"^[a-zA-Z0-9_]{3,16}$", body.username):
         raise HTTPException(status_code=400, detail="用户名需为 3-16 位字母、数字或下划线")
     email = (body.email or "").strip().lower()
     if not is_valid_email(email):
         raise HTTPException(status_code=400, detail="请填写有效的邮箱")
-    if len(body.password) < 6:
-        raise HTTPException(status_code=400, detail="密码至少 6 位")
-    if not verify_captcha(db, body.captcha_id, body.captcha):
-        raise HTTPException(status_code=400, detail="验证码错误，请重新输入")
-    if db.query(User).filter(User.username == body.username).first():
-        raise HTTPException(status_code=400, detail="用户名已被占用")
     if db.query(User).filter(User.email == email).first():
         raise HTTPException(status_code=400, detail="该邮箱已被注册")
+    if len(body.password) < 6:
+        raise HTTPException(status_code=400, detail="密码至少 6 位")
+    if db.query(User).filter(User.username == body.username).first():
+        raise HTTPException(status_code=400, detail="用户名已被占用")
+
+    code = (body.code or "").strip()
+    if not code:
+        raise HTTPException(status_code=400, detail="请填写邮箱验证码")
+    cutoff = datetime.utcnow() - timedelta(minutes=EMAIL_CODE_TTL_MINUTES)
+    row = (
+        db.query(EmailCode)
+        .filter(
+            EmailCode.email == email,
+            EmailCode.purpose == "register",
+            EmailCode.code == code,
+            EmailCode.used.is_(False),
+            EmailCode.created_at >= cutoff,
+        )
+        .order_by(EmailCode.created_at.desc())
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=400, detail="验证码无效或已过期")
+
+    row.used = True
     user = User(
         id="u_" + str(int(datetime.utcnow().timestamp() * 1000)),
         username=body.username,

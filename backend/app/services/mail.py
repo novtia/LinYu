@@ -14,8 +14,6 @@ from ..seed import load_settings
 logger = logging.getLogger(__name__)
 
 EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
-# 腾讯云模板变量总长度有限制，发货正文过长时截断
-_MAX_DELIVERY_CHARS = 480
 
 
 def is_valid_email(email: str) -> bool:
@@ -127,12 +125,6 @@ def notify_order_emails(db: Session, order: Order) -> None:
     settings = load_settings(db)
     site_name = settings["sys"].name or "领匣"
     products = "、".join(it.name for it in order.items) or "—"
-    delivery_parts = []
-    for d in order.deliveries:
-        delivery_parts.append(f"【{d.product_name}】\n{d.payload}")
-    delivery_content = "\n\n".join(delivery_parts) if delivery_parts else "请登录站点在订单中查看"
-    if len(delivery_content) > _MAX_DELIVERY_CHARS:
-        delivery_content = delivery_content[:_MAX_DELIVERY_CHARS] + "\n…（全文请登录网站订单详情查看）"
 
     user = db.query(User).filter(User.id == order.user_id).first()
     buyer_email = (user.email or "").strip() if user else ""
@@ -148,7 +140,8 @@ def notify_order_emails(db: Session, order: Order) -> None:
                 "username": order.username,
                 "total": f"{order.total:.2f}",
                 "products": products,
-                "delivery_content": delivery_content,
+                # 兼容旧模板变量；发货正文不再随邮件发送
+                "delivery_content": "",
             },
         )
 
@@ -168,5 +161,33 @@ def send_password_reset_code(db: Session, *, to: str, username: str, code: str) 
             "site_name": site_name,
             "username": username,
             "code": code,
+        },
+    )
+
+
+def send_register_code(
+    db: Session,
+    *,
+    to: str,
+    username: str,
+    code: str,
+    expire_minutes: int = 15,
+) -> None:
+    mail = get_mail_settings(db)
+    settings = load_settings(db)
+    if not mail.template_register.strip():
+        raise ValueError("未配置注册验证码邮件模板")
+    site_name = settings["sys"].name or "领匣"
+    send_tencent_ses(
+        mail,
+        to=to,
+        template_id=mail.template_register,
+        subject=f"【{site_name}】注册验证码",
+        data={
+            "site_name": site_name,
+            "username": username or to,
+            "email": to,
+            "code": code,
+            "expire_minutes": str(expire_minutes),
         },
     )

@@ -15,8 +15,25 @@ from ..payment.service import get_channel, list_public_methods, parse_config
 from ..schemas import CheckoutIn, CheckoutOut, DeliveryOut, OrderItemOut, OrderOut
 from ..seed import load_settings
 from ..services.fulfillment import fulfill_order
+from ..services.mail import is_valid_email
 
 router = APIRouter(prefix="/api/orders", tags=["orders"])
+
+
+def _bind_checkout_email(db: Session, user: User, submitted: str | None) -> str:
+    email = (submitted or user.email or "").strip().lower()
+    if not email:
+        raise HTTPException(status_code=400, detail="请填写收货邮箱")
+    if not is_valid_email(email):
+        raise HTTPException(status_code=400, detail="请填写有效的邮箱")
+    current = (user.email or "").strip().lower()
+    if email != current:
+        taken = db.query(User).filter(User.email == email, User.id != user.id).first()
+        if taken:
+            raise HTTPException(status_code=400, detail="该邮箱已被其他账号使用")
+        user.email = email
+        db.add(user)
+    return email
 
 
 def _delivery_out(d) -> DeliveryOut:
@@ -109,6 +126,8 @@ def checkout(
     settings = load_settings(db)
     if settings["sys"].maintain:
         raise HTTPException(status_code=400, detail="站点维护中，暂停下单")
+
+    _bind_checkout_email(db, user, body.email)
 
     debug_mode = bool(settings["sys"].debugMode)
     payment_method_id = (body.payment_method_id or "").strip()

@@ -35,8 +35,12 @@ class RegisterIn(BaseModel):
     username: str
     email: str
     password: str
-    captcha_id: str
-    captcha: str
+    code: str
+
+
+class SendRegisterCodeIn(BaseModel):
+    email: str
+    username: str = ""
 
 
 class AccountUpdateIn(BaseModel):
@@ -144,6 +148,7 @@ class CartItemIn(BaseModel):
 class CheckoutIn(BaseModel):
     items: List[CartItemIn] = Field(min_length=1)
     payment_method_id: str = Field(default="", description="公开支付方式 ID：{channel_id}:{method}；调试模式可留空")
+    email: Optional[str] = Field(default=None, description="收货邮箱；账号未绑定时必填")
 
 
 class DeliveryOut(BaseModel):
@@ -208,6 +213,7 @@ class MailSettings(BaseModel):
     reply_to: str = ""
     template_buyer: str = ""  # 买家发货通知（数字模板 ID）
     template_reset: str = ""  # 找回密码（数字模板 ID）
+    template_register: str = ""  # 注册验证码（数字模板 ID）
 
 
 class SysSettings(BaseModel):

@@ -17,6 +17,7 @@ const EMPTY_MAIL: MailSettings = {
   reply_to: '',
   template_buyer: '',
   template_reset: '',
+  template_register: '',
 }
 
 function normalizeSys(sys: SysSettings): SysSettings {
@@ -159,7 +160,7 @@ export function SystemPage() {
         </div>
         <SwitchRow
           title="启用邮件"
-          desc="关闭后不发送任何邮件（发货通知 / 找回密码）"
+          desc="关闭后不发送任何邮件（发货通知 / 注册验证 / 找回密码）"
           on={mail.enabled}
           onToggle={() => setMail({ enabled: !mail.enabled })}
         />
@@ -209,13 +210,19 @@ export function SystemPage() {
             label="买家发货模板 ID"
             value={mail.template_buyer}
             onChange={(v) => setMail({ template_buyer: v })}
-            hint="数字 ID；变量 {{site_name}} {{order_id}} {{username}} {{total}} {{products}} {{delivery_content}}"
+            hint="数字 ID；变量 {{site_name}} {{order_id}} {{username}} {{total}} {{products}}"
           />
           <Field
             label="找回密码模板 ID"
             value={mail.template_reset}
             onChange={(v) => setMail({ template_reset: v })}
             hint="数字 ID；变量 {{site_name}} {{username}} {{code}}"
+          />
+          <Field
+            label="注册验证码模板 ID"
+            value={mail.template_register}
+            onChange={(v) => setMail({ template_register: v })}
+            hint="数字 ID；变量 {{site_name}} {{username}} {{email}} {{code}} {{expire_minutes}}"
           />
         </div>
         <div className="flex justify-end bg-paper px-[18px] py-3.5">

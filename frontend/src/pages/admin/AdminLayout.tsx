@@ -332,7 +332,7 @@ export function AdminLayout() {
         </aside>
 
         <div className="flex min-h-0 min-w-0 flex-col">
-          <div className="flex shrink-0 items-center justify-between gap-4 border-b border-[var(--line)] bg-white/70 px-4 py-3 backdrop-blur md:px-6">
+          <div className="relative z-30 flex shrink-0 items-center justify-between gap-4 border-b border-[var(--line)] bg-white/70 px-4 py-3 backdrop-blur md:px-6">
             <nav aria-label="面包屑" className="min-w-0">
               <ol className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[0.9rem]">
                 {crumbs.map((crumb, i) => {
@@ -376,7 +376,7 @@ export function AdminLayout() {
                 {user.username.slice(0, 1).toUpperCase()}
               </button>
               {menuOpen && (
-                <div className="absolute top-[calc(100%+10px)] left-1/2 z-50 w-[220px] -translate-x-1/2 rounded-[14px] border border-[var(--line)] bg-white p-2 shadow-[0_18px_40px_-28px_rgba(20,32,28,.35)]">
+                <div className="absolute top-[calc(100%+10px)] right-0 z-40 w-[220px] rounded-[14px] border border-[var(--line)] bg-white p-2 shadow-[0_18px_40px_-28px_rgba(20,32,28,.55)]">
                   <div className="mb-1.5 border-b border-[var(--line)] px-3 py-2.5">
                     <strong className="block text-[0.95rem]">{user.username}</strong>
                     <span className="text-[0.78rem] text-ink-mute">管理员</span>
