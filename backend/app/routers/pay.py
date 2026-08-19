@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any, Dict, Optional
 from urllib.parse import urlencode
@@ -17,6 +18,8 @@ from ..payment.service import parse_config
 from ..services.fulfillment import fulfill_order
 
 router = APIRouter(prefix="/api/pay", tags=["pay"])
+
+logger = logging.getLogger("lingxia.pay")
 
 
 async def _collect_params(request: Request) -> Dict[str, Any]:
@@ -54,19 +57,38 @@ def _is_paid_status(provider: str, params: Dict[str, Any]) -> bool:
         return True
     # 部分易支付仅在成功时回调，无 status 字段
     if params.get("out_trade_no") and params.get("trade_no") and not status:
+        logger.info("回调无状态字段，按验签通过的成功通知处理：%s", params.get("out_trade_no"))
         return True
     return False
 
 
+_AMOUNT_FIELDS = {
+    "alipay": ("total_amount", "receipt_amount"),
+    "ezpay": ("money", "total_fee", "total_amount"),
+}
+_DEFAULT_AMOUNT_FIELDS = ("money", "total_amount", "total_fee", "amount")
+
+
 def _amount_ok(order: Order, provider: str, params: Dict[str, Any]) -> bool:
-    if provider != "alipay":
-        return True
-    raw = params.get("total_amount") or params.get("receipt_amount") or ""
+    """校验回调金额不低于订单金额，避免小额支付换取大额发货。"""
+    raw = ""
+    for field in _AMOUNT_FIELDS.get(provider, _DEFAULT_AMOUNT_FIELDS):
+        value = str(params.get(field) or "").strip()
+        if value:
+            raw = value
+            break
+    if not raw:
+        logger.warning("订单 %s 回调缺少金额字段，已拒绝：%s", order.id, sorted(params))
+        return False
     try:
         paid = round(float(raw), 2)
     except (TypeError, ValueError):
         return False
-    return paid == round(float(order.total), 2)
+    expected = round(float(order.total), 2)
+    if paid + 0.005 < expected:
+        logger.warning("订单 %s 回调金额不足：paid=%s expected=%s", order.id, paid, expected)
+        return False
+    return True
 
 
 def _process_payment(db: Session, params: Dict[str, Any], *, expect_provider: Optional[str] = None) -> bool:
@@ -102,6 +124,7 @@ def _process_payment(db: Session, params: Dict[str, Any], *, expect_provider: Op
 
     config = parse_config(channel.config_json)
     if not hasattr(adapter, "verify_notify") or not adapter.verify_notify(config, params):
+        logger.warning("订单 %s 回调验签失败（渠道 %s）", order.id, channel.provider)
         return False
 
     if expect_provider == "alipay":

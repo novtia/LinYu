@@ -18,6 +18,7 @@ const EMPTY_MAIL: MailSettings = {
   template_buyer: '',
   template_reset: '',
   template_register: '',
+  template_login: '',
 }
 
 function normalizeSys(sys: SysSettings): SysSettings {
@@ -42,7 +43,10 @@ export function SystemPage() {
     api
       .get<Settings>('/api/settings')
       .then((s) => setSys(normalizeSys(s.sys)))
-      .catch(() => setSys(null))
+      .catch((e) => {
+        setSys(null)
+        showToast(e instanceof ApiError ? e.message : '设置加载失败')
+      })
   }, [])
 
   useEffect(() => {
@@ -61,6 +65,18 @@ export function SystemPage() {
 
   function setMail(patch: Partial<MailSettings>) {
     setSys({ ...sys!, mail: { ...sys!.mail, ...patch } })
+  }
+
+  async function saveSys(successMessage: string) {
+    try {
+      // 返回值中的密钥为掩码，直接回写保持与后端一致
+      const saved = await api.put<Settings>('/api/settings/sys', sys)
+      setSys(normalizeSys(saved.sys))
+      await refreshSettings()
+      showToast(successMessage)
+    } catch (e) {
+      showToast(e instanceof ApiError ? e.message : '保存失败')
+    }
   }
 
   async function saveAccount() {
@@ -123,7 +139,7 @@ export function SystemPage() {
         <SwitchRow title="维护模式" desc="开启后暂停下单" on={sys.maintain} onToggle={() => setSys({ ...sys, maintain: !sys.maintain })} />
         <SwitchRow
           title="调试模式"
-          desc="开启后购买跳过真实支付，直接标记成功并发货（仅测试用）"
+          desc="仅管理员账号生效：跳过真实支付直接发货，普通买家不受影响（仅测试用）"
           on={!!sys.debugMode}
           onToggle={() => setSys({ ...sys, debugMode: !sys.debugMode })}
         />
@@ -131,11 +147,7 @@ export function SystemPage() {
           <button
             type="button"
             className="h-9 rounded-[10px] bg-ink px-4 text-[0.86rem] font-semibold text-white"
-            onClick={async () => {
-              await api.put('/api/settings/sys', sys)
-              await refreshSettings()
-              showToast('系统设置已保存')
-            }}
+            onClick={() => saveSys('系统设置已保存')}
           >
             保存
           </button>
@@ -160,7 +172,7 @@ export function SystemPage() {
         </div>
         <SwitchRow
           title="启用邮件"
-          desc="关闭后不发送任何邮件（发货通知 / 注册验证 / 找回密码）"
+          desc="关闭后不发送任何邮件（发货通知 / 注册验证 / 登录验证 / 找回密码）"
           on={mail.enabled}
           onToggle={() => setMail({ enabled: !mail.enabled })}
         />
@@ -171,7 +183,7 @@ export function SystemPage() {
             onChange={(v) => setMail({ secret_id: v })}
             type="password"
             autoComplete="off"
-            hint="访问管理 CAM 密钥"
+            hint="访问管理 CAM 密钥；掩码表示已保存，保持不变即不修改"
           />
           <Field
             label="SecretKey"
@@ -179,6 +191,7 @@ export function SystemPage() {
             onChange={(v) => setMail({ secret_key: v })}
             type="password"
             autoComplete="off"
+            hint="掩码表示已保存，保持不变即不修改"
           />
           <label className="grid grid-rows-[auto_auto_1.1em] gap-1.5 content-start">
             <span className="text-[0.82rem] font-semibold text-ink-soft">地域 Region</span>
@@ -224,16 +237,18 @@ export function SystemPage() {
             onChange={(v) => setMail({ template_register: v })}
             hint="数字 ID；变量 {{site_name}} {{username}} {{email}} {{code}} {{expire_minutes}}"
           />
+          <Field
+            label="登录验证码模板 ID"
+            value={mail.template_login}
+            onChange={(v) => setMail({ template_login: v })}
+            hint="数字 ID；变量 {{site_name}} {{username}} {{email}} {{code}} {{expire_minutes}}"
+          />
         </div>
         <div className="flex justify-end bg-paper px-[18px] py-3.5">
           <button
             type="button"
             className="h-9 rounded-[10px] bg-ink px-4 text-[0.86rem] font-semibold text-white"
-            onClick={async () => {
-              await api.put('/api/settings/sys', sys)
-              await refreshSettings()
-              showToast('邮件设置已保存')
-            }}
+            onClick={() => saveSys('邮件设置已保存')}
           >
             保存邮件设置
           </button>

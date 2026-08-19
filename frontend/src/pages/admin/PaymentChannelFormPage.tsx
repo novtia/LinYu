@@ -333,7 +333,7 @@ export function PaymentChannelFormPage() {
                 value={alipay.app_private_key}
                 onChange={(v) => setAlipay({ ...alipay, app_private_key: v })}
                 placeholder="支持带 BEGIN/END 头，或纯 Base64 正文"
-                hint="密钥工具生成的应用私钥，切勿泄露"
+                hint="已保存的私钥以掩码显示，保持不变即不修改；需更换时粘贴新私钥"
               />
               <TextArea
                 label="支付宝公钥"
@@ -407,6 +407,7 @@ export function PaymentChannelFormPage() {
                 onChange={(v) => setEzpay({ ...ezpay, key: v })}
                 type="password"
                 placeholder="用于 MD5 签名"
+                hint="已保存的密钥以掩码显示，保持不变即不修改"
               />
               <Field
                 label="异步通知 notify_url"

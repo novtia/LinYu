@@ -1,4 +1,12 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type FormEvent,
+  type MutableRefObject,
+  type SetStateAction,
+} from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ApiError, api } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
@@ -15,19 +23,27 @@ interface AuthRes {
   user: User
 }
 
+type LoginMode = 'password' | 'code'
+
 export function AuthModal() {
-  const { authOpen, authTab, setAuthTab, closeAuth, login, publicSettings } = useAuth()
+  const { authOpen, authTab, setAuthTab, closeAuth, login, publicSettings, sessionExpired } = useAuth()
   const { showToast } = useToast()
   const navigate = useNavigate()
 
+  const [loginMode, setLoginMode] = useState<LoginMode>('password')
   const [loginUser, setLoginUser] = useState('')
   const [loginPass, setLoginPass] = useState('')
+  const [loginEmail, setLoginEmail] = useState('')
+  const [loginCode, setLoginCode] = useState('')
   const [loginCaptcha, setLoginCaptcha] = useState('')
+  const [loginCodeCooldown, setLoginCodeCooldown] = useState(0)
+  const [sendingLoginCode, setSendingLoginCode] = useState(false)
   const [regUser, setRegUser] = useState('')
   const [regEmail, setRegEmail] = useState('')
   const [regPass, setRegPass] = useState('')
   const [regPass2, setRegPass2] = useState('')
   const [regCode, setRegCode] = useState('')
+  const [regCaptcha, setRegCaptcha] = useState('')
   const [regCodeCooldown, setRegCodeCooldown] = useState(0)
   const [sendingRegCode, setSendingRegCode] = useState(false)
   const [resetAccount, setResetAccount] = useState('')
@@ -42,6 +58,7 @@ export function AuthModal() {
   const [captcha, setCaptcha] = useState<CaptchaRes | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const regCooldownTimer = useRef<ReturnType<typeof setInterval> | null>(null)
+  const loginCooldownTimer = useRef<ReturnType<typeof setInterval> | null>(null)
 
   async function loadCaptcha() {
     try {
@@ -55,32 +72,45 @@ export function AuthModal() {
   useEffect(() => {
     if (authOpen) {
       loadCaptcha()
-      setLoginError('')
+      setLoginError(sessionExpired ? '登录已失效，请重新登录' : '')
       setRegError('')
       setResetError('')
       if (authTab !== 'reset') setResetStep('send')
     }
-  }, [authOpen, authTab])
+  }, [authOpen, authTab, sessionExpired])
 
   useEffect(() => {
     return () => {
       if (regCooldownTimer.current) clearInterval(regCooldownTimer.current)
+      if (loginCooldownTimer.current) clearInterval(loginCooldownTimer.current)
     }
   }, [])
 
-  function startRegCodeCooldown(seconds = 60) {
-    setRegCodeCooldown(seconds)
-    if (regCooldownTimer.current) clearInterval(regCooldownTimer.current)
-    regCooldownTimer.current = setInterval(() => {
-      setRegCodeCooldown((n) => {
+  function startCooldown(
+    setter: Dispatch<SetStateAction<number>>,
+    timerRef: MutableRefObject<ReturnType<typeof setInterval> | null>,
+    seconds = 60,
+  ) {
+    setter(seconds)
+    if (timerRef.current) clearInterval(timerRef.current)
+    timerRef.current = setInterval(() => {
+      setter((n) => {
         if (n <= 1) {
-          if (regCooldownTimer.current) clearInterval(regCooldownTimer.current)
-          regCooldownTimer.current = null
+          if (timerRef.current) clearInterval(timerRef.current)
+          timerRef.current = null
           return 0
         }
         return n - 1
       })
     }, 1000)
+  }
+
+  function startRegCodeCooldown(seconds = 60) {
+    startCooldown(setRegCodeCooldown, regCooldownTimer, seconds)
+  }
+
+  function startLoginCodeCooldown(seconds = 60) {
+    startCooldown(setLoginCodeCooldown, loginCooldownTimer, seconds)
   }
 
   async function onSendRegisterCode() {
@@ -99,33 +129,100 @@ export function AuthModal() {
       setRegError('请先填写邮箱')
       return
     }
+    if (!captcha || !regCaptcha.trim()) {
+      setRegError('请填写图形验证码')
+      return
+    }
     setSendingRegCode(true)
     setRegError('')
     try {
       const res = await api.post<{ message: string }>('/api/auth/send-register-code', {
         email,
         username,
+        captcha_id: captcha.captcha_id,
+        captcha: regCaptcha,
       })
       showToast(res.message)
       startRegCodeCooldown(60)
     } catch (err) {
       setRegError(err instanceof ApiError ? err.message : '验证码发送失败')
     } finally {
+      setRegCaptcha('')
+      loadCaptcha()
       setSendingRegCode(false)
+    }
+  }
+
+  async function onSendLoginCode() {
+    if (sendingLoginCode || loginCodeCooldown > 0) return
+    if (publicSettings && publicSettings.mailEnabled === false) {
+      setLoginError('邮件服务未启用，暂时无法使用验证码登录')
+      return
+    }
+    if (!captcha) return
+    const email = loginEmail.trim()
+    if (!email) {
+      setLoginError('请填写邮箱')
+      return
+    }
+    if (!loginCaptcha.trim()) {
+      setLoginError('请填写图形验证码')
+      return
+    }
+    setSendingLoginCode(true)
+    setLoginError('')
+    try {
+      const res = await api.post<{ message: string }>('/api/auth/send-login-code', {
+        email,
+        captcha_id: captcha.captcha_id,
+        captcha: loginCaptcha,
+      })
+      showToast(res.message)
+      startLoginCodeCooldown(60)
+      setLoginCaptcha('')
+      loadCaptcha()
+    } catch (err) {
+      setLoginError(err instanceof ApiError ? err.message : '验证码发送失败')
+      setLoginCaptcha('')
+      loadCaptcha()
+    } finally {
+      setSendingLoginCode(false)
     }
   }
 
   async function onLogin(e: FormEvent) {
     e.preventDefault()
-    if (!captcha) return
+    if (loginMode === 'password') {
+      if (!captcha) return
+      setSubmitting(true)
+      setLoginError('')
+      try {
+        const res = await api.post<AuthRes>('/api/auth/login', {
+          username: loginUser.trim(),
+          password: loginPass,
+          captcha_id: captcha.captcha_id,
+          captcha: loginCaptcha,
+        })
+        login(res.access_token, res.user)
+        closeAuth()
+        showToast('欢迎回来，' + res.user.username)
+        if (res.user.role === 'admin') navigate('/admin')
+      } catch (err) {
+        setLoginError(err instanceof ApiError ? err.message : '登录失败')
+        setLoginCaptcha('')
+        loadCaptcha()
+      } finally {
+        setSubmitting(false)
+      }
+      return
+    }
+
     setSubmitting(true)
     setLoginError('')
     try {
-      const res = await api.post<AuthRes>('/api/auth/login', {
-        username: loginUser.trim(),
-        password: loginPass,
-        captcha_id: captcha.captcha_id,
-        captcha: loginCaptcha,
+      const res = await api.post<AuthRes>('/api/auth/login-by-code', {
+        email: loginEmail.trim(),
+        code: loginCode.trim(),
       })
       login(res.access_token, res.user)
       closeAuth()
@@ -133,8 +230,6 @@ export function AuthModal() {
       if (res.user.role === 'admin') navigate('/admin')
     } catch (err) {
       setLoginError(err instanceof ApiError ? err.message : '登录失败')
-      setLoginCaptcha('')
-      loadCaptcha()
     } finally {
       setSubmitting(false)
     }
@@ -273,26 +368,105 @@ export function AuthModal() {
         <div className="p-5">
           {authTab === 'login' && (
             <form className="grid gap-3.5" onSubmit={onLogin} autoComplete="off">
-              <Field label="用户名">
-                <input
-                  className="field-input"
-                  value={loginUser}
-                  onChange={(e) => setLoginUser(e.target.value)}
-                  placeholder="请输入用户名"
-                  required
-                />
-              </Field>
-              <Field label="密码">
-                <input
-                  className="field-input"
-                  type="password"
-                  value={loginPass}
-                  onChange={(e) => setLoginPass(e.target.value)}
-                  placeholder="请输入密码"
-                  required
-                />
-              </Field>
-              <CaptchaField value={loginCaptcha} onChange={setLoginCaptcha} captcha={captcha} onRefresh={loadCaptcha} />
+              <div className="flex gap-1 rounded-[10px] bg-paper p-1">
+                {(
+                  [
+                    ['password', '密码登录'],
+                    ['code', '验证码登录'],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className={`flex-1 rounded-lg px-3 py-2 text-[0.84rem] font-semibold ${
+                      loginMode === id ? 'bg-white text-ink shadow-sm' : 'text-ink-soft'
+                    }`}
+                    onClick={() => {
+                      setLoginMode(id)
+                      setLoginError('')
+                      setLoginCaptcha('')
+                      loadCaptcha()
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {loginMode === 'password' ? (
+                <>
+                  <Field label="用户名或邮箱">
+                    <input
+                      className="field-input"
+                      value={loginUser}
+                      onChange={(e) => setLoginUser(e.target.value)}
+                      placeholder="用户名 / 邮箱"
+                      required
+                    />
+                  </Field>
+                  <Field label="密码">
+                    <input
+                      className="field-input"
+                      type="password"
+                      value={loginPass}
+                      onChange={(e) => setLoginPass(e.target.value)}
+                      placeholder="请输入密码"
+                      required
+                    />
+                  </Field>
+                  <CaptchaField
+                    value={loginCaptcha}
+                    onChange={setLoginCaptcha}
+                    captcha={captcha}
+                    onRefresh={loadCaptcha}
+                  />
+                </>
+              ) : (
+                <>
+                  <Field label="邮箱">
+                    <input
+                      className="field-input"
+                      type="email"
+                      value={loginEmail}
+                      onChange={(e) => setLoginEmail(e.target.value)}
+                      placeholder="已绑定的邮箱"
+                      required
+                    />
+                  </Field>
+                  <CaptchaField
+                    value={loginCaptcha}
+                    onChange={setLoginCaptcha}
+                    captcha={captcha}
+                    onRefresh={loadCaptcha}
+                  />
+                  <Field label="邮箱验证码">
+                    <div className="flex gap-2">
+                      <input
+                        className="field-input min-w-0 flex-1"
+                        value={loginCode}
+                        onChange={(e) => setLoginCode(e.target.value)}
+                        placeholder="6 位验证码"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        required
+                      />
+                      <button
+                        type="button"
+                        disabled={sendingLoginCode || loginCodeCooldown > 0}
+                        onClick={onSendLoginCode}
+                        className="h-11 shrink-0 rounded-xl border border-[var(--line-strong)] bg-white px-3 text-[0.82rem] font-semibold text-ink hover:border-teal hover:text-teal disabled:opacity-60"
+                      >
+                        {loginCodeCooldown > 0
+                          ? `${loginCodeCooldown}s`
+                          : sendingLoginCode
+                            ? '发送中…'
+                            : '发送验证码'}
+                      </button>
+                    </div>
+                  </Field>
+                </>
+              )}
+
               <div className="min-h-[1.2em] text-[0.82rem] text-danger">{loginError}</div>
               <button
                 type="submit"
@@ -352,6 +526,14 @@ export function AuthModal() {
                   required
                 />
               </Field>
+              <CaptchaField
+                value={regCaptcha}
+                onChange={setRegCaptcha}
+                captcha={captcha}
+                onRefresh={loadCaptcha}
+                required={false}
+                hint="发送验证码需填写"
+              />
               <Field label="邮箱验证码">
                 <div className="flex gap-2">
                   <input
@@ -487,21 +669,25 @@ function CaptchaField({
   onChange,
   captcha,
   onRefresh,
+  required = true,
+  hint,
 }: {
   value: string
   onChange: (v: string) => void
   captcha: CaptchaRes | null
   onRefresh: () => void
+  required?: boolean
+  hint?: string
 }) {
   return (
-    <Field label="图形验证码">
+    <Field label={hint ? `图形验证码（${hint}）` : '图形验证码'}>
       <div className="grid grid-cols-[1fr_110px] gap-2.5">
         <input
           className="field-input"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="输入右侧字符"
-          required
+          required={required}
         />
         <button
           type="button"

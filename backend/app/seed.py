@@ -1,29 +1,43 @@
 from __future__ import annotations
 
 import json
+import logging
+import os
 from datetime import datetime
 
 from sqlalchemy.orm import Session
 
-from .auth import hash_password
+from .auth import generate_password, hash_password
 from .models import Settings, User
 from .schemas import SiteSettings, SysSettings
+
+logger = logging.getLogger("lingxia.seed")
 
 
 def seed_if_empty(db: Session) -> None:
     """仅在空库时写入管理员与默认站点设置。"""
     if not db.query(User).filter(User.username == "admin").first():
+        password = (os.getenv("ADMIN_INITIAL_PASSWORD") or "").strip()
+        generated = not password
+        if generated:
+            password = generate_password()
         db.add(
             User(
                 id="u_admin",
                 username="admin",
-                password_hash=hash_password("admin123"),
+                password_hash=hash_password(password),
                 role="admin",
                 disabled=False,
                 created_at=datetime.utcnow(),
             )
         )
         db.commit()
+        if generated:
+            logger.warning(
+                "已创建管理员 admin，初始密码：%s （仅本次输出，请立即登录修改）", password
+            )
+        else:
+            logger.warning("已创建管理员 admin，初始密码取自 ADMIN_INITIAL_PASSWORD，请尽快修改")
 
     if not db.query(Settings).filter(Settings.id == 1).first():
         sys = SysSettings()

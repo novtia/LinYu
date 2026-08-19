@@ -29,6 +29,10 @@ class BasePaymentProvider(ABC):
         """渠道是否具备对外收款的最小配置（公开接口只返回 ready 的渠道方式）。"""
         return True
 
+    def secret_fields(self) -> List[str]:
+        """需要脱敏返回、留空即不修改的密钥字段。"""
+        return []
+
     def default_notify_path(self) -> str:
         return f"api/pay/{self.id}/notify"
 

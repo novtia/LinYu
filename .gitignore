@@ -13,12 +13,19 @@ __pycache__/
 venv/
 .env
 .env.*
+!.env.example
 
 # Local data & uploads
 *.db
 *.sqlite3
 backend/uploads/
 uploads/
+backups/
+
+# 部署产物与含凭据的本地配置（勿提交）
+_deploy/
+lingxia-deploy.zip
+.cursor/rules/server-deploy.mdc
 
 # Logs & editor
 logs/

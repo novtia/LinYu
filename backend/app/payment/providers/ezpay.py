@@ -88,6 +88,9 @@ class EzpayProvider(BasePaymentProvider):
         methods = (config or {}).get("methods") or {}
         return [code for code in METHOD_LABELS if methods.get(code)]
 
+    def secret_fields(self) -> List[str]:
+        return ["key"]
+
     def is_ready(self, config: Dict[str, Any]) -> bool:
         cfg = config or {}
         return bool(str(cfg.get("pid") or "").strip() and str(cfg.get("key") or "").strip())

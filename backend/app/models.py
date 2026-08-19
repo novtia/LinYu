@@ -18,6 +18,8 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(16), default="user")
     disabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    # 每次改密 / 重置密码自增，使旧 JWT 立即失效
+    token_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     orders: Mapped[List["Order"]] = relationship(back_populates="user")
@@ -32,6 +34,7 @@ class EmailCode(Base):
     code: Mapped[str] = mapped_column(String(16))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     used: Mapped[bool] = mapped_column(Boolean, default=False)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
 
 class Category(Base):
@@ -56,6 +59,9 @@ class Product(Base):
     delivery_content: Mapped[str] = mapped_column(Text, default="")
     cover: Mapped[str] = mapped_column(String(16), default="p1")
     cover_image: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    # 付费数字文件，仅经鉴权下载接口发放
+    file_path: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    file_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(8), default="on")  # on | off
     category_id: Mapped[Optional[int]] = mapped_column(ForeignKey("categories.id"), nullable=True)
 

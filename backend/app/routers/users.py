@@ -5,11 +5,11 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from ..auth import hash_password
+from ..auth import generate_password, hash_password
 from ..database import get_db
 from ..deps import get_admin_user
 from ..models import User
-from ..schemas import MessageOut, UserOut
+from ..schemas import ResetPasswordOut, UserOut
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -23,7 +23,7 @@ def list_users(
     return [UserOut.model_validate(u) for u in users]
 
 
-@router.post("/{username}/reset-password", response_model=MessageOut)
+@router.post("/{username}/reset-password", response_model=ResetPasswordOut)
 def reset_password(
     username: str,
     _: User = Depends(get_admin_user),
@@ -32,9 +32,15 @@ def reset_password(
     user = db.query(User).filter(User.username == username).first()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
-    user.password_hash = hash_password("123456")
+    password = generate_password()
+    user.password_hash = hash_password(password)
+    # 重置后该用户此前的登录态全部失效
+    user.token_version = (user.token_version or 0) + 1
     db.commit()
-    return MessageOut(message="已重置为 123456")
+    return ResetPasswordOut(
+        password=password,
+        message="已生成随机密码，仅本次显示，请立即转达用户并提醒其修改",
+    )
 
 
 @router.post("/{username}/toggle", response_model=UserOut)

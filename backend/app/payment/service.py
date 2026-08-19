@@ -20,6 +20,9 @@ from .schemas import (
 )
 
 
+SECRET_MASK = "********"
+
+
 def parse_config(raw: Optional[str]) -> Dict[str, Any]:
     try:
         data = json.loads(raw or "{}")
@@ -28,13 +31,46 @@ def parse_config(raw: Optional[str]) -> Dict[str, Any]:
         return {}
 
 
+def secret_fields(provider: str) -> List[str]:
+    adapter = get_provider(provider)
+    return list(adapter.secret_fields()) if adapter else []
+
+
+def mask_config(provider: str, config: Dict[str, Any]) -> Dict[str, Any]:
+    """管理端读取时脱敏密钥，避免密钥随接口反复外传。"""
+    masked = dict(config)
+    for field in secret_fields(provider):
+        if str(masked.get(field) or "").strip():
+            masked[field] = SECRET_MASK
+    return masked
+
+
+def keep_existing_secrets(
+    provider: str,
+    submitted: Optional[Dict[str, Any]],
+    current: Dict[str, Any],
+) -> Dict[str, Any]:
+    """提交为空或仍是掩码时，沿用库中已存密钥。"""
+    merged = dict(submitted or {})
+    for field in secret_fields(provider):
+        value = str(merged.get(field) or "").strip()
+        if value and value != SECRET_MASK:
+            continue
+        existing = current.get(field)
+        if existing:
+            merged[field] = existing
+        else:
+            merged.pop(field, None)
+    return merged
+
+
 def serialize_channel(ch: PaymentChannel) -> PaymentChannelOut:
     return PaymentChannelOut(
         id=ch.id,
         name=ch.name,
         provider=ch.provider,
         enabled=ch.enabled,
-        config=parse_config(ch.config_json),
+        config=mask_config(ch.provider, parse_config(ch.config_json)),
         created_at=ch.created_at,
         updated_at=ch.updated_at,
     )
@@ -79,12 +115,13 @@ def get_channel(db: Session, channel_id: str) -> PaymentChannel:
 def create_channel(db: Session, body: PaymentChannelIn) -> PaymentChannelOut:
     name = validate_channel_input(body)
     now = datetime.utcnow()
+    config = keep_existing_secrets(body.provider, body.config, {})
     ch = PaymentChannel(
         id="pay_" + random_id(),
         name=name,
         provider=body.provider,
         enabled=body.enabled,
-        config_json=json.dumps(normalize_channel_config(body.provider, body.config), ensure_ascii=False),
+        config_json=json.dumps(normalize_channel_config(body.provider, config), ensure_ascii=False),
         created_at=now,
         updated_at=now,
     )
@@ -97,10 +134,13 @@ def create_channel(db: Session, body: PaymentChannelIn) -> PaymentChannelOut:
 def update_channel(db: Session, channel_id: str, body: PaymentChannelIn) -> PaymentChannelOut:
     ch = get_channel(db, channel_id)
     name = validate_channel_input(body)
+    # 换渠道商时不沿用旧密钥
+    current = parse_config(ch.config_json) if ch.provider == body.provider else {}
+    config = keep_existing_secrets(body.provider, body.config, current)
     ch.name = name
     ch.provider = body.provider
     ch.enabled = body.enabled
-    ch.config_json = json.dumps(normalize_channel_config(body.provider, body.config), ensure_ascii=False)
+    ch.config_json = json.dumps(normalize_channel_config(body.provider, config), ensure_ascii=False)
     ch.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(ch)

@@ -1,9 +1,8 @@
-import { useToast } from '../context/ToastContext'
-import { MarkdownContent } from './MarkdownContent'
+import { Link } from 'react-router-dom'
 
 export type DeliveryUnlock = {
   unlocked: boolean
-  payload?: string | null
+  orderId?: string | null
 }
 
 type ProductDeliveryPanelProps = {
@@ -12,19 +11,9 @@ type ProductDeliveryPanelProps = {
 }
 
 export function ProductDeliveryPanel({ unlock, className = '' }: ProductDeliveryPanelProps) {
-  const { showToast } = useToast()
-
-  async function onCopy() {
-    if (!unlock.payload) return
-    try {
-      await navigator.clipboard.writeText(unlock.payload)
-      showToast('已复制到剪贴板')
-    } catch {
-      showToast('复制失败')
-    }
-  }
-
   if (unlock.unlocked) {
+    const href = unlock.orderId ? `/orders/${unlock.orderId}` : '/orders'
+
     return (
       <div className={`rounded-2xl border border-teal/25 bg-[rgba(15,110,92,.05)] p-4 ${className}`}>
         <div className="mb-3 flex items-center justify-between gap-2">
@@ -40,17 +29,15 @@ export function ProductDeliveryPanel({ unlock, className = '' }: ProductDelivery
           </span>
         </div>
 
-        <div className="mb-3 rounded-xl border border-[var(--line)] bg-white px-3 py-2.5">
-          <MarkdownContent content={unlock.payload || ''} />
-        </div>
-        <button
-          type="button"
-          disabled={!unlock.payload}
-          onClick={onCopy}
-          className="h-11 w-full rounded-xl bg-teal text-[0.9rem] font-semibold text-white hover:bg-teal-deep disabled:opacity-50"
+        <p className="mb-3 text-[0.84rem] leading-relaxed text-ink-soft">
+          发货内容已写入订单，可前往订单详情查看与复制。
+        </p>
+        <Link
+          to={href}
+          className="grid h-11 w-full place-items-center rounded-xl bg-teal text-[0.9rem] font-semibold text-white hover:bg-teal-deep"
         >
-          复制原文
-        </button>
+          查看订单详情
+        </Link>
       </div>
     )
   }

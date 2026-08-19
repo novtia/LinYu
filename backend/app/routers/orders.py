@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime
 from typing import List
 from urllib.parse import urljoin
@@ -14,8 +15,10 @@ from ..payment.providers import get_provider
 from ..payment.service import get_channel, list_public_methods, parse_config
 from ..schemas import CheckoutIn, CheckoutOut, DeliveryOut, OrderItemOut, OrderOut
 from ..seed import load_settings
+from ..services.delivery import random_id
 from ..services.fulfillment import fulfill_order
 from ..services.mail import is_valid_email
+from ..services.ratelimit import rate_limit
 
 router = APIRouter(prefix="/api/orders", tags=["orders"])
 
@@ -91,6 +94,10 @@ def _order_out(order: Order, include_payload: bool = False) -> OrderOut:
 
 
 def _public_base(request: Request) -> str:
+    # 生产环境优先使用固定配置，避免伪造 Host / X-Forwarded-Host 污染支付回调地址
+    fixed = (os.getenv("PUBLIC_BASE_URL") or "").strip().rstrip("/")
+    if fixed:
+        return fixed
     # 优先 X-Forwarded-*，便于反向代理；否则用请求自身
     proto = request.headers.get("x-forwarded-proto") or request.url.scheme
     host = request.headers.get("x-forwarded-host") or request.headers.get("host")
@@ -116,7 +123,11 @@ def _resolve_payment(db: Session, payment_method_id: str):
     return hit, channel, adapter, config
 
 
-@router.post("/checkout", response_model=CheckoutOut)
+@router.post(
+    "/checkout",
+    response_model=CheckoutOut,
+    dependencies=[Depends(rate_limit("checkout", limit=30, window=300))],
+)
 def checkout(
     body: CheckoutIn,
     request: Request,
@@ -129,7 +140,8 @@ def checkout(
 
     _bind_checkout_email(db, user, body.email)
 
-    debug_mode = bool(settings["sys"].debugMode)
+    # 调试模式跳过真实支付，仅限管理员，避免被当成零元购入口
+    debug_mode = bool(settings["sys"].debugMode) and user.role == "admin"
     payment_method_id = (body.payment_method_id or "").strip()
 
     # 以服务端商品为准计价
@@ -144,7 +156,8 @@ def checkout(
         raise HTTPException(status_code=400, detail="请选择商品")
 
     total = round(sum(p.price for p in lines), 2)
-    order_id = "LX" + str(int(datetime.utcnow().timestamp() * 1000))
+    # 时间戳 + 随机后缀：避免同毫秒并发下单撞主键，也降低订单号可预测性
+    order_id = "LX" + str(int(datetime.utcnow().timestamp() * 1000)) + random_id(length=4)
 
     if debug_mode:
         order = Order(

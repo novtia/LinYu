@@ -26,6 +26,8 @@ export interface Product {
   category_id?: number | null
   category_name?: string | null
   delivery_content?: string | null
+  /** 付费文件原始名，仅管理端可见 */
+  file_name?: string | null
 }
 
 export interface CartItem {
@@ -92,6 +94,7 @@ export interface PublicSettings {
   maintain: boolean
   name: string
   debugMode?: boolean
+  mailEnabled?: boolean
 }
 
 export interface EzpayConfig {
@@ -168,6 +171,7 @@ export interface MailSettings {
   template_buyer: string
   template_reset: string
   template_register: string
+  template_login: string
 }
 
 export interface SysSettings {

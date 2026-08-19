@@ -14,7 +14,13 @@ export function DeliveriesPage() {
   const [rows, setRows] = useState<Delivery[]>([])
 
   useEffect(() => {
-    api.get<Delivery[]>('/api/deliveries').then(setRows).catch(() => setRows([]))
+    api
+      .get<Delivery[]>('/api/deliveries')
+      .then(setRows)
+      .catch((e) => {
+        setRows([])
+        showToast(e instanceof ApiError ? e.message : '发放记录加载失败')
+      })
   }, [])
 
   return (

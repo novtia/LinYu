@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api } from '../../lib/api'
+import { ApiError, api } from '../../lib/api'
+import { useToast } from '../../context/ToastContext'
 import type { Order } from '../../types'
 import { orderStatusLabel } from '../../lib/orderStatus'
 import { PanelTable, Tag } from './ProductsPage'
@@ -11,10 +12,17 @@ function fmtTime(iso: string) {
 }
 
 export function OrdersPage() {
+  const { showToast } = useToast()
   const [orders, setOrders] = useState<Order[]>([])
 
   useEffect(() => {
-    api.get<Order[]>('/api/orders').then(setOrders).catch(() => setOrders([]))
+    api
+      .get<Order[]>('/api/orders')
+      .then(setOrders)
+      .catch((e) => {
+        setOrders([])
+        showToast(e instanceof ApiError ? e.message : '订单加载失败')
+      })
   }, [])
 
   return (

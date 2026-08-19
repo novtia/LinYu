@@ -8,6 +8,7 @@ import type { Category, Product } from '../../types'
 
 const COVERS = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6']
 const MAX_COVER_BYTES = 5 * 1024 * 1024
+const MAX_FILE_BYTES = 50 * 1024 * 1024
 
 function isImageName(name: string) {
   return /\.(png|jpe?g|gif|webp|bmp)$/i.test(name)
@@ -19,6 +20,7 @@ export function ProductFormPage() {
   const navigate = useNavigate()
   const { showToast } = useToast()
   const coverRef = useRef<HTMLInputElement>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   const [categories, setCategories] = useState<Category[]>([])
   const [form, setForm] = useState({
@@ -30,7 +32,9 @@ export function ProductFormPage() {
     delivery_content: '',
     status: 'on',
     category_id: '' as string,
+    file_name: '' as string,
   })
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
   const [pendingCover, setPendingCover] = useState<File | null>(null)
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -77,6 +81,7 @@ export function ProductFormPage() {
           delivery_content: p.delivery_content || '',
           status: p.status,
           category_id: p.category_id != null ? String(p.category_id) : '',
+          file_name: p.file_name || '',
         })
       })
       .catch((e) => setError(e instanceof ApiError ? e.message : '加载失败'))
@@ -137,6 +142,9 @@ export function ProductFormPage() {
       if (pendingCover) {
         await api.upload(`/api/products/${saved.id}/cover`, pendingCover)
       }
+      if (pendingFile) {
+        await api.upload(`/api/products/${saved.id}/file`, pendingFile)
+      }
       showToast(isEdit ? '商品已更新' : '商品已创建')
       navigate('/admin/products')
     } catch (err) {
@@ -157,6 +165,22 @@ export function ProductFormPage() {
       setPendingCover(null)
       setForm({ ...form, cover_url: '' })
       showToast('已删除封面')
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '删除失败')
+    }
+  }
+
+  async function removeProductFile() {
+    if (pendingFile) {
+      setPendingFile(null)
+      if (fileRef.current) fileRef.current.value = ''
+      return
+    }
+    if (!isEdit || !form.file_name) return
+    try {
+      await api.delete(`/api/products/${id}/file`)
+      setForm({ ...form, file_name: '' })
+      showToast('已删除商品文件')
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '删除失败')
     }
@@ -339,6 +363,48 @@ export function ProductFormPage() {
               placeholder="前台展示的商品介绍（支持纯文本）"
             />
           </label>
+
+          <div className="md:col-span-2">
+            <div className="mb-2 text-[0.82rem] font-semibold text-ink-soft">付费文件（可选）</div>
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--line-strong)] bg-paper/60 px-3.5 py-3">
+              <span className="min-w-0 flex-1 truncate text-[0.86rem] text-ink-soft">
+                {pendingFile ? `待上传：${pendingFile.name}` : form.file_name || '未上传文件'}
+              </span>
+              <button
+                type="button"
+                className="h-9 rounded-[10px] border border-[var(--line-strong)] bg-white px-3 text-[0.82rem] font-semibold text-ink hover:border-teal hover:text-teal"
+                onClick={() => fileRef.current?.click()}
+              >
+                选择文件
+              </button>
+              {(pendingFile || form.file_name) && (
+                <button
+                  type="button"
+                  className="h-9 rounded-[10px] border border-[var(--line-strong)] bg-white px-3 text-[0.82rem] font-semibold text-danger"
+                  onClick={removeProductFile}
+                >
+                  移除
+                </button>
+              )}
+            </div>
+            <p className="mt-1.5 text-[0.8rem] text-ink-mute">
+              最大 50MB。付款完成后随订单发放，通过鉴权接口下载，不会生成公开直链。
+            </p>
+            <input
+              ref={fileRef}
+              type="file"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0] || null
+                if (f && f.size > MAX_FILE_BYTES) {
+                  setError('文件过大，最大 50MB')
+                  return
+                }
+                setError('')
+                setPendingFile(f)
+              }}
+            />
+          </div>
 
           <MarkdownEditor
             label="发货内容（Markdown）"

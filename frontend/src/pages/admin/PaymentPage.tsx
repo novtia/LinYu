@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { api } from '../../lib/api'
+import { ApiError, api } from '../../lib/api'
 import { useToast } from '../../context/ToastContext'
 import type { PaymentChannel } from '../../types'
 import { IconBtn, PanelTable, Tag } from './ProductsPage'
@@ -21,8 +21,9 @@ export function PaymentPage() {
     try {
       const list = await api.get<PaymentChannel[]>('/api/payment-channels')
       setChannels(list)
-    } catch {
+    } catch (e) {
       setChannels([])
+      showToast(e instanceof ApiError ? e.message : '支付渠道加载失败')
     } finally {
       setLoading(false)
     }
@@ -33,16 +34,24 @@ export function PaymentPage() {
   }, [])
 
   async function toggle(id: string) {
-    const ch = await api.patch<PaymentChannel>(`/api/payment-channels/${id}/toggle`)
-    await load()
-    showToast(ch.enabled ? '渠道已启用' : '渠道已停用')
+    try {
+      const ch = await api.patch<PaymentChannel>(`/api/payment-channels/${id}/toggle`)
+      await load()
+      showToast(ch.enabled ? '渠道已启用' : '渠道已停用')
+    } catch (e) {
+      showToast(e instanceof ApiError ? e.message : '操作失败')
+    }
   }
 
   async function remove(id: string, name: string) {
     if (!window.confirm(`确定删除渠道「${name}」？`)) return
-    await api.delete(`/api/payment-channels/${id}`)
-    await load()
-    showToast('渠道已删除')
+    try {
+      await api.delete(`/api/payment-channels/${id}`)
+      await load()
+      showToast('渠道已删除')
+    } catch (e) {
+      showToast(e instanceof ApiError ? e.message : '删除失败')
+    }
   }
 
   if (loading) return <div className="text-ink-mute">加载中…</div>

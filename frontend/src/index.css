@@ -130,6 +130,8 @@ button.switch.on::after { transform: translateX(20px); }
 }
 .buy-short { display: none; }
 
+.product-slot-filler { visibility: hidden; pointer-events: none; }
+
 /* 商品详情 Markdown */
 .md-content {
   color: var(--ink-soft);

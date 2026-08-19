@@ -60,7 +60,7 @@ export function ProductDetailPage() {
           if (hit) {
             setUnlock({
               unlocked: true,
-              payload: hit.payload,
+              orderId: order.id,
             })
             return
           }
@@ -136,7 +136,7 @@ export function ProductDetailPage() {
       if (outcome === 'paid') {
         const hit = res.order.items.find((it) => it.product_id === product.id && it.payload)
         if (hit?.payload) {
-          setUnlock({ unlocked: true, payload: hit.payload })
+          setUnlock({ unlocked: true, orderId: res.order.id })
         }
         showPurchaseResult({
           status: 'success',

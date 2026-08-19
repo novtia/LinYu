@@ -17,6 +17,19 @@ export class ApiError extends Error {
   }
 }
 
+let unauthorizedHandler: (() => void) | null = null
+
+/** 注册登录态失效回调，由 AuthProvider 统一处理登出与提示。 */
+export function setUnauthorizedHandler(handler: (() => void) | null) {
+  unauthorizedHandler = handler
+}
+
+function handleUnauthorized(status: number) {
+  if (status !== 401) return
+  setToken(null)
+  unauthorizedHandler?.()
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers || {})
   if (!headers.has('Content-Type') && options.body) {
@@ -35,6 +48,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     } catch {
       /* ignore */
     }
+    handleUnauthorized(res.status)
     throw new ApiError(res.status, String(detail))
   }
   if (res.status === 204) return undefined as T
@@ -65,6 +79,7 @@ export const api = {
       } catch {
         /* ignore */
       }
+      handleUnauthorized(res.status)
       throw new ApiError(res.status, String(detail))
     }
     return res.json()
@@ -82,6 +97,7 @@ export const api = {
       } catch {
         /* ignore */
       }
+      handleUnauthorized(res.status)
       throw new ApiError(res.status, String(detail))
     }
     const blob = await res.blob()

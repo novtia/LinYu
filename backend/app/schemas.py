@@ -25,10 +25,21 @@ class UserOut(BaseModel):
 
 
 class LoginIn(BaseModel):
-    username: str
+    username: str  # 用户名或邮箱
     password: str
     captcha_id: str
     captcha: str
+
+
+class SendLoginCodeIn(BaseModel):
+    email: str
+    captcha_id: str
+    captcha: str
+
+
+class LoginByCodeIn(BaseModel):
+    email: str
+    code: str
 
 
 class RegisterIn(BaseModel):
@@ -41,6 +52,8 @@ class RegisterIn(BaseModel):
 class SendRegisterCodeIn(BaseModel):
     email: str
     username: str = ""
+    captcha_id: str
+    captcha: str
 
 
 class AccountUpdateIn(BaseModel):
@@ -95,6 +108,7 @@ class ProductOut(BaseModel):
     category_id: Optional[int] = None
     category_name: Optional[str] = None
     delivery_content: Optional[str] = None
+    file_name: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -115,6 +129,7 @@ class ProductOut(BaseModel):
             category_id=p.category_id,
             category_name=cat.name if cat else None,
             delivery_content=(p.delivery_content or "") if include_delivery else None,
+            file_name=getattr(p, "file_name", None) if include_delivery else None,
         )
 
 
@@ -137,6 +152,11 @@ class AssetUploadOut(BaseModel):
     url: str
     file_name: str
     message: str = "上传成功"
+
+
+class ProductFileOut(BaseModel):
+    file_name: str
+    message: str = "商品文件已上传"
 
 
 class CartItemIn(BaseModel):
@@ -214,6 +234,7 @@ class MailSettings(BaseModel):
     template_buyer: str = ""  # 买家发货通知（数字模板 ID）
     template_reset: str = ""  # 找回密码（数字模板 ID）
     template_register: str = ""  # 注册验证码（数字模板 ID）
+    template_login: str = ""  # 登录验证码（数字模板 ID）
 
 
 class SysSettings(BaseModel):
@@ -246,9 +267,15 @@ class PublicSettingsOut(BaseModel):
     maintain: bool
     name: str
     debugMode: bool = False
+    mailEnabled: bool = False
 
 
 class MessageOut(BaseModel):
+    message: str
+
+
+class ResetPasswordOut(BaseModel):
+    password: str
     message: str
 
 

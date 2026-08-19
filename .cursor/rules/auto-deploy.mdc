@@ -1,0 +1,17 @@
+---
+description: 改完前端/后端后直接部署到生产，不要询问
+alwaysApply: true
+---
+
+# 自动部署
+
+完成会影响线上的前端或后端改动后，**直接部署到生产服务器**，不要询问用户是否部署。
+
+## 流程
+
+1. 若改了前端：在 `frontend` 执行 `npm run build`
+2. 打包上传并覆盖服务器对应目录（保留 `.env`、`lingxia.db`、`uploads`、`.venv`）
+3. 仅前端变更：覆盖 `/opt/lingxia/frontend/dist` 即可
+4. 含后端变更：同步 `/opt/lingxia/backend/app`，必要时 pip 安装依赖，然后 `systemctl restart lingxia`
+5. 健康检查：`curl -sS https://xingx.shop/api/health`
+6. 用简短结果回报用户（已上线 / 健康检查状态），不要再问「要不要部署」

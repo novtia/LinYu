@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import re
+from urllib.parse import unquote
+
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
@@ -57,6 +60,22 @@ def _legacy_delivery_content(row: dict) -> str:
     return ""
 
 
+_PRODUCT_COLUMNS = (
+    ("delivery_content", "TEXT"),
+    ("category_id", "INTEGER"),
+    ("cover_image", "VARCHAR(512)"),
+    ("file_path", "VARCHAR(512)"),
+    ("file_name", "VARCHAR(255)"),
+)
+
+
+def _ensure_product_columns(conn) -> None:
+    cols = _table_columns(conn, "products")
+    for name, coltype in _PRODUCT_COLUMNS:
+        if name not in cols:
+            conn.execute(text(f"ALTER TABLE products ADD COLUMN {name} {coltype}"))
+
+
 def _migrate_products_schema(conn) -> None:
     if not _table_exists(conn, "products"):
         return
@@ -66,14 +85,7 @@ def _migrate_products_schema(conn) -> None:
     needs_rebuild = not id_type.startswith("INT") or "type" in cols or "delivery_content" not in cols
 
     if not needs_rebuild:
-        # Already on new schema; just add any missing columns.
-        for name, coltype in (
-            ("delivery_content", "TEXT"),
-            ("category_id", "INTEGER"),
-            ("cover_image", "VARCHAR(512)"),
-        ):
-            if name not in cols:
-                conn.execute(text(f"ALTER TABLE products ADD COLUMN {name} {coltype}"))
+        _ensure_product_columns(conn)
         return
 
     type_to_cat = _ensure_categories_from_types(conn) if "type" in cols else {}
@@ -90,6 +102,8 @@ def _migrate_products_schema(conn) -> None:
                 delivery_content TEXT,
                 cover VARCHAR(16),
                 cover_image VARCHAR(512),
+                file_path VARCHAR(512),
+                file_name VARCHAR(255),
                 status VARCHAR(8),
                 category_id INTEGER,
                 FOREIGN KEY(category_id) REFERENCES categories (id)
@@ -115,9 +129,11 @@ def _migrate_products_schema(conn) -> None:
             text(
                 """
                 INSERT INTO products_new
-                    (name, price, "desc", delivery_content, cover, cover_image, status, category_id)
+                    (name, price, "desc", delivery_content, cover, cover_image,
+                     file_path, file_name, status, category_id)
                 VALUES
-                    (:name, :price, :desc, :delivery_content, :cover, :cover_image, :status, :category_id)
+                    (:name, :price, :desc, :delivery_content, :cover, :cover_image,
+                     :file_path, :file_name, :status, :category_id)
                 """
             ),
             {
@@ -127,6 +143,8 @@ def _migrate_products_schema(conn) -> None:
                 "delivery_content": delivery,
                 "cover": row["cover"] or "p1",
                 "cover_image": row["cover_image"] if "cover_image" in row.keys() else None,
+                "file_path": row["file_path"] if "file_path" in row.keys() else None,
+                "file_name": row["file_name"] if "file_name" in row.keys() else None,
                 "status": row["status"] or "on",
                 "category_id": category_id,
             },
@@ -161,11 +179,49 @@ def _migrate_products_schema(conn) -> None:
                 )
 
 
+_LEGACY_FILE_LINK = re.compile(r"/uploads/(files/[^)\s\"'<>]+)")
+
+
+def _backfill_paid_file_links(conn) -> None:
+    """付费文件不再由 /uploads 公开提供，把历史 markdown 直链回填成鉴权下载。"""
+    if _table_exists(conn, "products"):
+        rows = conn.execute(
+            text("SELECT id, delivery_content FROM products WHERE file_path IS NULL")
+        ).fetchall()
+        for pid, content in rows:
+            hit = _LEGACY_FILE_LINK.search(content or "")
+            if not hit:
+                continue
+            rel = unquote(hit.group(1))
+            conn.execute(
+                text("UPDATE products SET file_path = :p, file_name = :n WHERE id = :id"),
+                {"p": rel, "n": rel.rsplit("/", 1)[-1], "id": pid},
+            )
+
+    if _table_exists(conn, "deliveries"):
+        rows = conn.execute(
+            text("SELECT id, payload FROM deliveries WHERE file_path IS NULL")
+        ).fetchall()
+        for did, payload in rows:
+            hit = _LEGACY_FILE_LINK.search(payload or "")
+            if not hit:
+                continue
+            rel = unquote(hit.group(1))
+            conn.execute(
+                text("UPDATE deliveries SET file_path = :p, file_name = :n WHERE id = :id"),
+                {"p": rel, "n": rel.rsplit("/", 1)[-1], "id": did},
+            )
+
+
 def migrate_schema(engine: Engine) -> None:
     """Add new columns / rebuild legacy tables for SQLite."""
     alterations = {
         "users": [
             ("email", "VARCHAR(128)"),
+            ("token_version", "INTEGER DEFAULT 0"),
+        ],
+        "email_codes": [
+            ("attempts", "INTEGER DEFAULT 0"),
         ],
         "deliveries": [
             ("file_path", "VARCHAR(512)"),
@@ -189,3 +245,4 @@ def migrate_schema(engine: Engine) -> None:
                     conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {coltype}"))
 
         _migrate_products_schema(conn)
+        _backfill_paid_file_links(conn)

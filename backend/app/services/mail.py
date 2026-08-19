@@ -191,3 +191,31 @@ def send_register_code(
             "expire_minutes": str(expire_minutes),
         },
     )
+
+
+def send_login_code(
+    db: Session,
+    *,
+    to: str,
+    username: str,
+    code: str,
+    expire_minutes: int = 15,
+) -> None:
+    mail = get_mail_settings(db)
+    settings = load_settings(db)
+    if not mail.template_login.strip():
+        raise ValueError("未配置登录验证码邮件模板")
+    site_name = settings["sys"].name or "领匣"
+    send_tencent_ses(
+        mail,
+        to=to,
+        template_id=mail.template_login,
+        subject=f"【{site_name}】登录验证码",
+        data={
+            "site_name": site_name,
+            "username": username or to,
+            "email": to,
+            "code": code,
+            "expire_minutes": str(expire_minutes),
+        },
+    )

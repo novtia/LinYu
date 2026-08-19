@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { api } from '../../lib/api'
+import { ApiError, api } from '../../lib/api'
 import { useToast } from '../../context/ToastContext'
 import type { Product } from '../../types'
 
@@ -15,13 +15,31 @@ export function ProductsPage() {
   }
 
   useEffect(() => {
-    load().catch(() => setProducts([]))
+    load().catch((e) => {
+      setProducts([])
+      showToast(e instanceof ApiError ? e.message : '商品列表加载失败')
+    })
   }, [])
 
   async function toggle(id: number) {
-    const p = await api.patch<Product>(`/api/products/${id}/toggle`)
-    await load()
-    showToast(p.status === 'on' ? '已上架' : '已下架')
+    try {
+      const p = await api.patch<Product>(`/api/products/${id}/toggle`)
+      await load()
+      showToast(p.status === 'on' ? '已上架' : '已下架')
+    } catch (e) {
+      showToast(e instanceof ApiError ? e.message : '操作失败')
+    }
+  }
+
+  async function remove(p: Product) {
+    if (!window.confirm(`确定删除商品「${p.name}」？删除后无法恢复，历史订单的发货记录会保留。`)) return
+    try {
+      await api.delete(`/api/products/${p.id}`)
+      await load()
+      showToast('商品已删除')
+    } catch (e) {
+      showToast(e instanceof ApiError ? e.message : '删除失败')
+    }
   }
 
   return (
@@ -71,6 +89,9 @@ export function ProductsPage() {
                 </IconBtn>
                 <IconBtn title="前台预览" onClick={() => window.open(`/product/${p.id}`, '_blank')}>
                   ↗
+                </IconBtn>
+                <IconBtn title="删除" onClick={() => remove(p)} danger>
+                  ⌫
                 </IconBtn>
               </div>
             </td>

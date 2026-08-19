@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import io
 import random
+import secrets
 import uuid
 from datetime import datetime, timedelta
 
@@ -16,7 +17,8 @@ CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 
 def create_captcha(db: Session) -> tuple:
-    code = "".join(random.choice(CHARS) for _ in range(4))
+    # 验证码本身用密码学随机；噪点等视觉扰动继续用 random
+    code = "".join(secrets.choice(CHARS) for _ in range(4))
     captcha_id = str(uuid.uuid4())
 
     # cleanup old captchas
@@ -78,7 +80,7 @@ def verify_captcha(db: Session, captcha_id: str, code: str) -> bool:
     row = db.query(Captcha).filter(Captcha.id == captcha_id).first()
     if not row:
         return False
-    ok = row.code.upper() == (code or "").strip().upper()
+    ok = secrets.compare_digest(row.code.upper(), (code or "").strip().upper())
     db.delete(row)
     db.commit()
     return ok

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 import uuid
 from pathlib import Path
@@ -9,6 +10,8 @@ from fastapi import UploadFile
 
 from ..database import BASE_DIR
 
+logger = logging.getLogger("lingxia.files")
+
 UPLOAD_DIR = BASE_DIR / "uploads"
 COVER_DIR = UPLOAD_DIR / "covers"
 FILE_DIR = UPLOAD_DIR / "files"
@@ -16,6 +19,14 @@ ASSET_DIR = UPLOAD_DIR / "assets"
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50MB
 MAX_COVER_BYTES = 5 * 1024 * 1024  # 5MB
 COVER_EXTENSIONS: Set[str] = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}
+# assets 目录由 Nginx/StaticFiles 公开提供，禁止可在站点源下执行的类型
+ASSET_EXTENSIONS: Set[str] = {
+    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico",
+    ".pdf", ".txt", ".md", ".csv", ".json",
+    ".zip", ".rar", ".7z", ".gz", ".tar",
+    ".mp3", ".mp4", ".wav", ".webm",
+    ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+}
 
 
 def ensure_upload_dir() -> Path:
@@ -74,6 +85,8 @@ async def save_asset(file: UploadFile) -> tuple:
     """Save markdown attachment; returns (relative_path, original_filename)."""
     ensure_upload_dir()
     original = safe_filename(file.filename or "file.bin")
+    if Path(original).suffix.lower() not in ASSET_EXTENSIONS:
+        raise ValueError("不支持的附件类型，请上传图片、文档或压缩包")
     stored = f"{uuid.uuid4().hex[:12]}_{original}"
     dest = ASSET_DIR / stored
     await _save_to(file, dest, MAX_UPLOAD_BYTES)
@@ -87,7 +100,9 @@ def resolve_stored_path(relative: str) -> Path:
         path = (UPLOAD_DIR / rel.name).resolve()
     else:
         path = (UPLOAD_DIR / rel).resolve()
-    if not str(path).startswith(str(UPLOAD_DIR.resolve())):
+    try:
+        path.relative_to(UPLOAD_DIR.resolve())
+    except ValueError:
         raise FileNotFoundError("非法路径")
     if not path.is_file():
         raise FileNotFoundError("文件不存在")
@@ -99,8 +114,10 @@ def delete_stored(relative: Optional[str]) -> None:
         return
     try:
         resolve_stored_path(relative).unlink(missing_ok=True)
-    except Exception:
-        pass
+    except FileNotFoundError:
+        return
+    except OSError as e:
+        logger.warning("删除文件失败 %s：%s", relative, e)
 
 
 def cover_public_url(relative: Optional[str]) -> Optional[str]:

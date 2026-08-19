@@ -6,10 +6,10 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session, joinedload
 
 from ..database import get_db
-from ..deps import get_admin_user
+from ..deps import get_admin_user, get_optional_user
 from ..models import Category, Product, User
-from ..schemas import AssetUploadOut, CoverUploadOut, MessageOut, ProductIn, ProductOut
-from ..services.files import delete_stored, save_asset, save_cover
+from ..schemas import AssetUploadOut, CoverUploadOut, MessageOut, ProductFileOut, ProductIn, ProductOut
+from ..services.files import delete_stored, save_asset, save_cover, save_upload
 
 router = APIRouter(prefix="/api/products", tags=["products"])
 
@@ -41,11 +41,13 @@ def _validate_category(db: Session, category_id: Optional[int]) -> None:
 @router.get("", response_model=List[ProductOut])
 def list_products(
     category_id: Optional[int] = Query(None),
-    all: bool = Query(False),
+    all: bool = Query(False, description="包含下架商品，仅管理员可用"),
+    viewer: Optional[User] = Depends(get_optional_user),
     db: Session = Depends(get_db),
 ):
     q = db.query(Product).options(joinedload(Product.category))
-    if not all:
+    include_off = all and bool(viewer and viewer.role == "admin")
+    if not include_off:
         q = q.filter(Product.status == "on")
     if category_id is not None:
         q = q.filter(Product.category_id == category_id)
@@ -136,6 +138,40 @@ def update_product(
     return _out(_get_product(db, product.id), include_delivery=True)
 
 
+@router.post("/{product_id}/file", response_model=ProductFileOut)
+async def upload_product_file(
+    product_id: int,
+    file: UploadFile = File(...),
+    _: User = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    """上传付费数字文件，发货时随订单发放（不公开直链）。"""
+    product = _get_product(db, product_id)
+    try:
+        stored, original = await save_upload(file, str(product_id))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    delete_stored(product.file_path)
+    product.file_path = stored
+    product.file_name = original
+    db.commit()
+    return ProductFileOut(file_name=original)
+
+
+@router.delete("/{product_id}/file", response_model=MessageOut)
+def delete_product_file(
+    product_id: int,
+    _: User = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    product = _get_product(db, product_id)
+    delete_stored(product.file_path)
+    product.file_path = None
+    product.file_name = None
+    db.commit()
+    return MessageOut(message="已删除商品文件")
+
+
 @router.post("/{product_id}/cover", response_model=CoverUploadOut)
 async def upload_product_cover(
     product_id: int,
@@ -189,6 +225,7 @@ def delete_product(
 ):
     product = _get_product(db, product_id)
     delete_stored(product.cover_image)
+    delete_stored(product.file_path)
     db.delete(product)
     db.commit()
     return MessageOut(message="已删除")

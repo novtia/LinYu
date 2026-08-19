@@ -7,6 +7,20 @@ import { useAuth } from '../context/AuthContext'
 import { ProductMedia } from '../components/ProductMedia'
 import type { Category, Product } from '../types'
 
+function useShopColumns() {
+  const [cols, setCols] = useState(3)
+  useEffect(() => {
+    const update = () => {
+      const w = window.innerWidth
+      setCols(w <= 640 ? 1 : w <= 900 ? 2 : 3)
+    }
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
+  return cols
+}
+
 export function ShopPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -14,9 +28,16 @@ export function ShopPage() {
   const { addProduct } = useCart()
   const { showToast } = useToast()
   const { publicSettings } = useAuth()
+  const cols = useShopColumns()
 
   useEffect(() => {
-    api.get<Product[]>('/api/products').then(setProducts).catch(() => setProducts([]))
+    api
+      .get<Product[]>('/api/products')
+      .then(setProducts)
+      .catch(() => {
+        setProducts([])
+        showToast('商品加载失败，请稍后刷新重试')
+      })
     api.get<Category[]>('/api/categories').then(setCategories).catch(() => setCategories([]))
   }, [])
 
@@ -24,6 +45,8 @@ export function ShopPage() {
     () => (filter === 'all' ? products : products.filter((p) => p.category_id === filter)),
     [products, filter],
   )
+
+  const fillerCount = Math.max(0, cols * 2 - visible.length)
 
   return (
     <>
@@ -63,53 +86,69 @@ export function ShopPage() {
               </div>
             </div>
 
-            <div className="product-grid-responsive grid grid-cols-3 gap-5">
-              {visible.map((p, i) => (
-                <article
-                  key={p.id}
-                  className={`product ${p.cover} flex min-w-0 flex-col overflow-hidden rounded-[22px] border border-[var(--line)] bg-white transition duration-300 hover:-translate-y-1 hover:border-[rgba(15,110,92,0.35)] hover:shadow-[0_18px_40px_-28px_rgba(20,32,28,0.35)]`}
-                  style={{ animation: `riseIn .7s var(--ease) both`, animationDelay: `${(i % 3) * 0.08}s` }}
-                >
-                  <Link to={`/product/${p.id}`} className="block overflow-hidden">
-                    <ProductMedia cover={p.cover} coverUrl={p.cover_url} tag={p.category_name || undefined} />
-                  </Link>
-                  <div className="flex flex-1 flex-col gap-2.5 p-5 pb-[18px]">
-                    <Link to={`/product/${p.id}`}>
-                      <h3 className="font-[family-name:var(--font-display)] text-[1.15rem] tracking-[-0.02em] hover:text-teal">{p.name}</h3>
+            <div className="product-list-shell relative">
+              <div className="product-grid-responsive grid grid-cols-3 gap-5">
+                {visible.map((p, i) => (
+                  <article
+                    key={p.id}
+                    className={`product ${p.cover} flex min-w-0 flex-col overflow-hidden rounded-[22px] border border-[var(--line)] bg-white transition duration-300 hover:-translate-y-1 hover:border-[rgba(15,110,92,0.35)] hover:shadow-[0_18px_40px_-28px_rgba(20,32,28,0.35)]`}
+                    style={{ animation: `riseIn .7s var(--ease) both`, animationDelay: `${(i % 3) * 0.08}s` }}
+                  >
+                    <Link to={`/product/${p.id}`} className="block overflow-hidden">
+                      <ProductMedia cover={p.cover} coverUrl={p.cover_url} tag={p.category_name || undefined} />
                     </Link>
-                    <p className="flex-1 text-[0.9rem] leading-relaxed text-ink-soft line-clamp-3">{p.desc}</p>
-                    <div className="mt-1 flex items-center justify-between gap-3">
-                      <div className="font-[family-name:var(--font-display)] text-[1.35rem] font-bold tracking-tight">
-                        ¥{p.price}
-                      </div>
-                      <div className="flex gap-2">
-                        <Link
-                          to={`/product/${p.id}`}
-                          className="inline-flex h-10 items-center rounded-xl border border-[var(--line-strong)] bg-white px-3 text-[0.82rem] font-semibold text-ink-soft hover:border-teal hover:text-teal"
-                        >
-                          详情
-                        </Link>
-                        <button
-                          type="button"
-                          className="h-10 rounded-xl bg-ink px-4 text-[0.88rem] font-semibold text-white transition hover:bg-teal-deep"
-                          onClick={() => {
-                            addProduct(p)
-                            showToast('已加入购物车：' + p.name)
-                          }}
-                        >
-                          <span className="buy-full">加入购物车</span>
-                          <span className="buy-short">加购</span>
-                        </button>
+                    <div className="flex flex-1 flex-col gap-2.5 p-5 pb-[18px]">
+                      <Link to={`/product/${p.id}`}>
+                        <h3 className="font-[family-name:var(--font-display)] text-[1.15rem] tracking-[-0.02em] hover:text-teal">{p.name}</h3>
+                      </Link>
+                      <p className="flex-1 text-[0.9rem] leading-relaxed text-ink-soft line-clamp-3">{p.desc}</p>
+                      <div className="mt-1 flex items-center justify-between gap-3">
+                        <div className="font-[family-name:var(--font-display)] text-[1.35rem] font-bold tracking-tight">
+                          ¥{p.price}
+                        </div>
+                        <div className="flex gap-2">
+                          <Link
+                            to={`/product/${p.id}`}
+                            className="inline-flex h-10 items-center rounded-xl border border-[var(--line-strong)] bg-white px-3 text-[0.82rem] font-semibold text-ink-soft hover:border-teal hover:text-teal"
+                          >
+                            详情
+                          </Link>
+                          <button
+                            type="button"
+                            className="h-10 rounded-xl bg-ink px-4 text-[0.88rem] font-semibold text-white transition hover:bg-teal-deep"
+                            onClick={() => {
+                              addProduct(p)
+                              showToast('已加入购物车：' + p.name)
+                            }}
+                          >
+                            <span className="buy-full">加入购物车</span>
+                            <span className="buy-short">加购</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
+                  </article>
+                ))}
+                {Array.from({ length: fillerCount }, (_, i) => (
+                  <div
+                    key={`filler-${i}`}
+                    className="product-slot-filler overflow-hidden rounded-[22px] border border-transparent"
+                    aria-hidden
+                  >
+                    <div className="aspect-[16/10]" />
+                    <div className="flex flex-col gap-2.5 p-5 pb-[18px]">
+                      <div className="h-[1.4rem]" />
+                      <div className="h-[4.4rem]" />
+                      <div className="mt-1 h-10" />
+                    </div>
                   </div>
-                </article>
-              ))}
-            </div>
+                ))}
+              </div>
 
-            {!visible.length && (
-              <div className="mt-10 text-center text-ink-mute">暂无商品</div>
-            )}
+              {!visible.length && (
+                <div className="absolute inset-0 grid place-items-center text-[0.95rem] text-ink-mute">暂无商品</div>
+              )}
+            </div>
           </div>
         </section>
 

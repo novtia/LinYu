@@ -1,5 +1,22 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { CartItem, Product, PublicPaymentMethod } from '../types'
+
+const CART_KEY = 'lingxia_cart'
+
+function readStoredCart(): CartItem[] {
+  try {
+    const raw = localStorage.getItem(CART_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    // 已发货内容不落地，避免发货信息留在浏览器
+    return parsed
+      .filter((it) => it && typeof it.id === 'number' && typeof it.price === 'number' && !it.delivered)
+      .map((it) => ({ ...it, delivered: false, payload: '' }))
+  } catch {
+    return []
+  }
+}
 
 interface CartContextValue {
   items: CartItem[]
@@ -17,8 +34,21 @@ interface CartContextValue {
 const CartContext = createContext<CartContextValue | null>(null)
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>([])
+  const [items, setItems] = useState<CartItem[]>(readStoredCart)
   const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    try {
+      const persistable = items.filter((it) => !it.delivered)
+      if (persistable.length) {
+        localStorage.setItem(CART_KEY, JSON.stringify(persistable))
+      } else {
+        localStorage.removeItem(CART_KEY)
+      }
+    } catch {
+      /* 隐私模式等场景忽略存储失败 */
+    }
+  }, [items])
 
   const addProduct = useCallback((p: Product, payment?: PublicPaymentMethod | null, options?: { openDrawer?: boolean }) => {
     setItems((prev) => [

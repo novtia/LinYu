@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api } from '../../lib/api'
+import { ApiError, api } from '../../lib/api'
+import { useToast } from '../../context/ToastContext'
+import { orderStatusLabel } from '../../lib/orderStatus'
 import type { Dashboard } from '../../types'
+import { Tag } from './ProductsPage'
 
 function fmtTime(iso: string) {
   const d = new Date(iso)
@@ -9,10 +12,17 @@ function fmtTime(iso: string) {
 }
 
 export function DashboardPage() {
+  const { showToast } = useToast()
   const [data, setData] = useState<Dashboard | null>(null)
 
   useEffect(() => {
-    api.get<Dashboard>('/api/dashboard').then(setData).catch(() => setData(null))
+    api
+      .get<Dashboard>('/api/dashboard')
+      .then(setData)
+      .catch((e) => {
+        setData(null)
+        showToast(e instanceof ApiError ? e.message : '概览数据加载失败')
+      })
   }, [])
 
   if (!data) return <div className="text-ink-mute">加载中…</div>
@@ -60,9 +70,12 @@ export function DashboardPage() {
                     <td className="whitespace-nowrap px-[18px] py-3.5">{o.items.map((i) => i.name).join('、')}</td>
                     <td className="whitespace-nowrap px-[18px] py-3.5">¥{o.total}</td>
                     <td className="whitespace-nowrap px-[18px] py-3.5">
-                      <span className="inline-flex rounded-md bg-[rgba(15,110,92,.12)] px-2 py-1 text-[0.75rem] font-semibold text-teal">
-                        已完成
-                      </span>
+                      <Tag
+                        green={o.status === 'completed' || o.status === 'paid'}
+                        red={o.status === 'failed' || o.status === 'cancelled'}
+                      >
+                        {orderStatusLabel(o.status)}
+                      </Tag>
                     </td>
                     <td className="whitespace-nowrap px-[18px] py-3.5">{fmtTime(o.created_at)}</td>
                   </tr>

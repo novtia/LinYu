@@ -25,8 +25,11 @@ def download_delivery_file(
     order = db.query(Order).filter(Order.id == delivery.order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
-    if user.role != "admin" and order.user_id != user.id:
-        raise HTTPException(status_code=403, detail="无权下载该文件")
+    if user.role != "admin":
+        if order.user_id != user.id:
+            raise HTTPException(status_code=403, detail="无权下载该文件")
+        if order.status not in ("paid", "completed"):
+            raise HTTPException(status_code=403, detail="订单未完成支付")
 
     try:
         path = resolve_stored_path(delivery.file_path)

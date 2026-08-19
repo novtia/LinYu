@@ -46,8 +46,9 @@ def fulfill_order(
 
             product = db.query(Product).filter(Product.id == it.product_id).first()
             payload = (product.delivery_content or "").strip() if product else ""
+            file_path = getattr(product, "file_path", None) if product else None
             if not payload:
-                payload = "暂无发货内容，请联系客服"
+                payload = "文件已附在本条发货记录，请点击下载。" if file_path else "暂无发货内容，请联系客服"
 
             delivery = Delivery(
                 id="d_" + random_id(),
@@ -55,6 +56,8 @@ def fulfill_order(
                 product_id=it.product_id,
                 product_name=it.name,
                 payload=payload,
+                file_path=file_path,
+                file_name=getattr(product, "file_name", None) if product else None,
                 created_at=datetime.utcnow(),
             )
             db.add(delivery)

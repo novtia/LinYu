@@ -18,7 +18,10 @@ export function CategoriesPage() {
   }
 
   useEffect(() => {
-    load().catch(() => setCategories([]))
+    load().catch((e) => {
+      setCategories([])
+      showToast(e instanceof ApiError ? e.message : '分类加载失败')
+    })
   }, [])
 
   useEffect(() => {

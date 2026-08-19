@@ -137,6 +137,9 @@ class AlipayPageProvider(BasePaymentProvider):
             and str(cfg.get("alipay_public_key") or "").strip()
         )
 
+    def secret_fields(self) -> List[str]:
+        return ["app_private_key"]
+
     def gateway(self, config: Dict[str, Any]) -> str:
         return GATEWAY_SANDBOX if (config or {}).get("sandbox") else GATEWAY_PROD
 

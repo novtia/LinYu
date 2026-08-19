@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api } from '../../lib/api'
+import { ApiError, api } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
 import type { Settings, SiteSettings } from '../../types'
@@ -11,7 +11,13 @@ export function WebsitePage() {
   const [site, setSite] = useState<SiteSettings | null>(null)
 
   useEffect(() => {
-    api.get<Settings>('/api/settings').then((s) => setSite(s.site)).catch(() => setSite(null))
+    api
+      .get<Settings>('/api/settings')
+      .then((s) => setSite(s.site))
+      .catch((e) => {
+        setSite(null)
+        showToast(e instanceof ApiError ? e.message : '网站设置加载失败')
+      })
   }, [])
 
   if (!site) return <div className="text-ink-mute">加载中…</div>
@@ -43,10 +49,14 @@ export function WebsitePage() {
           type="button"
           className="h-9 rounded-[10px] bg-ink px-4 text-[0.86rem] font-semibold text-white"
           onClick={async () => {
-            await api.put('/api/settings/site', site)
-            document.title = site.title
-            await refreshSettings()
-            showToast('网站设置已保存')
+            try {
+              await api.put('/api/settings/site', site)
+              document.title = site.title
+              await refreshSettings()
+              showToast('网站设置已保存')
+            } catch (e) {
+              showToast(e instanceof ApiError ? e.message : '保存失败')
+            }
           }}
         >
           保存
