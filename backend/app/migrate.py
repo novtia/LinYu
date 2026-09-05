@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from urllib.parse import unquote
 
 from sqlalchemy import text
@@ -213,6 +214,164 @@ def _backfill_paid_file_links(conn) -> None:
             )
 
 
+def _column_notnull(conn, table: str) -> dict[str, bool]:
+    rows = conn.execute(text(f"PRAGMA table_info({table})")).fetchall()
+    return {row[1]: bool(row[3]) for row in rows}
+
+
+def _sql_col(existing: dict[str, str], name: str, expr: str | None = None) -> str:
+    if name in existing:
+        return expr or f"o.{name}"
+    return "NULL"
+
+
+def _migrate_orders_guest_email(conn) -> None:
+    """Allow guest orders: nullable user_id + required buyer email."""
+    if not _table_exists(conn, "orders"):
+        return
+    existing = _table_columns(conn, "orders")
+    notnull = _column_notnull(conn, "orders")
+    has_email = "email" in existing
+    user_id_required = notnull.get("user_id", True)
+    if has_email and not user_id_required:
+        return
+
+    email_expr = (
+        "lower(trim(COALESCE(NULLIF(o.email, ''), u.email, '')))"
+        if has_email
+        else "lower(trim(COALESCE(u.email, '')))"
+    )
+    conn.execute(text("DROP TABLE IF EXISTS orders_new"))
+    conn.execute(
+        text(
+            """
+            CREATE TABLE orders_new (
+                id VARCHAR(64) NOT NULL PRIMARY KEY,
+                user_id VARCHAR(64),
+                username VARCHAR(64) NOT NULL,
+                email VARCHAR(128) NOT NULL,
+                total FLOAT NOT NULL,
+                status VARCHAR(16),
+                payment_channel_id VARCHAR(64),
+                payment_method VARCHAR(32),
+                payment_provider VARCHAR(32),
+                trade_no VARCHAR(128),
+                paid_at DATETIME,
+                created_at DATETIME,
+                FOREIGN KEY(user_id) REFERENCES users (id)
+            )
+            """
+        )
+    )
+    conn.execute(
+        text(
+            f"""
+            INSERT INTO orders_new (
+                id, user_id, username, email, total, status,
+                payment_channel_id, payment_method, payment_provider,
+                trade_no, paid_at, created_at
+            )
+            SELECT
+                o.id,
+                o.user_id,
+                o.username,
+                {email_expr},
+                o.total,
+                o.status,
+                {_sql_col(existing, "payment_channel_id")},
+                {_sql_col(existing, "payment_method")},
+                {_sql_col(existing, "payment_provider")},
+                {_sql_col(existing, "trade_no")},
+                {_sql_col(existing, "paid_at")},
+                o.created_at
+            FROM orders o
+            LEFT JOIN users u ON u.id = o.user_id
+            """
+        )
+    )
+    conn.execute(text("DROP TABLE orders"))
+    conn.execute(text("ALTER TABLE orders_new RENAME TO orders"))
+    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_orders_email ON orders (email)"))
+
+
+def _migrate_multi_files(conn) -> None:
+    """Create product_files / delivery_files and backfill legacy single-file columns.
+
+    `create_all` may already have created empty tables before this runs, so backfill
+    is based on missing rows rather than table existence.
+    """
+    if _table_exists(conn, "products"):
+        conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS product_files (
+                    id VARCHAR(64) NOT NULL PRIMARY KEY,
+                    product_id INTEGER NOT NULL,
+                    file_path VARCHAR(512) NOT NULL,
+                    file_name VARCHAR(255) NOT NULL,
+                    sort_order INTEGER DEFAULT 0,
+                    created_at DATETIME,
+                    FOREIGN KEY(product_id) REFERENCES products (id)
+                )
+                """
+            )
+        )
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_product_files_product_id ON product_files (product_id)"))
+        rows = conn.execute(
+            text(
+                """
+                SELECT p.id, p.file_path, p.file_name
+                FROM products p
+                WHERE p.file_path IS NOT NULL AND TRIM(p.file_path) != ''
+                  AND NOT EXISTS (SELECT 1 FROM product_files pf WHERE pf.product_id = p.id)
+                """
+            )
+        ).fetchall()
+        for i, (pid, path, name) in enumerate(rows):
+            conn.execute(
+                text(
+                    "INSERT INTO product_files (id, product_id, file_path, file_name, sort_order, created_at) "
+                    "VALUES (:id, :pid, :path, :name, 0, CURRENT_TIMESTAMP)"
+                ),
+                {"id": f"pf_m{i:06d}", "pid": pid, "path": path, "name": name or Path(path).name},
+            )
+
+    if _table_exists(conn, "deliveries"):
+        conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS delivery_files (
+                    id VARCHAR(64) NOT NULL PRIMARY KEY,
+                    delivery_id VARCHAR(64) NOT NULL,
+                    file_path VARCHAR(512) NOT NULL,
+                    file_name VARCHAR(255) NOT NULL,
+                    sort_order INTEGER DEFAULT 0,
+                    FOREIGN KEY(delivery_id) REFERENCES deliveries (id)
+                )
+                """
+            )
+        )
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_delivery_files_delivery_id ON delivery_files (delivery_id)"))
+        rows = conn.execute(
+            text(
+                """
+                SELECT d.id, d.file_path, d.file_name
+                FROM deliveries d
+                WHERE d.file_path IS NOT NULL AND TRIM(d.file_path) != ''
+                  AND NOT EXISTS (SELECT 1 FROM delivery_files df WHERE df.delivery_id = d.id)
+                """
+            )
+        ).fetchall()
+        for i, (did, path, name) in enumerate(rows):
+            conn.execute(
+                text(
+                    "INSERT INTO delivery_files (id, delivery_id, file_path, file_name, sort_order) "
+                    "VALUES (:id, :did, :path, :name, 0)"
+                ),
+                {"id": f"df_m{i:06d}", "did": did, "path": path, "name": name or Path(path).name},
+            )
+
+
 def migrate_schema(engine: Engine) -> None:
     """Add new columns / rebuild legacy tables for SQLite."""
     alterations = {
@@ -245,4 +404,6 @@ def migrate_schema(engine: Engine) -> None:
                     conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {coltype}"))
 
         _migrate_products_schema(conn)
+        _migrate_orders_guest_email(conn)
         _backfill_paid_file_links(conn)
+        _migrate_multi_files(conn)

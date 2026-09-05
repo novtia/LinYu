@@ -1,13 +1,11 @@
 import { useNavigate } from 'react-router-dom'
 import { ApiError, api } from '../lib/api'
-import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
 
 /** 购物车下拉：扁平列表，结算跳转独立页面 */
 export function CartDropdown() {
   const { items, open, closeCart, removeAt } = useCart()
-  const { user, openAuth } = useAuth()
   const { showToast } = useToast()
   const navigate = useNavigate()
 
@@ -19,12 +17,6 @@ export function CartDropdown() {
   function goCheckout() {
     if (!pending.length) {
       showToast('购物车暂无待结算商品')
-      return
-    }
-    if (!user) {
-      closeCart()
-      openAuth('login')
-      showToast('请先登录后再结算')
       return
     }
     closeCart()

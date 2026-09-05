@@ -28,6 +28,14 @@ export interface Product {
   delivery_content?: string | null
   /** 付费文件原始名，仅管理端可见 */
   file_name?: string | null
+  files?: ProductFileItem[]
+}
+
+export interface ProductFileItem {
+  id: string
+  file_name: string
+  is_image: boolean
+  download_url?: string | null
 }
 
 export interface CartItem {
@@ -55,11 +63,13 @@ export interface OrderItem {
   payload?: string | null
   file_name?: string | null
   download_url?: string | null
+  files?: ProductFileItem[]
 }
 
 export interface Order {
   id: string
   username: string
+  email?: string
   total: number
   status: string
   payment_method?: string | null
@@ -84,6 +94,7 @@ export interface Delivery {
   payload: string
   file_name?: string | null
   download_url?: string | null
+  files?: ProductFileItem[]
   created_at: string
 }
 

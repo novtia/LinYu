@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { useEffect, useState, type FormEvent } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { ApiError, api } from '../lib/api'
+import { getGuestEmail, setGuestEmail } from '../lib/guestEmail'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { orderStatusClass, orderStatusLabel } from '../lib/orderStatus'
@@ -12,28 +13,63 @@ function fmtTime(iso: string) {
 }
 
 export function OrdersListPage() {
-  const { user, loading, openAuth } = useAuth()
+  const { user, loading } = useAuth()
   const { showToast } = useToast()
   const [orders, setOrders] = useState<Order[]>([])
   const [busy, setBusy] = useState(true)
+  const [email, setEmail] = useState(getGuestEmail())
+  const [searched, setSearched] = useState(false)
   const navigate = useNavigate()
+  const isGuest = !loading && !user
 
   useEffect(() => {
     if (loading) return
-    if (!user) {
-      openAuth('login')
+    if (user) {
+      setBusy(true)
+      api
+        .get<Order[]>('/api/orders/mine')
+        .then(setOrders)
+        .catch((e) => showToast(e instanceof ApiError ? e.message : '加载失败'))
+        .finally(() => setBusy(false))
+      return
+    }
+    const saved = getGuestEmail()
+    if (!saved) {
+      setOrders([])
+      setSearched(false)
       setBusy(false)
       return
     }
+    setEmail(saved)
+    setBusy(true)
     api
-      .get<Order[]>('/api/orders/mine')
-      .then(setOrders)
-      .catch((e) => showToast(e instanceof ApiError ? e.message : '加载失败'))
+      .post<Order[]>('/api/orders/lookup', { email: saved })
+      .then((list) => {
+        setOrders(list)
+        setSearched(true)
+      })
+      .catch((e) => showToast(e instanceof ApiError ? e.message : '查询失败'))
       .finally(() => setBusy(false))
-  }, [user, loading, openAuth, showToast])
+  }, [user, loading, showToast])
 
-  if (!loading && !user) {
-    return <Navigate to="/" replace />
+  async function searchByEmail(e: FormEvent) {
+    e.preventDefault()
+    const value = email.trim()
+    if (!value) {
+      showToast('请填写购买时使用的邮箱')
+      return
+    }
+    setBusy(true)
+    try {
+      const list = await api.post<Order[]>('/api/orders/lookup', { email: value })
+      setGuestEmail(value)
+      setOrders(list)
+      setSearched(true)
+    } catch (err) {
+      showToast(err instanceof ApiError ? err.message : '查询失败')
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -42,18 +78,48 @@ export function OrdersListPage() {
         <div className="mb-6 flex items-center justify-between gap-3">
           <div>
             <h1 className="font-[family-name:var(--font-display)] text-2xl font-extrabold tracking-tight">我的订单</h1>
-            <p className="mt-1 text-[0.9rem] text-ink-mute">查看发放内容与下载文件</p>
+            <p className="mt-1 text-[0.9rem] text-ink-mute">
+              {isGuest ? '输入购买时填写的邮箱即可查找订单' : '查看发放内容与下载文件'}
+            </p>
           </div>
           <Link to="/" className="text-[0.9rem] font-semibold text-teal hover:underline">
             返回商城
           </Link>
         </div>
 
+        {isGuest && (
+          <form
+            onSubmit={searchByEmail}
+            className="mb-6 flex flex-col gap-3 rounded-[18px] border border-[var(--line)] bg-white p-4 sm:flex-row sm:items-end"
+          >
+            <label className="min-w-0 flex-1">
+              <span className="mb-1.5 block text-[0.82rem] font-semibold text-ink-soft">购买邮箱</span>
+              <input
+                className="field-input"
+                type="email"
+                value={email}
+                onChange={(ev) => setEmail(ev.target.value)}
+                placeholder="填写下单时使用的邮箱"
+                required
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={busy}
+              className="h-11 shrink-0 rounded-xl bg-teal px-5 text-[0.9rem] font-semibold text-white hover:bg-teal-deep disabled:opacity-60"
+            >
+              {busy ? '查询中…' : '查询订单'}
+            </button>
+          </form>
+        )}
+
         {busy ? (
           <div className="py-16 text-center text-ink-mute">加载中…</div>
         ) : !orders.length ? (
           <div className="rounded-[22px] border border-[var(--line)] bg-white/80 px-6 py-16 text-center">
-            <p className="mb-4 text-ink-mute">暂无订单</p>
+            <p className="mb-4 text-ink-mute">
+              {isGuest && !searched ? '请先填写购买邮箱查询订单' : '暂无订单'}
+            </p>
             <Link to="/#shop" className="font-semibold text-teal hover:underline">
               去选购商品
             </Link>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ApiError, api } from '../lib/api'
+import { setGuestEmail } from '../lib/guestEmail'
 import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
 import { usePurchaseResult } from '../context/PurchaseResultContext'
@@ -28,9 +29,10 @@ export function ProductDetailPage() {
   const [buying, setBuying] = useState(false)
   const [checkoutEmail, setCheckoutEmail] = useState('')
   const { addProduct } = useCart()
-  const { user, openAuth, publicSettings, refreshMe } = useAuth()
+  const { user, loading: authLoading, publicSettings, refreshMe } = useAuth()
   const { showToast } = useToast()
   const { showPurchaseResult } = usePurchaseResult()
+  const needEmail = !authLoading && !user?.email
 
   useEffect(() => {
     if (!id) return
@@ -56,7 +58,11 @@ export function ProductDetailPage() {
       .then((orders) => {
         if (!alive) return
         for (const order of orders) {
-          const hit = order.items.find((it) => it.product_id === product.id && it.payload)
+          const hit = order.items.find(
+            (it) =>
+              it.product_id === product.id &&
+              (Boolean(it.payload) || Boolean(it.download_url) || Boolean(it.files && it.files.length)),
+          )
           if (hit) {
             setUnlock({
               unlocked: true,
@@ -90,9 +96,10 @@ export function ProductDetailPage() {
   }
 
   const debugMode = !!publicSettings?.debugMode
+  const isFree = product.price === 0
 
   function ensurePayment(): boolean {
-    if (debugMode) return true
+    if (debugMode || isFree) return true
     if (!payment) {
       showToast(paymentRequired ? '请选择购买渠道' : '暂无可用支付方式，请稍后再试')
       return false
@@ -109,18 +116,14 @@ export function ProductDetailPage() {
   async function handleBuyNow() {
     if (!product) return
     if (!ensurePayment()) return
-    if (!user) {
-      openAuth('login')
-      showToast('请先登录后再购买')
-      return
-    }
     if (publicSettings?.maintain) {
       showToast('站点维护中，暂停下单')
       return
     }
-    const needEmail = !user.email
+    const needEmailNow = !user?.email
     const email = checkoutEmail.trim()
-    if (needEmail && !email) {
+    if (authLoading) return
+    if (needEmailNow && !email) {
       showToast('请填写收货邮箱')
       return
     }
@@ -129,18 +132,23 @@ export function ProductDetailPage() {
       const res = await api.post<CheckoutResult>('/api/orders/checkout', {
         items: [{ id: product.id, name: product.name, price: product.price }],
         payment_method_id: payment?.id || '',
-        ...(needEmail ? { email } : {}),
+        ...(needEmailNow ? { email } : {}),
       })
-      await refreshMe()
+      if (needEmailNow) setGuestEmail(email)
+      if (user) await refreshMe()
       const outcome = resolveCheckoutResult(res)
       if (outcome === 'paid') {
-        const hit = res.order.items.find((it) => it.product_id === product.id && it.payload)
-        if (hit?.payload) {
+        const hit = res.order.items.find(
+          (it) =>
+            it.product_id === product.id &&
+            (Boolean(it.payload) || Boolean(it.download_url) || Boolean(it.files && it.files.length)),
+        )
+        if (hit) {
           setUnlock({ unlocked: true, orderId: res.order.id })
         }
         showPurchaseResult({
           status: 'success',
-          message: debugMode ? '调试模式：已跳过支付并完成发货' : '订单已生成，商品已发货。',
+          message: debugMode ? '调试模式：已跳过支付并完成发货' : isFree ? '免费领取成功，商品已发放。' : '订单已生成，商品已发货。',
           orderId: res.order.id,
         })
         return
@@ -221,6 +229,10 @@ export function ProductDetailPage() {
                     <div className="mb-5 rounded-xl border border-[rgba(196,165,116,.45)] bg-[rgba(196,165,116,.12)] px-3.5 py-3 text-[0.82rem] text-[#8b6b3d]">
                       调试模式已开启：购买将跳过真实支付并直接发货
                     </div>
+                  ) : isFree ? (
+                    <div className="mb-5 rounded-xl border border-[rgba(15,110,92,.25)] bg-[rgba(15,110,92,.08)] px-3.5 py-3 text-[0.82rem] text-teal">
+                      本商品免费，点击购买后将直接发放
+                    </div>
                   ) : (
                     <PaymentMethodPicker
                       className="mb-5"
@@ -230,7 +242,7 @@ export function ProductDetailPage() {
                     />
                   )}
 
-                  {user && !user.email && (
+                  {needEmail && (
                     <label className="mb-5 block">
                       <span className="mb-1.5 block text-[0.82rem] font-semibold text-ink-soft">收货邮箱</span>
                       <input
@@ -238,7 +250,7 @@ export function ProductDetailPage() {
                         type="email"
                         value={checkoutEmail}
                         onChange={(e) => setCheckoutEmail(e.target.value)}
-                        placeholder="用于发货通知，提交后写入账号"
+                        placeholder="用于发货通知与查询订单"
                         required
                       />
                     </label>
@@ -254,15 +266,15 @@ export function ProductDetailPage() {
                     </button>
                     <button
                       type="button"
-                      disabled={buying}
+                      disabled={buying || authLoading}
                       className="h-12 rounded-xl bg-teal text-[0.95rem] font-semibold text-white transition hover:bg-teal-deep disabled:opacity-60"
                       onClick={handleBuyNow}
                     >
-                      {buying ? (debugMode ? '处理中…' : '跳转支付中…') : debugMode ? '调试购买' : '购买'}
+                      {buying ? (debugMode || isFree ? '处理中…' : '跳转支付中…') : debugMode ? '调试购买' : isFree ? '免费领取' : '购买'}
                     </button>
                   </div>
 
-                  {!debugMode && payment && (
+                  {!debugMode && !isFree && payment && (
                     <p className="mt-3 text-[0.78rem] text-ink-mute">
                       当前渠道：{payment.label} · {payment.channel_name}
                     </p>
@@ -270,7 +282,10 @@ export function ProductDetailPage() {
                 </div>
 
                 <ul className="mt-6 grid gap-2 border-t border-[var(--line)] pt-5 text-[0.82rem] text-ink-soft">
-                  {['付款成功自动发货', '内容仅买家可见', '支持在「我的订单」随时查看'].map((t) => (
+                  {(isFree
+                    ? ['点击购买立即发货', '内容仅买家可见', '支持在「我的订单」随时查看']
+                    : ['付款成功自动发货', '内容仅买家可见', '支持在「我的订单」随时查看']
+                  ).map((t) => (
                     <li key={t} className="flex items-center gap-2">
                       <span className="grid h-[18px] w-[18px] place-items-center rounded-full bg-[rgba(15,110,92,.12)] text-[0.65rem] text-teal">
                         ✓

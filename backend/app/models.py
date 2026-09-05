@@ -66,14 +66,33 @@ class Product(Base):
     category_id: Mapped[Optional[int]] = mapped_column(ForeignKey("categories.id"), nullable=True)
 
     category: Mapped[Optional["Category"]] = relationship(back_populates="products")
+    files: Mapped[List["ProductFile"]] = relationship(
+        back_populates="product",
+        cascade="all, delete-orphan",
+        order_by="ProductFile.sort_order",
+    )
+
+
+class ProductFile(Base):
+    __tablename__ = "product_files"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), index=True)
+    file_path: Mapped[str] = mapped_column(String(512))
+    file_name: Mapped[str] = mapped_column(String(255))
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    product: Mapped["Product"] = relationship(back_populates="files")
 
 
 class Order(Base):
     __tablename__ = "orders"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.id"))
+    user_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("users.id"), nullable=True)
     username: Mapped[str] = mapped_column(String(64))
+    email: Mapped[str] = mapped_column(String(128), index=True, default="")
     total: Mapped[float] = mapped_column(Float)
     status: Mapped[str] = mapped_column(String(16), default="pending")  # pending | paid | completed | failed | cancelled
     payment_channel_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
@@ -83,7 +102,7 @@ class Order(Base):
     paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
-    user: Mapped["User"] = relationship(back_populates="orders")
+    user: Mapped[Optional["User"]] = relationship(back_populates="orders")
     items: Mapped[List["OrderItem"]] = relationship(back_populates="order", cascade="all, delete-orphan")
     deliveries: Mapped[List["Delivery"]] = relationship(back_populates="order", cascade="all, delete-orphan")
 
@@ -113,6 +132,23 @@ class Delivery(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     order: Mapped["Order"] = relationship(back_populates="deliveries")
+    files: Mapped[List["DeliveryFile"]] = relationship(
+        back_populates="delivery",
+        cascade="all, delete-orphan",
+        order_by="DeliveryFile.sort_order",
+    )
+
+
+class DeliveryFile(Base):
+    __tablename__ = "delivery_files"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    delivery_id: Mapped[str] = mapped_column(String(64), ForeignKey("deliveries.id"), index=True)
+    file_path: Mapped[str] = mapped_column(String(512))
+    file_name: Mapped[str] = mapped_column(String(255))
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+    delivery: Mapped["Delivery"] = relationship(back_populates="files")
 
 
 class Settings(Base):

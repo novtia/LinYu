@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom'
 import { ApiError, api } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
+import { useBackdropClose } from '../lib/overlayDismiss'
 import type { User } from '../types'
 
 interface CaptchaRes {
@@ -57,8 +58,45 @@ export function AuthModal() {
   const [resetError, setResetError] = useState('')
   const [captcha, setCaptcha] = useState<CaptchaRes | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const backdrop = useBackdropClose(closeAuth, !submitting)
   const regCooldownTimer = useRef<ReturnType<typeof setInterval> | null>(null)
   const loginCooldownTimer = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  function clearAuthForms() {
+    setLoginMode('password')
+    setLoginUser('')
+    setLoginPass('')
+    setLoginEmail('')
+    setLoginCode('')
+    setLoginCaptcha('')
+    setLoginCodeCooldown(0)
+    setSendingLoginCode(false)
+    setRegUser('')
+    setRegEmail('')
+    setRegPass('')
+    setRegPass2('')
+    setRegCode('')
+    setRegCaptcha('')
+    setRegCodeCooldown(0)
+    setSendingRegCode(false)
+    setResetAccount('')
+    setResetCode('')
+    setResetPass('')
+    setResetPass2('')
+    setResetCaptcha('')
+    setResetStep('send')
+    setLoginError('')
+    setRegError('')
+    setResetError('')
+    if (regCooldownTimer.current) {
+      clearInterval(regCooldownTimer.current)
+      regCooldownTimer.current = null
+    }
+    if (loginCooldownTimer.current) {
+      clearInterval(loginCooldownTimer.current)
+      loginCooldownTimer.current = null
+    }
+  }
 
   async function loadCaptcha() {
     try {
@@ -204,6 +242,7 @@ export function AuthModal() {
           captcha: loginCaptcha,
         })
         login(res.access_token, res.user)
+        clearAuthForms()
         closeAuth()
         showToast('欢迎回来，' + res.user.username)
         if (res.user.role === 'admin') navigate('/admin')
@@ -225,6 +264,7 @@ export function AuthModal() {
         code: loginCode.trim(),
       })
       login(res.access_token, res.user)
+      clearAuthForms()
       closeAuth()
       showToast('欢迎回来，' + res.user.username)
       if (res.user.role === 'admin') navigate('/admin')
@@ -263,6 +303,7 @@ export function AuthModal() {
         code: regCode.trim(),
       })
       login(res.access_token, res.user)
+      clearAuthForms()
       closeAuth()
       showToast('注册成功，已自动登录')
     } catch (err) {
@@ -311,11 +352,8 @@ export function AuthModal() {
         new_password: resetPass,
       })
       showToast(res.message)
+      clearAuthForms()
       setAuthTab('login')
-      setResetStep('send')
-      setResetCode('')
-      setResetPass('')
-      setResetPass2('')
     } catch (err) {
       setResetError(err instanceof ApiError ? err.message : '重置失败')
     } finally {
@@ -328,11 +366,12 @@ export function AuthModal() {
   return (
     <div
       className="fixed inset-0 z-[70] grid place-items-center bg-[rgba(20,32,28,0.5)] p-5"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) closeAuth()
-      }}
+      {...backdrop}
     >
-      <div className="w-[min(420px,100%)] overflow-hidden rounded-[22px] border border-[var(--line)] bg-fog">
+      <div
+        className="w-[min(420px,100%)] overflow-hidden rounded-[22px] border border-[var(--line)] bg-fog"
+        onPointerDown={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between px-5 pt-5">
           <div className="flex flex-wrap gap-1 rounded-[10px] bg-paper p-1">
             {(

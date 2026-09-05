@@ -69,7 +69,10 @@
     cursor: pointer;
   }
   a { color: inherit; text-decoration: none; }
-  input, textarea, select { font: inherit; }
+  input, textarea, select {
+    font: inherit;
+    user-select: text;
+  }
 }
 
 .wrap { width: min(1120px, calc(100% - 40px)); margin-inline: auto; }

@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { ApiError, api } from '../../lib/api'
 import { useToast } from '../../context/ToastContext'
+import { useBackdropClose } from '../../lib/overlayDismiss'
 import type { Category } from '../../types'
 import { IconBtn, PanelTable, Tag } from './ProductsPage'
 
@@ -39,6 +40,8 @@ export function CategoriesPage() {
     setError('')
     setForm({ name: '', sort_order: '0', enabled: true })
   }
+
+  const backdrop = useBackdropClose(closeModal, !saving)
 
   function startCreate() {
     setEditing(null)
@@ -142,12 +145,11 @@ export function CategoriesPage() {
       {open && (
         <div
           className="fixed inset-0 z-[120] flex items-center justify-center bg-[rgba(20,32,28,.45)] p-4 backdrop-blur-[2px]"
-          onClick={(e) => {
-            if (e.target === e.currentTarget && !saving) closeModal()
-          }}
+          {...backdrop}
         >
           <form
             onSubmit={onSave}
+            onPointerDown={(e) => e.stopPropagation()}
             className="w-full max-w-md overflow-hidden rounded-[18px] border border-[var(--line)] bg-white shadow-[0_24px_60px_-28px_rgba(20,32,28,.55)]"
             role="dialog"
             aria-modal="true"

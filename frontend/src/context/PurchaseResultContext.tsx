@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
+import { useBackdropClose } from '../lib/overlayDismiss'
 
 export type PurchaseResultStatus = 'success' | 'failure'
 
@@ -28,6 +29,7 @@ function PurchaseResultModal({
 }) {
   const ok = result.status === 'success'
   const orderHref = result.orderId ? `/orders/${result.orderId}` : '/orders'
+  const backdrop = useBackdropClose(onClose)
 
   return createPortal(
     <div
@@ -35,11 +37,12 @@ function PurchaseResultModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="purchase-result-title"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
+      {...backdrop}
     >
-      <div className="relative w-[min(400px,100%)] overflow-hidden rounded-[22px] border border-[var(--line)] bg-white shadow-[0_28px_60px_-28px_rgba(20,32,28,.55)]">
+      <div
+        className="relative w-[min(400px,100%)] overflow-hidden rounded-[22px] border border-[var(--line)] bg-white shadow-[0_28px_60px_-28px_rgba(20,32,28,.55)]"
+        onPointerDown={(e) => e.stopPropagation()}
+      >
         <button
           type="button"
           onClick={onClose}

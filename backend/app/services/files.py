@@ -124,3 +124,22 @@ def cover_public_url(relative: Optional[str]) -> Optional[str]:
     if not relative:
         return None
     return "/uploads/" + relative.replace("\\", "/").lstrip("/")
+
+
+IMAGE_EXTENSIONS: Set[str] = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}
+IMAGE_MEDIA_TYPES = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".bmp": "image/bmp",
+}
+
+
+def is_image_name(name: str) -> bool:
+    return Path(name or "").suffix.lower() in IMAGE_EXTENSIONS
+
+
+def image_media_type(name: str) -> str:
+    return IMAGE_MEDIA_TYPES.get(Path(name or "").suffix.lower(), "application/octet-stream")

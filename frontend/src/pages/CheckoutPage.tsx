@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link, Navigate } from 'react-router-dom'
+import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { ApiError, api } from '../lib/api'
+import { setGuestEmail } from '../lib/guestEmail'
 import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
 import { usePurchaseResult } from '../context/PurchaseResultContext'
@@ -12,7 +13,7 @@ import type { CheckoutResult, PublicPaymentMethod } from '../types'
 
 export function CheckoutPage() {
   const { items, replaceWithDelivered } = useCart()
-  const { user, loading: authLoading, openAuth, publicSettings, refreshMe } = useAuth()
+  const { user, loading: authLoading, publicSettings, refreshMe } = useAuth()
   const { showToast } = useToast()
   const { showPurchaseResult } = usePurchaseResult()
 
@@ -23,16 +24,9 @@ export function CheckoutPage() {
   const [paymentRequired, setPaymentRequired] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [checkoutEmail, setCheckoutEmail] = useState('')
+  const needEmail = !authLoading && !user?.email
 
-  useEffect(() => {
-    if (!authLoading && !user) openAuth('login')
-  }, [authLoading, user, openAuth])
-
-  if (!authLoading && !user) {
-    return <Navigate to="/" replace />
-  }
-
-  if (!authLoading && user && !pending.length) {
+  if (!authLoading && !pending.length) {
     return (
       <main className="pb-20 pt-8">
         <div className="wrap max-w-xl py-16 text-center">
@@ -47,10 +41,11 @@ export function CheckoutPage() {
   }
 
   const debugMode = !!publicSettings?.debugMode
+  const isFree = total === 0
 
   async function submit() {
     if (!pending.length) return
-    if (!debugMode && !payment) {
+    if (!debugMode && !isFree && !payment) {
       showToast(paymentRequired ? '请选择支付方式' : '暂无可用支付方式，请稍后再试')
       return
     }
@@ -58,7 +53,6 @@ export function CheckoutPage() {
       showToast('站点维护中，暂停下单')
       return
     }
-    const needEmail = !!user && !user.email
     const email = checkoutEmail.trim()
     if (needEmail && !email) {
       showToast('请填写收货邮箱')
@@ -71,13 +65,14 @@ export function CheckoutPage() {
         payment_method_id: payment?.id || '',
         ...(needEmail ? { email } : {}),
       })
-      await refreshMe()
+      if (needEmail) setGuestEmail(email)
+      if (user) await refreshMe()
       replaceWithDelivered([])
       const outcome = resolveCheckoutResult(res)
       if (outcome === 'paid') {
         showPurchaseResult({
           status: 'success',
-          message: debugMode ? '调试模式：已跳过支付并完成发货' : '订单已生成，商品已发货。',
+          message: debugMode ? '调试模式：已跳过支付并完成发货' : isFree ? '免费领取成功，商品已发放。' : '订单已生成，商品已发货。',
           orderId: res.order.id,
         })
         return
@@ -142,6 +137,10 @@ export function CheckoutPage() {
               <div className="mb-5 rounded-xl border border-[rgba(196,165,116,.45)] bg-[rgba(196,165,116,.12)] px-3.5 py-3 text-[0.82rem] text-[#8b6b3d]">
                 调试模式已开启：将跳过真实支付并直接发货
               </div>
+            ) : isFree ? (
+              <div className="mb-5 rounded-xl border border-[rgba(15,110,92,.25)] bg-[rgba(15,110,92,.08)] px-3.5 py-3 text-[0.82rem] text-teal">
+                本单免费，确认后将直接发放
+              </div>
             ) : (
               <PaymentMethodPicker
                 className="mb-5"
@@ -151,13 +150,13 @@ export function CheckoutPage() {
               />
             )}
 
-            {!debugMode && payment && (
+            {!debugMode && !isFree && payment && (
               <p className="mb-4 text-[0.78rem] text-ink-mute">
                 将使用：{payment.label} · {payment.channel_name}
               </p>
             )}
 
-            {user && !user.email && (
+            {needEmail && (
               <label className="mb-5 block">
                 <span className="mb-1.5 block text-[0.82rem] font-semibold text-ink-soft">收货邮箱</span>
                 <input
@@ -165,7 +164,7 @@ export function CheckoutPage() {
                   type="email"
                   value={checkoutEmail}
                   onChange={(e) => setCheckoutEmail(e.target.value)}
-                  placeholder="用于发货通知，提交后写入账号"
+                  placeholder="用于发货通知与查询订单"
                   required
                 />
               </label>
@@ -173,23 +172,27 @@ export function CheckoutPage() {
 
             <button
               type="button"
-              disabled={submitting || !pending.length}
+              disabled={submitting || !pending.length || authLoading}
               onClick={submit}
               className="h-12 w-full rounded-xl bg-teal text-[0.95rem] font-semibold text-white hover:bg-teal-deep disabled:opacity-60"
             >
               {submitting
-                ? debugMode
+                ? debugMode || isFree
                   ? '处理中…'
                   : '正在跳转支付…'
                 : debugMode
                   ? '调试购买'
-                  : '去支付'}
+                  : isFree
+                    ? '免费领取'
+                    : '去支付'}
             </button>
 
             <p className="mt-4 text-[0.78rem] leading-relaxed text-ink-mute">
               {debugMode
                 ? '调试模式下不会发起真实支付，订单会立即完成并发货。'
-                : '支付成功后将自动发货，内容可在订单详情中查看。'}
+                : isFree
+                  ? '确认后将立即发货，内容可在订单详情中查看。'
+                  : '支付成功后将自动发货，内容可在订单详情中查看。'}
             </p>
           </section>
         </div>

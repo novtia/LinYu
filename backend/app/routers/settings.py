@@ -28,6 +28,7 @@ def _order_brief(order: Order) -> OrderOut:
     return OrderOut(
         id=order.id,
         username=order.username,
+        email=order.email or "",
         total=order.total,
         status=order.status,
         created_at=order.created_at,

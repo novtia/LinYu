@@ -3,9 +3,9 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List, Optional
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
-from ..models import Delivery, Order, Product
+from ..models import Delivery, DeliveryFile, Order, Product, ProductFile
 from ..seed import load_settings
 from .delivery import random_id
 
@@ -44,11 +44,20 @@ def fulfill_order(
                 deliveries.append(exists)
                 continue
 
-            product = db.query(Product).filter(Product.id == it.product_id).first()
+            product = (
+                db.query(Product)
+                .options(joinedload(Product.files))
+                .filter(Product.id == it.product_id)
+                .first()
+            )
             payload = (product.delivery_content or "").strip() if product else ""
-            file_path = getattr(product, "file_path", None) if product else None
-            if not payload:
-                payload = "文件已附在本条发货记录，请点击下载。" if file_path else "暂无发货内容，请联系客服"
+            paid_files: List[ProductFile] = []
+            if product:
+                paid_files = sorted(list(product.files or []), key=lambda f: (f.sort_order, f.created_at or datetime.min))
+            first_path = paid_files[0].file_path if paid_files else (getattr(product, "file_path", None) if product else None)
+            first_name = paid_files[0].file_name if paid_files else (getattr(product, "file_name", None) if product else None)
+            if not payload and not first_path:
+                payload = "暂无发货内容，请联系客服"
 
             delivery = Delivery(
                 id="d_" + random_id(),
@@ -56,11 +65,32 @@ def fulfill_order(
                 product_id=it.product_id,
                 product_name=it.name,
                 payload=payload,
-                file_path=file_path,
-                file_name=getattr(product, "file_name", None) if product else None,
+                file_path=first_path,
+                file_name=first_name,
                 created_at=datetime.utcnow(),
             )
             db.add(delivery)
+            if paid_files:
+                for i, pf in enumerate(paid_files):
+                    db.add(
+                        DeliveryFile(
+                            id="df_" + random_id(length=8),
+                            delivery_id=delivery.id,
+                            file_path=pf.file_path,
+                            file_name=pf.file_name,
+                            sort_order=i,
+                        )
+                    )
+            elif first_path:
+                db.add(
+                    DeliveryFile(
+                        id="df_" + random_id(length=8),
+                        delivery_id=delivery.id,
+                        file_path=first_path,
+                        file_name=first_name or "已购文件",
+                        sort_order=0,
+                    )
+                )
             deliveries.append(delivery)
         order.status = "completed"
     else:

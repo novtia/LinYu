@@ -26,11 +26,12 @@ export function OrdersPage() {
   }, [])
 
   return (
-    <PanelTable headers={['订单号', '用户', '商品', '金额', '状态', '时间', '操作']} empty={!orders.length} emptyText="暂无订单">
+    <PanelTable headers={['订单号', '用户', '邮箱', '商品', '金额', '状态', '时间', '操作']} empty={!orders.length} emptyText="暂无订单">
       {orders.map((o) => (
         <tr key={o.id} className="border-t border-[var(--line)] hover:bg-[rgba(232,241,238,.4)]">
           <td className="whitespace-nowrap px-[18px] py-3.5 font-[family-name:var(--font-mono)] text-[0.85rem]">{o.id}</td>
           <td className="whitespace-nowrap px-[18px] py-3.5">{o.username}</td>
+          <td className="whitespace-nowrap px-[18px] py-3.5 text-[0.85rem] text-ink-soft">{o.email || '—'}</td>
           <td className="whitespace-nowrap px-[18px] py-3.5">{o.items.map((i) => i.name).join('、')}</td>
           <td className="whitespace-nowrap px-[18px] py-3.5">¥{o.total}</td>
           <td className="whitespace-nowrap px-[18px] py-3.5">

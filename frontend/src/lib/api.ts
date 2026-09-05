@@ -1,3 +1,5 @@
+import { withGuestEmailQuery } from './guestEmail'
+
 const TOKEN_KEY = 'lingxia_token'
 
 export function getToken(): string | null {
@@ -88,7 +90,8 @@ export const api = {
     const headers = new Headers()
     const token = getToken()
     if (token) headers.set('Authorization', `Bearer ${token}`)
-    const res = await fetch(path, { headers })
+    const requestUrl = token ? path : withGuestEmailQuery(path)
+    const res = await fetch(requestUrl, { headers })
     if (!res.ok) {
       let detail = '下载失败'
       try {
@@ -115,5 +118,24 @@ export const api = {
     a.click()
     a.remove()
     URL.revokeObjectURL(url)
+  },
+  blobUrl: async (path: string) => {
+    const headers = new Headers()
+    const token = getToken()
+    if (token) headers.set('Authorization', `Bearer ${token}`)
+    const requestUrl = token ? path : withGuestEmailQuery(path)
+    const res = await fetch(requestUrl, { headers })
+    if (!res.ok) {
+      let detail = '加载失败'
+      try {
+        const data = await res.json()
+        detail = data.detail || detail
+      } catch {
+        /* ignore */
+      }
+      handleUnauthorized(res.status)
+      throw new ApiError(res.status, String(detail))
+    }
+    return URL.createObjectURL(await res.blob())
   },
 }

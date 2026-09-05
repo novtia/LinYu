@@ -97,6 +97,39 @@ class CategoryIn(BaseModel):
     enabled: bool = True
 
 
+class ProductFileItemOut(BaseModel):
+    id: str
+    file_name: str
+    is_image: bool = False
+    download_url: Optional[str] = None
+
+    @classmethod
+    def list_from_delivery(cls, d) -> List["ProductFileItemOut"]:
+        from .services.files import is_image_name
+
+        items: List[ProductFileItemOut] = []
+        for f in getattr(d, "files", None) or []:
+            items.append(
+                cls(
+                    id=f.id,
+                    file_name=f.file_name,
+                    is_image=is_image_name(f.file_name),
+                    download_url=f"/api/downloads/files/{f.id}",
+                )
+            )
+        if not items and getattr(d, "file_path", None):
+            name = getattr(d, "file_name", None) or "已购文件"
+            items.append(
+                cls(
+                    id=d.id,
+                    file_name=name,
+                    is_image=is_image_name(name),
+                    download_url=f"/api/downloads/{d.id}",
+                )
+            )
+        return items
+
+
 class ProductOut(BaseModel):
     id: int
     name: str
@@ -109,15 +142,26 @@ class ProductOut(BaseModel):
     category_name: Optional[str] = None
     delivery_content: Optional[str] = None
     file_name: Optional[str] = None
+    files: List[ProductFileItemOut] = Field(default_factory=list)
 
     class Config:
         from_attributes = True
 
     @classmethod
     def from_orm_product(cls, p, *, include_delivery: bool = False) -> "ProductOut":
-        from .services.files import cover_public_url
+        from .services.files import cover_public_url, is_image_name
 
         cat = getattr(p, "category", None)
+        files: List[ProductFileItemOut] = []
+        if include_delivery:
+            for f in getattr(p, "files", None) or []:
+                files.append(
+                    ProductFileItemOut(
+                        id=f.id,
+                        file_name=f.file_name,
+                        is_image=is_image_name(f.file_name),
+                    )
+                )
         return cls(
             id=p.id,
             name=p.name,
@@ -129,13 +173,14 @@ class ProductOut(BaseModel):
             category_id=p.category_id,
             category_name=cat.name if cat else None,
             delivery_content=(p.delivery_content or "") if include_delivery else None,
-            file_name=getattr(p, "file_name", None) if include_delivery else None,
+            file_name=(files[0].file_name if files else getattr(p, "file_name", None)) if include_delivery else None,
+            files=files,
         )
 
 
 class ProductIn(BaseModel):
     name: str
-    price: float
+    price: float = Field(ge=0)
     desc: str = ""
     delivery_content: str = ""
     cover: str = "p1"
@@ -155,7 +200,9 @@ class AssetUploadOut(BaseModel):
 
 
 class ProductFileOut(BaseModel):
+    id: Optional[str] = None
     file_name: str
+    is_image: bool = False
     message: str = "商品文件已上传"
 
 
@@ -168,7 +215,11 @@ class CartItemIn(BaseModel):
 class CheckoutIn(BaseModel):
     items: List[CartItemIn] = Field(min_length=1)
     payment_method_id: str = Field(default="", description="公开支付方式 ID：{channel_id}:{method}；调试模式可留空")
-    email: Optional[str] = Field(default=None, description="收货邮箱；账号未绑定时必填")
+    email: Optional[str] = Field(default=None, description="收货邮箱；游客必填，已登录则使用账号邮箱")
+
+
+class OrderLookupIn(BaseModel):
+    email: str = Field(min_length=1, description="购买时填写的收货邮箱")
 
 
 class DeliveryOut(BaseModel):
@@ -179,6 +230,7 @@ class DeliveryOut(BaseModel):
     payload: str
     file_name: Optional[str] = None
     download_url: Optional[str] = None
+    files: List[ProductFileItemOut] = Field(default_factory=list)
     created_at: datetime
 
     class Config:
@@ -192,11 +244,13 @@ class OrderItemOut(BaseModel):
     payload: Optional[str] = None
     file_name: Optional[str] = None
     download_url: Optional[str] = None
+    files: List[ProductFileItemOut] = Field(default_factory=list)
 
 
 class OrderOut(BaseModel):
     id: str
     username: str
+    email: str = ""
     total: float
     status: str
     payment_method: Optional[str] = None

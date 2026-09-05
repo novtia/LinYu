@@ -53,6 +53,12 @@ export function Topbar() {
           领匣
         </Link>
         <div className="relative flex items-center gap-2.5">
+          <Link
+            to="/orders"
+            className="inline-flex h-10 items-center rounded-xl px-3.5 text-[0.88rem] font-semibold text-ink-soft transition hover:-translate-y-px hover:bg-paper hover:text-ink"
+          >
+            我的订单
+          </Link>
           <div className="relative" ref={cartRef}>
             <button
               type="button"

@@ -1,12 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
-import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ApiError, api } from '../lib/api'
+import { getGuestEmail, orderPath, setGuestEmail } from '../lib/guestEmail'
 import { orderStatusClass, orderStatusLabel } from '../lib/orderStatus'
 import { useAuth } from '../context/AuthContext'
 import { usePurchaseResult } from '../context/PurchaseResultContext'
 import { useToast } from '../context/ToastContext'
 import { MarkdownContent } from '../components/MarkdownContent'
-import type { Order } from '../types'
+import { DeliveryFileList } from '../components/DeliveryFileList'
+import type { Order, ProductFileItem } from '../types'
 
 function fmtTime(iso: string) {
   const d = new Date(iso)
@@ -17,31 +19,47 @@ export function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const [searchParams, setSearchParams] = useSearchParams()
   const fromPay = searchParams.get('pay') === '1'
-  const { user, loading, openAuth } = useAuth()
+  const { user, loading } = useAuth()
   const { showToast } = useToast()
   const { showPurchaseResult } = usePurchaseResult()
   const [order, setOrder] = useState<Order | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(true)
+  const [needEmail, setNeedEmail] = useState(false)
+  const [emailInput, setEmailInput] = useState(getGuestEmail())
+  const [emailKey, setEmailKey] = useState(0)
   const navigate = useNavigate()
   const resultShown = useRef(false)
 
   useEffect(() => {
     if (loading) return
-    if (!user) {
-      openAuth('login')
+    if (!id) return
+    const canFetch = !!user || !!getGuestEmail()
+    if (!canFetch) {
+      setNeedEmail(true)
       setBusy(false)
+      setOrder(null)
       return
     }
-    if (!id) return
     let alive = true
+    setBusy(true)
+    setNeedEmail(false)
+    setError('')
     api
-      .get<Order>(`/api/orders/${id}`)
+      .get<Order>(user ? `/api/orders/${id}` : orderPath(id))
       .then((o) => {
         if (alive) setOrder(o)
       })
       .catch((e) => {
-        if (alive) setError(e instanceof ApiError ? e.message : '加载失败')
+        if (!alive) return
+        const message = e instanceof ApiError ? e.message : '加载失败'
+        if (e instanceof ApiError && e.status === 403 && message.includes('邮箱')) {
+          setNeedEmail(true)
+          setOrder(null)
+          setError('')
+          return
+        }
+        setError(message)
       })
       .finally(() => {
         if (alive) setBusy(false)
@@ -49,11 +67,11 @@ export function OrderDetailPage() {
     return () => {
       alive = false
     }
-  }, [id, user, loading, openAuth])
+  }, [id, user, loading, emailKey])
 
-  // 支付回跳：轮询直到完成或超时
   useEffect(() => {
-    if (!fromPay || !id || !user || !order) return
+    const hasAccess = !!user || !!getGuestEmail()
+    if (!fromPay || !id || !hasAccess || !order) return
     if (order.status === 'completed' || order.status === 'paid') {
       if (!resultShown.current) {
         resultShown.current = true
@@ -83,7 +101,7 @@ export function OrderDetailPage() {
     const timer = window.setInterval(async () => {
       tries += 1
       try {
-        const next = await api.get<Order>(`/api/orders/${id}`)
+        const next = await api.get<Order>(user ? `/api/orders/${id}` : orderPath(id))
         setOrder(next)
         if (next.status === 'completed' || next.status === 'paid') {
           window.clearInterval(timer)
@@ -116,7 +134,50 @@ export function OrderDetailPage() {
     return () => window.clearInterval(timer)
   }, [fromPay, id, user, order, showPurchaseResult, setSearchParams])
 
-  if (!loading && !user) return <Navigate to="/" replace />
+  function submitEmail(e: FormEvent) {
+    e.preventDefault()
+    const value = emailInput.trim()
+    if (!value) {
+      showToast('请填写购买时使用的邮箱')
+      return
+    }
+    setGuestEmail(value)
+    setBusy(true)
+    setEmailKey((n) => n + 1)
+  }
+
+  if (needEmail) {
+    return (
+      <main className="pb-20 pt-8">
+        <div className="wrap max-w-lg">
+          <h1 className="mb-2 font-[family-name:var(--font-display)] text-2xl font-extrabold tracking-tight">查找订单</h1>
+          <p className="mb-6 text-[0.9rem] text-ink-mute">请填写购买时使用的邮箱后查看发放内容。</p>
+          <form onSubmit={submitEmail} className="rounded-[22px] border border-[var(--line)] bg-white p-5">
+            <label className="mb-4 block">
+              <span className="mb-1.5 block text-[0.82rem] font-semibold text-ink-soft">购买邮箱</span>
+              <input
+                className="field-input"
+                type="email"
+                value={emailInput}
+                onChange={(ev) => setEmailInput(ev.target.value)}
+                placeholder="填写下单时使用的邮箱"
+                required
+              />
+            </label>
+            <button
+              type="submit"
+              className="h-11 w-full rounded-xl bg-teal text-[0.9rem] font-semibold text-white hover:bg-teal-deep"
+            >
+              查看订单
+            </button>
+          </form>
+          <Link to="/orders" className="mt-5 inline-block text-[0.9rem] font-semibold text-teal hover:underline">
+            返回订单列表
+          </Link>
+        </div>
+      </main>
+    )
+  }
 
   if (busy) return <div className="wrap py-20 text-center text-ink-mute">加载中…</div>
 
@@ -136,7 +197,7 @@ export function OrderDetailPage() {
 
   return (
     <main className="pb-20 pt-8">
-      <div className="wrap max-w-3xl">
+      <div className="wrap">
         <button type="button" onClick={() => navigate('/orders')} className="mb-6 text-[0.9rem] text-ink-soft hover:text-teal">
           ← 我的订单
         </button>
@@ -200,28 +261,35 @@ export function OrderDetailPage() {
                           复制原文
                         </button>
                       </>
-                    ) : it.download_url ? (
-                      <div className="flex items-center gap-3">
-                        <div className="min-w-0 flex-1 truncate font-[family-name:var(--font-mono)] text-[0.82rem] text-ink">
-                          {it.file_name || '已购文件'}
-                        </div>
-                        <button
-                          type="button"
-                          className="shrink-0 text-[0.82rem] font-semibold text-teal hover:underline"
-                          onClick={async () => {
+                    ) : null}
+                    {(it.files && it.files.length > 0) || it.download_url ? (
+                      <div className={it.payload ? 'mt-3' : ''}>
+                        <DeliveryFileList
+                          files={
+                            it.files && it.files.length
+                              ? it.files
+                              : ([
+                                  {
+                                    id: it.download_url || it.file_name || String(i),
+                                    file_name: it.file_name || '已购文件',
+                                    is_image: /\.(png|jpe?g|gif|webp|bmp)$/i.test(it.file_name || ''),
+                                    download_url: it.download_url,
+                                  },
+                                ] as ProductFileItem[])
+                          }
+                          onDownload={async (url, name) => {
                             try {
-                              await api.download(it.download_url!, it.file_name || undefined)
+                              await api.download(url, name)
                             } catch (e) {
                               showToast(e instanceof ApiError ? e.message : '下载失败')
                             }
                           }}
-                        >
-                          下载文件
-                        </button>
+                        />
                       </div>
-                    ) : (
+                    ) : null}
+                    {!it.payload && !(it.files && it.files.length) && !it.download_url ? (
                       <div className="text-[0.86rem] text-ink-mute">未发放</div>
-                    )}
+                    ) : null}
                   </div>
                 )}
               </div>

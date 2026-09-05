@@ -126,8 +126,10 @@ def notify_order_emails(db: Session, order: Order) -> None:
     site_name = settings["sys"].name or "领匣"
     products = "、".join(it.name for it in order.items) or "—"
 
-    user = db.query(User).filter(User.id == order.user_id).first()
-    buyer_email = (user.email or "").strip() if user else ""
+    buyer_email = (order.email or "").strip()
+    if not buyer_email and order.user_id:
+        user = db.query(User).filter(User.id == order.user_id).first()
+        buyer_email = (user.email or "").strip() if user else ""
     if buyer_email and mail.template_buyer.strip():
         _safe_send(
             mail,
