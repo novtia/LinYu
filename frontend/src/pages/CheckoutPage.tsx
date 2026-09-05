@@ -3,22 +3,23 @@ import { Link } from 'react-router-dom'
 import { ApiError, api } from '../lib/api'
 import { setGuestEmail } from '../lib/guestEmail'
 import { useAuth } from '../context/AuthContext'
-import { useCart } from '../context/CartContext'
+import { cartLineQty, cartLineTotal, expandCartLines, useCart } from '../context/CartContext'
 import { usePurchaseResult } from '../context/PurchaseResultContext'
 import { useToast } from '../context/ToastContext'
 import { PageBreadcrumb } from '../components/PageBreadcrumb'
 import { PaymentMethodPicker } from '../components/PaymentMethodPicker'
+import { QuantityStepper } from '../components/QuantityStepper'
 import { resolveCheckoutResult } from '../lib/checkout'
 import type { CheckoutResult, PublicPaymentMethod } from '../types'
 
 export function CheckoutPage() {
-  const { items, replaceWithDelivered } = useCart()
+  const { items, replaceWithDelivered, setQuantity, removeAt } = useCart()
   const { user, loading: authLoading, publicSettings, refreshMe } = useAuth()
   const { showToast } = useToast()
   const { showPurchaseResult } = usePurchaseResult()
 
   const pending = useMemo(() => items.filter((it) => !it.delivered), [items])
-  const total = pending.reduce((s, it) => s + it.price, 0)
+  const total = pending.reduce((s, it) => s + cartLineTotal(it), 0)
 
   const [payment, setPayment] = useState<PublicPaymentMethod | null>(null)
   const [paymentRequired, setPaymentRequired] = useState(false)
@@ -61,7 +62,7 @@ export function CheckoutPage() {
     setSubmitting(true)
     try {
       const res = await api.post<CheckoutResult>('/api/orders/checkout', {
-        items: pending.map((it) => ({ id: it.id, name: it.name, price: it.price })),
+        items: expandCartLines(pending),
         payment_method_id: payment?.id || '',
         ...(needEmail ? { email } : {}),
       })
@@ -109,21 +110,34 @@ export function CheckoutPage() {
           <section className="min-w-0">
             <h2 className="mb-4 text-[0.82rem] font-semibold tracking-wide text-ink-mute">商品清单</h2>
             <ul className="divide-y divide-[var(--line)] border-y border-[var(--line)]">
-              {pending.map((item, i) => (
-                <li key={`${item.id}-${i}`} className="flex items-start justify-between gap-4 py-4">
-                  <div className="min-w-0">
-                    <div className="font-semibold text-ink">{item.name}</div>
-                    {item.payment && (
+              {pending.map((item, i) => {
+                const idx = items.indexOf(item)
+                const qty = cartLineQty(item)
+                return (
+                  <li key={`${item.id}-${i}`} className="flex items-start justify-between gap-4 py-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-ink">{item.name}</div>
                       <div className="mt-1 text-[0.8rem] text-ink-mute">
-                        加购渠道偏好：{item.payment.label} · {item.payment.channel_name}
+                        ¥{item.price} / 件
+                        {item.payment ? ` · 加购渠道偏好：${item.payment.label} · ${item.payment.channel_name}` : ''}
                       </div>
-                    )}
-                  </div>
-                  <div className="shrink-0 font-[family-name:var(--font-display)] text-[1.05rem] font-bold">
-                    ¥{item.price}
-                  </div>
-                </li>
-              ))}
+                      <div className="mt-3 flex flex-wrap items-center gap-3">
+                        <QuantityStepper size="sm" value={qty} onChange={(next) => setQuantity(idx, next)} />
+                        <button
+                          type="button"
+                          className="text-[0.8rem] text-danger hover:underline"
+                          onClick={() => removeAt(idx)}
+                        >
+                          移除
+                        </button>
+                      </div>
+                    </div>
+                    <div className="shrink-0 font-[family-name:var(--font-display)] text-[1.05rem] font-bold">
+                      ¥{cartLineTotal(item)}
+                    </div>
+                  </li>
+                )
+              })}
             </ul>
           </section>
 

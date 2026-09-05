@@ -42,6 +42,7 @@ export interface CartItem {
   id: number
   name: string
   price: number
+  quantity: number
   delivered?: boolean
   payload?: string
   file_name?: string | null

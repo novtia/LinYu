@@ -9,6 +9,7 @@ import { useToast } from '../context/ToastContext'
 import { MarkdownContent } from '../components/MarkdownContent'
 import { PageBreadcrumb } from '../components/PageBreadcrumb'
 import { PaymentMethodPicker } from '../components/PaymentMethodPicker'
+import { QuantityStepper, clampCartQty } from '../components/QuantityStepper'
 import { ProductDeliveryPanel, type DeliveryUnlock } from '../components/ProductDeliveryPanel'
 import { ProductMedia } from '../components/ProductMedia'
 import { resolveCheckoutResult } from '../lib/checkout'
@@ -28,6 +29,7 @@ export function ProductDetailPage() {
   const [unlock, setUnlock] = useState<DeliveryUnlock | null>(null)
   const [buying, setBuying] = useState(false)
   const [checkoutEmail, setCheckoutEmail] = useState('')
+  const [quantity, setQuantity] = useState(1)
   const { addProduct } = useCart()
   const { user, loading: authLoading, publicSettings, refreshMe } = useAuth()
   const { showToast } = useToast()
@@ -40,6 +42,7 @@ export function ProductDetailPage() {
     setPayment(null)
     setPaymentRequired(false)
     setUnlock(null)
+    setQuantity(1)
     api
       .get<Product>(`/api/products/${id}`)
       .then((p) => {
@@ -109,8 +112,9 @@ export function ProductDetailPage() {
 
   function handleAddCart() {
     if (!product) return
-    addProduct(product, payment, { openDrawer: true })
-    showToast(`已加入购物车：${product.name}`)
+    const qty = clampCartQty(quantity)
+    addProduct(product, payment, { openDrawer: true, quantity: qty })
+    showToast(qty > 1 ? `已加入购物车：${product.name} ×${qty}` : `已加入购物车：${product.name}`)
   }
 
   async function handleBuyNow() {
@@ -129,8 +133,9 @@ export function ProductDetailPage() {
     }
     setBuying(true)
     try {
+      const qty = clampCartQty(quantity)
       const res = await api.post<CheckoutResult>('/api/orders/checkout', {
-        items: [{ id: product.id, name: product.name, price: product.price }],
+        items: Array.from({ length: qty }, () => ({ id: product.id, name: product.name, price: product.price })),
         payment_method_id: payment?.id || '',
         ...(needEmailNow ? { email } : {}),
       })
@@ -216,10 +221,15 @@ export function ProductDetailPage() {
 
             <aside className="w-full self-start">
               <div className="rounded-[22px] border border-[var(--line)] bg-white p-5 shadow-[0_22px_48px_-40px_rgba(20,32,28,.4)] md:p-6">
-                <div className="mb-5 flex items-end gap-2 border-b border-[var(--line)] pb-5">
+                <div className="mb-5 flex items-end justify-between gap-3 border-b border-[var(--line)] pb-5">
                   <span className="font-[family-name:var(--font-display)] text-[2.2rem] font-bold tracking-tight text-ink">
                     ¥{product.price}
                   </span>
+                  {quantity > 1 && (
+                    <span className="mb-1 text-[0.82rem] text-ink-mute">
+                      小计 ¥{Math.round(product.price * quantity * 100) / 100}
+                    </span>
+                  )}
                 </div>
 
                 <ProductDeliveryPanel className="mb-5" unlock={unlock} />
@@ -241,6 +251,11 @@ export function ProductDetailPage() {
                       onAvailabilityChange={setPaymentRequired}
                     />
                   )}
+
+                  <div className="mb-5">
+                    <span className="mb-1.5 block text-[0.82rem] font-semibold text-ink-soft">购买数量</span>
+                    <QuantityStepper value={quantity} onChange={setQuantity} />
+                  </div>
 
                   {needEmail && (
                     <label className="mb-5 block">

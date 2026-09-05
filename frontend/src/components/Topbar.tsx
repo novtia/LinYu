@@ -7,7 +7,7 @@ import { CartDropdown } from './CartDropdown'
 
 export function Topbar() {
   const { user, openAuth, logout } = useAuth()
-  const { items, open: cartOpen, closeCart, toggleCart } = useCart()
+  const { count, open: cartOpen, closeCart, toggleCart } = useCart()
   const { showToast } = useToast()
   const [menuOpen, setMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
@@ -75,7 +75,7 @@ export function Topbar() {
             >
               购物车
               <span className="inline-grid min-w-5 place-items-center rounded-md bg-mint px-1.5 text-[0.75rem] font-bold text-ink">
-                {items.length}
+                {count}
               </span>
             </button>
             <CartDropdown />
