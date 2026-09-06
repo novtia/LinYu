@@ -391,6 +391,7 @@ class CommissionThreadOut(BaseModel):
     username: str
     product_id: int
     product_name: str
+    order_id: Optional[str] = None
     unread_admin: int = 0
     unread_user: int = 0
     last_preview: Optional[str] = None

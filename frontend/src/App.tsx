@@ -22,6 +22,7 @@ import { PaymentChannelFormPage } from './pages/admin/PaymentChannelFormPage'
 import { SystemPage } from './pages/admin/SystemPage'
 import { WebsitePage } from './pages/admin/WebsitePage'
 import { ConversationsPage } from './pages/admin/ConversationsPage'
+import { MyCommissionsPage } from './pages/MyCommissionsPage'
 
 export default function App() {
   return (
@@ -37,6 +38,7 @@ export default function App() {
                   <Route path="/checkout" element={<CheckoutPage />} />
                   <Route path="/orders" element={<OrdersListPage />} />
                   <Route path="/orders/:id" element={<OrderDetailPage />} />
+                  <Route path="/commissions" element={<MyCommissionsPage />} />
                 </Route>
                 <Route path="/admin" element={<AdminLayout />}>
                   <Route index element={<DashboardPage />} />

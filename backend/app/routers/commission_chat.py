@@ -6,11 +6,11 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from ..database import get_db
 from ..deps import get_admin_user, get_current_user
-from ..models import CommissionMessage, CommissionThread, Product, User
+from ..models import CommissionMessage, CommissionThread, Order, OrderItem, Product, User
 from ..schemas import (
     CommissionMessageIn,
     CommissionMessageOut,
@@ -18,6 +18,7 @@ from ..schemas import (
     CommissionThreadListOut,
     CommissionThreadOut,
 )
+from ..services.commission import is_commission_mode
 from ..services.commission_chat import (
     add_message,
     assert_commission_product,
@@ -43,12 +44,15 @@ def _get_thread(db: Session, thread_id: str) -> CommissionThread:
     return thread
 
 
-def _assert_access(thread: CommissionThread, user: User) -> str:
+def _assert_access(thread: CommissionThread, user: User, viewer: Optional[str] = None) -> str:
+    want_admin = (viewer or "").strip().lower() == "admin"
+    if user.role == "admin" and want_admin:
+        return "admin"
+    if thread.user_id == user.id:
+        return "user"
     if user.role == "admin":
         return "admin"
-    if thread.user_id != user.id:
-        raise HTTPException(status_code=403, detail="无权查看该对话")
-    return "user"
+    raise HTTPException(status_code=403, detail="无权查看该对话")
 
 
 def _mark_read(thread: CommissionThread, role: str) -> None:
@@ -58,18 +62,66 @@ def _mark_read(thread: CommissionThread, role: str) -> None:
         thread.unread_user = 0
 
 
-@router.get("/threads/mine", response_model=CommissionThreadOut)
-def my_thread(
-    product_id: int = Query(...),
+@router.get("/threads/mine", response_model=CommissionThreadListOut)
+def my_threads(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    rows = (
+        db.query(CommissionThread)
+        .filter(CommissionThread.user_id == user.id, CommissionThread.order_id.isnot(None))
+        .order_by(CommissionThread.updated_at.desc())
+        .all()
+    )
+    items = thread_out_many(db, rows)
+    return CommissionThreadListOut(items=items, total=len(items))
+
+
+@router.get("/threads/mine/product/{product_id}", response_model=CommissionThreadOut)
+def my_thread_for_product(
+    product_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """商品页内嵌对话：有订单则打开该商品最近一笔，否则建付款前闲聊线程。"""
     product = db.query(Product).filter(Product.id == product_id).first()
     assert_commission_product(product)
-    thread = get_or_create_thread(db, user.id, product_id)
+    latest = (
+        db.query(CommissionThread)
+        .filter(
+            CommissionThread.user_id == user.id,
+            CommissionThread.product_id == product_id,
+            CommissionThread.order_id.isnot(None),
+        )
+        .order_by(CommissionThread.updated_at.desc())
+        .first()
+    )
+    thread = latest or get_or_create_thread(db, user.id, product_id)
     db.commit()
     db.refresh(thread)
     return thread_out(db, thread, user=user, product=product)
+
+
+@router.get("/threads/mine/{order_id}", response_model=CommissionThreadOut)
+def my_thread_for_order(
+    order_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    order = db.query(Order).options(selectinload(Order.items)).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    if user.role != "admin" and order.user_id != user.id:
+        raise HTTPException(status_code=403, detail="无权查看该对话")
+    if not is_commission_mode(getattr(order, "sale_mode", None)):
+        raise HTTPException(status_code=400, detail="该订单不是约稿订单")
+    items = list(order.items or []) or db.query(OrderItem).filter(OrderItem.order_id == order.id).all()
+    if not items:
+        raise HTTPException(status_code=400, detail="订单没有商品")
+    thread = get_or_create_thread(db, order.user_id or user.id, items[0].product_id, order.id)
+    db.commit()
+    db.refresh(thread)
+    return thread_out(db, thread, user=user)
 
 
 @router.get("/threads", response_model=CommissionThreadListOut)
@@ -92,6 +144,7 @@ def admin_threads(
             or_(
                 CommissionThread.user_id.in_(users),
                 CommissionThread.product_id.in_(products),
+                CommissionThread.order_id.contains(keyword),
                 CommissionThread.last_preview.contains(keyword),
             )
         )
@@ -120,11 +173,13 @@ def list_messages(
     after_id: int = Query(default=0, ge=0),
     before_id: int = Query(default=0, ge=0),
     limit: int = Query(default=PAGE_SIZE, ge=1, le=PAGE_SIZE),
+    viewer: Optional[str] = Query(default=None),
+    mark_read: bool = Query(default=True),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     thread = _get_thread(db, thread_id)
-    role = _assert_access(thread, user)
+    role = _assert_access(thread, user, viewer)
     now = datetime.utcnow()
     q = db.query(CommissionMessage).filter(CommissionMessage.thread_id == thread.id)
     has_more = False
@@ -152,8 +207,9 @@ def list_messages(
         rows = q.order_by(CommissionMessage.id.desc()).limit(limit).all()
         has_more = len(rows) >= limit
         rows.reverse()
-    _mark_read(thread, role)
-    db.commit()
+    if mark_read:
+        _mark_read(thread, role)
+        db.commit()
     unread = int(thread.unread_admin if role == "admin" else thread.unread_user)
     return CommissionMessagesOut(
         messages=[message_out(m, viewer_role=role, now=now) for m in rows],
@@ -166,12 +222,13 @@ def list_messages(
 def send_message(
     thread_id: str,
     body: CommissionMessageIn,
+    viewer: Optional[str] = Query(default=None),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     limit_or_raise(f"chat_send:{user.id}", limit=30, window=60)
     thread = _get_thread(db, thread_id)
-    role = _assert_access(thread, user)
+    role = _assert_access(thread, user, viewer)
     msg_type = (body.type or "text").strip()
     if msg_type not in ALLOWED_TYPES:
         raise HTTPException(status_code=400, detail="不支持的消息类型")
@@ -188,12 +245,13 @@ def send_message(
 async def upload_message(
     thread_id: str,
     file: UploadFile = File(...),
+    viewer: Optional[str] = Query(default=None),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     limit_or_raise(f"chat_upload:{user.id}", limit=20, window=60)
     thread = _get_thread(db, thread_id)
-    role = _assert_access(thread, user)
+    role = _assert_access(thread, user, viewer)
     try:
         stored, original, size = await save_chat_upload(file)
     except ValueError as e:
@@ -217,6 +275,7 @@ async def upload_message(
 @router.post("/messages/{message_id}/recall", response_model=CommissionMessageOut)
 def recall_message(
     message_id: int,
+    viewer: Optional[str] = Query(default=None),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -224,7 +283,7 @@ def recall_message(
     if not msg:
         raise HTTPException(status_code=404, detail="消息不存在")
     thread = _get_thread(db, msg.thread_id)
-    role = _assert_access(thread, user)
+    role = _assert_access(thread, user, viewer)
     if msg.role != role:
         raise HTTPException(status_code=403, detail="只能撤回自己的消息")
     if msg.role == "system" or msg.type == "system":

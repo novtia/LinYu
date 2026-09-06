@@ -45,9 +45,12 @@ async def _collect_params(request: Request) -> Dict[str, Any]:
     return {k: ("" if v is None else str(v)) for k, v in params.items()}
 
 
-def _frontend_order_url(order_id: str) -> str:
+def _frontend_order_url(db: Session, order_id: str) -> str:
     base = (os.getenv("FRONTEND_URL") or "http://127.0.0.1:5173").rstrip("/")
     qs = urlencode({"pay": "1"})
+    order = db.query(Order).filter(Order.id == order_id).first() if order_id else None
+    if order and is_commission_mode(order.sale_mode):
+        return f"{base}/commissions?order={order.id}&{qs}"
     return f"{base}/orders/{order_id}?{qs}"
 
 
@@ -228,7 +231,7 @@ async def ezpay_return(request: Request, db: Session = Depends(get_db)):
             _process_payment(db, params, expect_provider="ezpay")
         except Exception:
             pass
-        return RedirectResponse(_frontend_order_url(_order_id_from_out_trade_no(db, out_trade_no)), status_code=302)
+        return RedirectResponse(_frontend_order_url(db, _order_id_from_out_trade_no(db, out_trade_no)), status_code=302)
     base = (os.getenv("FRONTEND_URL") or "http://127.0.0.1:5173").rstrip("/")
     return RedirectResponse(f"{base}/orders", status_code=302)
 
@@ -251,6 +254,6 @@ async def alipay_return(request: Request, db: Session = Depends(get_db)):
             _process_payment(db, params, expect_provider="alipay")
         except Exception:
             pass
-        return RedirectResponse(_frontend_order_url(_order_id_from_out_trade_no(db, out_trade_no)), status_code=302)
+        return RedirectResponse(_frontend_order_url(db, _order_id_from_out_trade_no(db, out_trade_no)), status_code=302)
     base = (os.getenv("FRONTEND_URL") or "http://127.0.0.1:5173").rstrip("/")
     return RedirectResponse(f"{base}/orders", status_code=302)

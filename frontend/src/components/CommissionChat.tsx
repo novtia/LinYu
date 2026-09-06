@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { FileText, Image as ImageIcon, Paperclip, Smile } from 'lucide-react'
 import { ApiError, api } from '../lib/api'
 import { formatFileSize } from '../lib/commission'
@@ -7,8 +8,8 @@ import type { CommissionMessage, CommissionMessagesResult } from '../types'
 
 const EMOJIS = ['😀', '😁', '😂', '🥰', '😍', '😘', '🤔', '😅', '😭', '😡', '👍', '👎', '👏', '🙏', '🔥', '✨', '❤️', '🤍', '🌸', '⭐', '🎉', '📌', '✅', '💪', '☕', '🌙', '🎵', '📎']
 const RECALL_MS = 10 * 60 * 1000
-const FAST_POLL = 5000
-const SLOW_POLL = 15000
+const FAST_POLL = 3000
+const SLOW_POLL = 12000
 
 type PendingFile = { id: string; file: File; preview?: string }
 
@@ -21,6 +22,16 @@ type Props = {
   mineAvatar?: string
   placeholder?: string
   className?: string
+  onUnread?: (unread: number, threadId: string) => void
+}
+
+function chatPath(path: string, viewer: 'user' | 'admin', extra?: Record<string, string | number>) {
+  const params = new URLSearchParams()
+  params.set('viewer', viewer)
+  if (extra) {
+    for (const [k, v] of Object.entries(extra)) params.set(k, String(v))
+  }
+  return `${path}?${params}`
 }
 
 function isMine(msg: CommissionMessage, viewer: 'user' | 'admin') {
@@ -82,7 +93,7 @@ function AuthImage({ src, alt, className, onClick }: { src: string; alt: string;
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
   }, [src])
-  if (!url) return <div className={`bg-[#1d332d] ${className || ''}`} />
+  if (!url) return <div className={`bg-transparent ${className || ''}`} />
   return <img src={url} alt={alt} className={className} onClick={onClick} />
 }
 
@@ -95,6 +106,7 @@ export function CommissionChat({
   mineAvatar = '我',
   placeholder,
   className = '',
+  onUnread,
 }: Props) {
   const { showToast } = useToast()
   const [messages, setMessages] = useState<CommissionMessage[]>([])
@@ -113,9 +125,16 @@ export function CommissionChat({
   const fileRef = useRef<HTMLInputElement>(null)
   const emptyStreak = useRef(0)
   const lastId = useRef(0)
+  const readyRef = useRef(false)
   const loadingOlder = useRef(false)
+  const onUnreadRef = useRef(onUnread)
+  const activeRef = useRef(active)
+  onUnreadRef.current = onUnread
+  activeRef.current = active
 
-  const pollOn = active && visible && Boolean(threadId)
+  function focused() {
+    return activeRef.current && document.visibilityState === 'visible'
+  }
 
   useEffect(() => {
     const onVis = () => setVisible(document.visibilityState === 'visible')
@@ -135,60 +154,107 @@ export function CommissionChat({
     if (force || near) el.scrollTop = el.scrollHeight
   }, [])
 
-  const loadInitial = useCallback(async (id: string) => {
-    const res = await api.get<CommissionMessagesResult>(`/api/commission/threads/${id}/messages`)
-    setMessages(res.messages)
-    setHasMore(res.has_more)
-    lastId.current = res.messages.at(-1)?.id || 0
-    requestAnimationFrame(() => scrollBottom(true))
-  }, [scrollBottom])
-
   useEffect(() => {
     setMessages([])
     setHasMore(false)
     lastId.current = 0
     emptyStreak.current = 0
+    readyRef.current = false
     if (!threadId) return
     let alive = true
-    loadInitial(threadId).catch(() => {
-      if (alive) setMessages([])
-    })
+    api
+      .get<CommissionMessagesResult>(
+        chatPath(`/api/commission/threads/${threadId}/messages`, viewer, { mark_read: focused() ? 1 : 0 }),
+      )
+      .then((res) => {
+        if (!alive) return
+        setMessages(res.messages)
+        setHasMore(res.has_more)
+        lastId.current = res.messages.at(-1)?.id || 0
+        readyRef.current = true
+        onUnreadRef.current?.(res.unread, threadId)
+        requestAnimationFrame(() => scrollBottom(true))
+      })
+      .catch(() => {
+        if (alive) {
+          setMessages([])
+          readyRef.current = true
+        }
+      })
     return () => {
       alive = false
     }
-  }, [threadId, loadInitial])
+  }, [threadId, viewer, scrollBottom])
 
   useEffect(() => {
-    if (!pollOn || !threadId) return
+    if (!threadId) return
     let timer = 0
     let stopped = false
+
     const tick = async () => {
-      if (stopped || document.visibilityState !== 'visible') return
-      try {
-        const q = lastId.current ? `?after_id=${lastId.current}` : ''
-        const res = await api.get<CommissionMessagesResult>(`/api/commission/threads/${threadId}/messages${q}`)
-        if (res.messages.length) {
-          emptyStreak.current = 0
-          setMessages((prev) => {
-            const next = mergeMessages(prev, res.messages)
-            lastId.current = next.at(-1)?.id || lastId.current
-            return next
-          })
-          requestAnimationFrame(() => scrollBottom())
-        } else {
+      if (stopped) return
+      if (document.visibilityState === 'visible' && readyRef.current) {
+        try {
+          const extra: Record<string, string | number> = { mark_read: focused() ? 1 : 0 }
+          if (lastId.current) extra.after_id = lastId.current
+          const res = await api.get<CommissionMessagesResult>(
+            chatPath(`/api/commission/threads/${threadId}/messages`, viewer, extra),
+          )
+          if (stopped) return
+          onUnreadRef.current?.(res.unread, threadId)
+          if (res.messages.length) {
+            emptyStreak.current = 0
+            setMessages((prev) => {
+              const next = mergeMessages(prev, res.messages)
+              lastId.current = next.at(-1)?.id || lastId.current
+              return next
+            })
+            requestAnimationFrame(() => scrollBottom())
+          } else {
+            emptyStreak.current += 1
+          }
+        } catch {
           emptyStreak.current += 1
         }
-      } catch {
-        emptyStreak.current += 1
       }
       if (!stopped) timer = window.setTimeout(tick, emptyStreak.current >= 2 ? SLOW_POLL : FAST_POLL)
     }
-    timer = window.setTimeout(tick, FAST_POLL)
+
+    timer = window.setTimeout(tick, 800)
+    const onVis = () => {
+      if (document.visibilityState !== 'visible' || stopped) return
+      window.clearTimeout(timer)
+      void tick()
+    }
+    document.addEventListener('visibilitychange', onVis)
     return () => {
       stopped = true
       window.clearTimeout(timer)
+      document.removeEventListener('visibilitychange', onVis)
     }
-  }, [pollOn, threadId, scrollBottom])
+  }, [threadId, viewer, scrollBottom])
+
+  useEffect(() => {
+    if (!threadId || !active || !visible || !readyRef.current) return
+    api
+      .get<CommissionMessagesResult>(
+        chatPath(`/api/commission/threads/${threadId}/messages`, viewer, {
+          mark_read: 1,
+          ...(lastId.current ? { after_id: lastId.current } : {}),
+        }),
+      )
+      .then((res) => {
+        onUnreadRef.current?.(res.unread, threadId)
+        if (!res.messages.length) return
+        setMessages((prev) => {
+          const next = mergeMessages(prev, res.messages)
+          lastId.current = next.at(-1)?.id || lastId.current
+          return next
+        })
+        requestAnimationFrame(() => scrollBottom())
+      })
+      .catch(() => {})
+  }, [active, visible, threadId, viewer, scrollBottom])
 
   async function loadOlder() {
     if (!threadId || !hasMore || loadingOlder.current || !messages.length) return
@@ -197,7 +263,10 @@ export function CommissionChat({
     const before = el ? el.scrollHeight - el.scrollTop : 0
     try {
       const res = await api.get<CommissionMessagesResult>(
-        `/api/commission/threads/${threadId}/messages?before_id=${messages[0].id}`,
+        chatPath(`/api/commission/threads/${threadId}/messages`, viewer, {
+          before_id: messages[0].id,
+          mark_read: focused() ? 1 : 0,
+        }),
       )
       setMessages((prev) => mergeMessages(res.messages, prev))
       setHasMore(res.has_more)
@@ -245,12 +314,12 @@ export function CommissionChat({
     try {
       const created: CommissionMessage[] = []
       for (const item of files) {
-        created.push(await api.upload<CommissionMessage>(`/api/commission/threads/${threadId}/messages/upload`, item.file))
+        created.push(await api.upload<CommissionMessage>(chatPath(`/api/commission/threads/${threadId}/messages/upload`, viewer), item.file))
       }
       if (body) {
         const isEmoji = [...body].length <= 2 && /\p{Extended_Pictographic}/u.test(body)
         created.push(
-          await api.post<CommissionMessage>(`/api/commission/threads/${threadId}/messages`, {
+          await api.post<CommissionMessage>(chatPath(`/api/commission/threads/${threadId}/messages`, viewer), {
             body,
             type: isEmoji ? 'emoji' : 'text',
           }),
@@ -278,7 +347,7 @@ export function CommissionChat({
 
   async function recall(id: number) {
     try {
-      const updated = await api.post<CommissionMessage>(`/api/commission/messages/${id}/recall`)
+      const updated = await api.post<CommissionMessage>(chatPath(`/api/commission/messages/${id}/recall`, viewer))
       setMessages((prev) => prev.map((m) => (m.id === id ? updated : m)))
       showToast('已撤回')
     } catch (e) {
@@ -310,7 +379,7 @@ export function CommissionChat({
 
       <div
         ref={listRef}
-        className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-auto px-0.5 py-3.5"
+        className="flex min-h-0 min-w-0 flex-1 flex-col gap-2.5 overflow-x-hidden overflow-y-auto px-0.5 py-3.5"
         onScroll={(e) => {
           if (e.currentTarget.scrollTop < 40) loadOlder()
         }}
@@ -337,42 +406,40 @@ export function CommissionChat({
             const left = mine && !msg.recalled_at ? recallLeft(msg.created_at, now) : ''
             const showRecall = Boolean(left || (mine && !msg.recalled_at && msg.can_recall))
             return (
-              <div key={msg.id} className="w-full">
+              <div key={msg.id} className="w-full min-w-0">
                 {stamp ? <div className="mb-2 text-center text-[0.72rem] text-ink-mute">{stamp}</div> : null}
-                <div className={`flex w-full ${mine ? 'justify-end' : 'justify-start'} ${follow ? '-mt-1' : ''}`}>
-                  <div className={`flex max-w-[min(26rem,86%)] items-start gap-2 ${mine ? 'flex-row-reverse' : ''}`}>
+                <div className={`flex w-full min-w-0 ${mine ? 'justify-end' : 'justify-start'} ${follow ? '-mt-1' : ''}`}>
+                  <div className={`flex min-w-0 max-w-[min(26rem,100%)] items-start gap-2 ${mine ? 'flex-row-reverse' : ''}`}>
                   <div
                     className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-[0.7rem] font-bold text-white ${mine ? 'bg-teal' : 'bg-ink'} ${follow ? 'invisible' : ''}`}
                   >
                     {mine ? mineAvatar : peerAvatar}
                   </div>
-                  <div className="max-w-[23.75rem] shrink-0">
+                  <div className="min-w-0 max-w-[calc(100%-2.25rem)]">
                     {!follow && (
                       <span className="mb-0.5 block text-[0.68rem] text-ink-mute">{mine ? '我' : viewer === 'admin' ? '买家' : '作者'}</span>
                     )}
                     {msg.recalled_at ? (
                       <div className="text-[0.8rem] text-ink-mute">{mine ? '你撤回了一条消息' : '对方撤回了一条消息'}</div>
+                    ) : msg.type === 'image' && msg.file_url ? (
+                      <button
+                        type="button"
+                        className="block w-full max-w-full border-0 bg-transparent p-0"
+                        onClick={() => setLightbox(msg.file_url || null)}
+                      >
+                        <AuthImage
+                          src={msg.file_url}
+                          alt={msg.file_name || '图片'}
+                          className="block h-auto max-h-[min(70vh,32rem)] w-auto max-w-full cursor-zoom-in object-contain"
+                        />
+                      </button>
                     ) : (
                       <div
                         className={`chat-bubble text-[0.88rem] leading-relaxed ${
-                          msg.type === 'image' || msg.type === 'file' ? 'p-1.5' : 'px-2.5 py-2'
+                          msg.type === 'file' ? 'p-1.5' : 'px-2.5 py-2'
                         } ${mine ? 'bg-ink text-white' : 'bg-fog text-ink'}`}
                       >
-                        {msg.type === 'image' && msg.file_url ? (
-                          <>
-                            <div className="h-28 w-[168px] overflow-hidden bg-[#1d332d]">
-                              <AuthImage
-                                src={msg.file_url}
-                                alt={msg.file_name || '图片'}
-                                className="h-full w-full cursor-zoom-in object-cover"
-                                onClick={() => setLightbox(msg.file_url || null)}
-                              />
-                            </div>
-                            <span className={`mt-1.5 block px-1 text-[0.7rem] ${mine ? 'text-white/70' : 'text-ink-mute'}`}>
-                              {msg.file_name || '参考图'}
-                            </span>
-                          </>
-                        ) : msg.type === 'file' ? (
+                        {msg.type === 'file' ? (
                           <button
                             type="button"
                             className="flex w-[200px] items-center gap-2 text-left"
@@ -514,11 +581,17 @@ export function CommissionChat({
         }}
       />
 
-      {lightbox && (
-        <div className="fixed inset-0 z-[120] grid place-items-center bg-[rgba(20,32,28,.72)] p-6" onClick={() => setLightbox(null)}>
-          <AuthImage src={lightbox} alt="预览" className="max-h-[86vh] max-w-[min(920px,100%)]" />
-        </div>
-      )}
+      {lightbox
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[120] flex items-center justify-center bg-black"
+              onClick={() => setLightbox(null)}
+            >
+              <AuthImage src={lightbox} alt="预览" className="max-h-full max-w-full object-contain" />
+            </div>,
+            document.body,
+          )
+        : null}
     </section>
   )
 }

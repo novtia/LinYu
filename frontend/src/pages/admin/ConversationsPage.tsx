@@ -45,9 +45,13 @@ export function ConversationsPage() {
     loadList()
       .then((items) => {
         if (!alive) return
+        const order = searchParams.get('order')
         const user = searchParams.get('user')
         const product = searchParams.get('product')
-        if (user && product) {
+        if (order) {
+          const hit = items.find((t) => t.order_id === order)
+          if (hit) setActiveId(hit.id)
+        } else if (user && product) {
           const hit = items.find((t) => t.user_id === user && String(t.product_id) === product)
           if (hit) setActiveId(hit.id)
         }
@@ -77,7 +81,7 @@ export function ConversationsPage() {
           <h3 className="mb-3 text-[0.95rem] font-bold">用户</h3>
           <input
             className="h-9 w-full border-0 border-b border-[var(--line)] bg-transparent outline-none"
-            placeholder="搜索用户或篇名"
+            placeholder="搜索用户、篇名或订单码"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -111,7 +115,8 @@ export function ConversationsPage() {
                 className={`grid w-full grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-2.5 px-[18px] py-3 text-left hover:bg-fog ${t.id === activeId ? 'bg-fog' : ''}`}
                 onClick={() => {
                   setActiveId(t.id)
-                  setSearchParams({ user: t.user_id, product: String(t.product_id) }, { replace: true })
+                  setThreads((prev) => prev.map((x) => (x.id === t.id ? { ...x, unread_admin: 0 } : x)))
+                  setSearchParams(t.order_id ? { order: t.order_id } : { user: t.user_id, product: String(t.product_id) }, { replace: true })
                 }}
               >
                 <div className="grid h-9 w-9 place-items-center rounded-full bg-ink text-[0.78rem] font-bold text-white">
@@ -119,6 +124,7 @@ export function ConversationsPage() {
                 </div>
                 <div className="min-w-0">
                   <b className="block text-[0.88rem]">{t.username}</b>
+                  <div className="truncate font-[family-name:var(--font-mono)] text-[0.7rem] text-ink-mute">{t.order_id || t.product_name}</div>
                   <div className="truncate text-[0.74rem] text-ink-mute">{t.last_preview || t.product_name}</div>
                 </div>
                 <div className="text-right">
@@ -145,6 +151,9 @@ export function ConversationsPage() {
             active={visible}
             mineAvatar="匣"
             peerAvatar={active.username.slice(0, 1)}
+            onUnread={(unread, threadId) => {
+              setThreads((prev) => prev.map((t) => (t.id === threadId ? { ...t, unread_admin: unread } : t)))
+            }}
             className="h-full min-h-0 border-0 px-6 pb-5"
             header={
               <div className="mb-2 flex items-center justify-between border-b border-[var(--line)] py-[18px]">
@@ -155,6 +164,7 @@ export function ConversationsPage() {
                   <div>
                     <strong className="block text-[0.95rem]">{active.username}</strong>
                     <span className="text-[0.75rem] text-ink-mute">
+                      {active.order_id ? `${active.order_id} · ` : ''}
                       {active.product_name}
                       {active.word_count ? ` · ${formatWords(active.word_count)}` : ''}
                     </span>

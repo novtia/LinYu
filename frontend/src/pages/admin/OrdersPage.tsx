@@ -57,7 +57,7 @@ export function OrdersPage() {
             </Link>
             {o.sale_mode === 'commission' && o.user_id && o.items[0] ? (
               <Link
-                to={`/admin/conversations?user=${encodeURIComponent(o.user_id)}&product=${o.items[0].product_id}`}
+                to={`/admin/conversations?order=${encodeURIComponent(o.id)}`}
                 className="ml-3 text-[0.82rem] font-semibold text-teal hover:underline"
               >
                 对话

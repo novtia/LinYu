@@ -319,14 +319,14 @@ export function OrderDetailPage() {
             <p className="mt-4">
               {user?.role === 'admin' && order.user_id ? (
                 <Link
-                  to={`/admin/conversations?user=${encodeURIComponent(order.user_id)}&product=${order.items[0].product_id}`}
+                  to={`/admin/conversations?order=${encodeURIComponent(order.id)}`}
                   className="text-[0.86rem] font-semibold text-teal hover:underline"
                 >
                   打开约稿对话
                 </Link>
               ) : (
                 <Link
-                  to={`/product/${order.items[0].product_id}?pane=talk`}
+                  to={`/commissions?order=${encodeURIComponent(order.id)}`}
                   className="text-[0.86rem] font-semibold text-teal hover:underline"
                 >
                   与作者沟通

@@ -206,7 +206,7 @@ class Captcha(Base):
 class CommissionThread(Base):
     __tablename__ = "commission_threads"
     __table_args__ = (
-        UniqueConstraint("user_id", "product_id", name="uq_commission_thread_user_product"),
+        UniqueConstraint("order_id", name="uq_commission_thread_order"),
         Index("ix_commission_threads_updated_at", "updated_at"),
         Index("ix_commission_threads_unread_admin", "unread_admin"),
     )
@@ -214,6 +214,8 @@ class CommissionThread(Base):
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.id"), index=True)
     product_id: Mapped[int] = mapped_column(Integer, index=True)
+    # 一单一会话；付款前闲聊可为空，前台「我的约稿」不展示
+    order_id: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("orders.id"), nullable=True, index=True)
     unread_admin: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     unread_user: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     last_preview: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)

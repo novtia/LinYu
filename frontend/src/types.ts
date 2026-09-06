@@ -248,6 +248,7 @@ export interface CommissionThread {
   username: string
   product_id: number
   product_name: string
+  order_id?: string | null
   unread_admin: number
   unread_user: number
   last_preview?: string | null

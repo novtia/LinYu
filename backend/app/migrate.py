@@ -419,6 +419,7 @@ def _migrate_commission_chat(conn) -> None:
                 id VARCHAR(64) NOT NULL PRIMARY KEY,
                 user_id VARCHAR(64) NOT NULL,
                 product_id INTEGER NOT NULL,
+                order_id VARCHAR(64),
                 unread_admin INTEGER DEFAULT 0 NOT NULL,
                 unread_user INTEGER DEFAULT 0 NOT NULL,
                 last_preview VARCHAR(255),
@@ -426,8 +427,9 @@ def _migrate_commission_chat(conn) -> None:
                 last_kind VARCHAR(16),
                 created_at DATETIME NOT NULL,
                 updated_at DATETIME NOT NULL,
-                CONSTRAINT uq_commission_thread_user_product UNIQUE (user_id, product_id),
-                FOREIGN KEY(user_id) REFERENCES users (id)
+                CONSTRAINT uq_commission_thread_order UNIQUE (order_id),
+                FOREIGN KEY(user_id) REFERENCES users (id),
+                FOREIGN KEY(order_id) REFERENCES orders (id)
             )
             """
         )
@@ -436,6 +438,7 @@ def _migrate_commission_chat(conn) -> None:
     conn.execute(text("CREATE INDEX IF NOT EXISTS ix_commission_threads_unread_admin ON commission_threads (unread_admin)"))
     conn.execute(text("CREATE INDEX IF NOT EXISTS ix_commission_threads_user_id ON commission_threads (user_id)"))
     conn.execute(text("CREATE INDEX IF NOT EXISTS ix_commission_threads_product_id ON commission_threads (product_id)"))
+    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_commission_threads_order_id ON commission_threads (order_id)"))
     conn.execute(
         text(
             """
@@ -461,6 +464,101 @@ def _migrate_commission_chat(conn) -> None:
         )
     )
     conn.execute(text("CREATE INDEX IF NOT EXISTS ix_commission_messages_thread_id ON commission_messages (thread_id)"))
+
+
+def _index_names(conn, table: str) -> set[str]:
+    rows = conn.execute(text(f"PRAGMA index_list({table})")).fetchall()
+    return {str(row[1]) for row in rows}
+
+
+def _migrate_commission_thread_order(conn) -> None:
+    """一单一会话：给线程加上 order_id，去掉 user+product 唯一约束。"""
+    if not _table_exists(conn, "commission_threads"):
+        return
+    cols = _table_columns(conn, "commission_threads")
+    if "order_id" not in cols:
+        conn.execute(text("ALTER TABLE commission_threads ADD COLUMN order_id VARCHAR(64)"))
+
+    if _table_exists(conn, "orders") and _table_exists(conn, "order_items"):
+        conn.execute(
+            text(
+                """
+                UPDATE commission_threads
+                SET order_id = (
+                    SELECT o.id
+                    FROM orders o
+                    JOIN order_items i ON i.order_id = o.id
+                    WHERE o.user_id = commission_threads.user_id
+                      AND i.product_id = commission_threads.product_id
+                      AND o.sale_mode = 'commission'
+                    ORDER BY o.created_at DESC
+                    LIMIT 1
+                )
+                WHERE order_id IS NULL
+                """
+            )
+        )
+
+    indexes = _index_names(conn, "commission_threads")
+    table_sql = conn.execute(
+        text("SELECT sql FROM sqlite_master WHERE type='table' AND name='commission_threads'")
+    ).scalar()
+    has_old_unique = "uq_commission_thread_user_product" in indexes or (
+        isinstance(table_sql, str) and "uq_commission_thread_user_product" in table_sql
+    )
+    has_new_unique = "uq_commission_thread_order" in indexes or (
+        isinstance(table_sql, str) and "uq_commission_thread_order" in table_sql
+    )
+    if not has_old_unique and has_new_unique:
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_commission_threads_order_id ON commission_threads (order_id)"))
+        return
+
+    conn.execute(text("PRAGMA foreign_keys=OFF"))
+    conn.execute(text("DROP TABLE IF EXISTS commission_threads_new"))
+    conn.execute(
+        text(
+            """
+            CREATE TABLE commission_threads_new (
+                id VARCHAR(64) NOT NULL PRIMARY KEY,
+                user_id VARCHAR(64) NOT NULL,
+                product_id INTEGER NOT NULL,
+                order_id VARCHAR(64),
+                unread_admin INTEGER DEFAULT 0 NOT NULL,
+                unread_user INTEGER DEFAULT 0 NOT NULL,
+                last_preview VARCHAR(255),
+                last_at DATETIME,
+                last_kind VARCHAR(16),
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                CONSTRAINT uq_commission_thread_order UNIQUE (order_id),
+                FOREIGN KEY(user_id) REFERENCES users (id),
+                FOREIGN KEY(order_id) REFERENCES orders (id)
+            )
+            """
+        )
+    )
+    conn.execute(
+        text(
+            """
+            INSERT INTO commission_threads_new (
+                id, user_id, product_id, order_id, unread_admin, unread_user,
+                last_preview, last_at, last_kind, created_at, updated_at
+            )
+            SELECT
+                id, user_id, product_id, order_id, unread_admin, unread_user,
+                last_preview, last_at, last_kind, created_at, updated_at
+            FROM commission_threads
+            """
+        )
+    )
+    conn.execute(text("DROP TABLE commission_threads"))
+    conn.execute(text("ALTER TABLE commission_threads_new RENAME TO commission_threads"))
+    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_commission_threads_updated_at ON commission_threads (updated_at)"))
+    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_commission_threads_unread_admin ON commission_threads (unread_admin)"))
+    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_commission_threads_user_id ON commission_threads (user_id)"))
+    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_commission_threads_product_id ON commission_threads (product_id)"))
+    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_commission_threads_order_id ON commission_threads (order_id)"))
+    conn.execute(text("PRAGMA foreign_keys=ON"))
 
 
 def migrate_schema(engine: Engine) -> None:
@@ -501,3 +599,4 @@ def migrate_schema(engine: Engine) -> None:
         _migrate_multi_files(conn)
         _migrate_commission_mode(conn)
         _migrate_commission_chat(conn)
+        _migrate_commission_thread_order(conn)

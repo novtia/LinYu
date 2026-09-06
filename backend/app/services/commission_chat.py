@@ -27,25 +27,74 @@ def _preview(msg_type: str, body: str, file_name: Optional[str]) -> str:
     return text[:PREVIEW_LEN]
 
 
-def get_or_create_thread(db: Session, user_id: str, product_id: int) -> CommissionThread:
+def _new_thread(user_id: str, product_id: int, order_id: Optional[str] = None) -> CommissionThread:
+    now = datetime.utcnow()
+    return CommissionThread(
+        id="ct_" + random_id(length=10),
+        user_id=user_id,
+        product_id=product_id,
+        order_id=order_id,
+        created_at=now,
+        updated_at=now,
+    )
+
+
+def get_or_create_thread(
+    db: Session,
+    user_id: str,
+    product_id: int,
+    order_id: Optional[str] = None,
+) -> CommissionThread:
+    if order_id:
+        thread = db.query(CommissionThread).filter(CommissionThread.order_id == order_id).first()
+        if thread:
+            return thread
+        # 把同商品付款前闲聊挂到这笔新订单上
+        loose = (
+            db.query(CommissionThread)
+            .filter(
+                CommissionThread.user_id == user_id,
+                CommissionThread.product_id == product_id,
+                CommissionThread.order_id.is_(None),
+            )
+            .order_by(CommissionThread.updated_at.desc())
+            .first()
+        )
+        if loose:
+            loose.order_id = order_id
+            return loose
+        thread = _new_thread(user_id, product_id, order_id)
+        db.add(thread)
+        db.flush()
+        return thread
+
     thread = (
         db.query(CommissionThread)
-        .filter(CommissionThread.user_id == user_id, CommissionThread.product_id == product_id)
+        .filter(
+            CommissionThread.user_id == user_id,
+            CommissionThread.product_id == product_id,
+            CommissionThread.order_id.is_(None),
+        )
+        .order_by(CommissionThread.updated_at.desc())
         .first()
     )
     if thread:
         return thread
-    now = datetime.utcnow()
-    thread = CommissionThread(
-        id="ct_" + random_id(length=10),
-        user_id=user_id,
-        product_id=product_id,
-        created_at=now,
-        updated_at=now,
-    )
+    thread = _new_thread(user_id, product_id)
     db.add(thread)
     db.flush()
     return thread
+
+
+def ensure_thread_for_order(db: Session, order: Order) -> Optional[CommissionThread]:
+    if not order.user_id or not is_commission_mode(getattr(order, "sale_mode", None)):
+        return None
+    items = list(order.items or [])
+    if not items:
+        items = db.query(OrderItem).filter(OrderItem.order_id == order.id).all()
+    if not items:
+        return None
+    return get_or_create_thread(db, order.user_id, items[0].product_id, order.id)
 
 
 def refresh_thread_preview(db: Session, thread: CommissionThread) -> None:
@@ -97,8 +146,8 @@ def add_message(
     elif role == "admin":
         thread.unread_user = int(thread.unread_user or 0) + 1
     else:
+        # 系统通知只提醒作者；买家自己触发的定金等不必再亮红点
         thread.unread_admin = int(thread.unread_admin or 0) + 1
-        thread.unread_user = int(thread.unread_user or 0) + 1
     return msg
 
 
@@ -111,7 +160,7 @@ def notify_deposit_paid(db: Session, order: Order) -> None:
     if not items:
         return
     product_id = items[0].product_id
-    thread = get_or_create_thread(db, order.user_id, product_id)
+    thread = get_or_create_thread(db, order.user_id, product_id, order.id)
     deposit, _ = split_price(order.total)
     words = int(order.word_count or 0)
     text = f"已支付定金 {format_yuan_text(deposit)}"
@@ -157,20 +206,6 @@ def message_out(msg: CommissionMessage, *, viewer_role: str, now: Optional[datet
     )
 
 
-def _latest_order(db: Session, user_id: str, product_id: int) -> Optional[Order]:
-    return (
-        db.query(Order)
-        .join(OrderItem, OrderItem.order_id == Order.id)
-        .filter(
-            Order.user_id == user_id,
-            OrderItem.product_id == product_id,
-            Order.sale_mode == "commission",
-        )
-        .order_by(Order.created_at.desc())
-        .first()
-    )
-
-
 def _thread_out_from(
     thread: CommissionThread,
     *,
@@ -185,6 +220,7 @@ def _thread_out_from(
         username=user.username if user else "用户",
         product_id=thread.product_id,
         product_name=product.name if product else "约稿",
+        order_id=thread.order_id,
         unread_admin=int(thread.unread_admin or 0),
         unread_user=int(thread.unread_user or 0),
         last_preview=thread.last_preview,
@@ -198,12 +234,18 @@ def _thread_out_from(
     )
 
 
+def _order_for_thread(db: Session, thread: CommissionThread) -> Optional[Order]:
+    if thread.order_id:
+        return db.query(Order).filter(Order.id == thread.order_id).first()
+    return None
+
+
 def thread_out(db: Session, thread: CommissionThread, *, user: Optional[User] = None, product: Optional[Product] = None) -> CommissionThreadOut:
     if user is None:
         user = db.query(User).filter(User.id == thread.user_id).first()
     if product is None:
         product = db.query(Product).filter(Product.id == thread.product_id).first()
-    order = _latest_order(db, thread.user_id, thread.product_id)
+    order = _order_for_thread(db, thread)
     return _thread_out_from(thread, user=user, product=product, order=order)
 
 
@@ -212,30 +254,16 @@ def thread_out_many(db: Session, threads: list[CommissionThread]) -> list[Commis
         return []
     user_ids = {t.user_id for t in threads}
     product_ids = {t.product_id for t in threads}
+    order_ids = {t.order_id for t in threads if t.order_id}
     users = {u.id: u for u in db.query(User).filter(User.id.in_(user_ids)).all()}
     products = {p.id: p for p in db.query(Product).filter(Product.id.in_(product_ids)).all()}
-    order_rows = (
-        db.query(Order, OrderItem.product_id)
-        .join(OrderItem, OrderItem.order_id == Order.id)
-        .filter(
-            Order.user_id.in_(user_ids),
-            OrderItem.product_id.in_(product_ids),
-            Order.sale_mode == "commission",
-        )
-        .order_by(Order.created_at.desc())
-        .all()
-    )
-    latest: dict[tuple[str, int], Order] = {}
-    for order, product_id in order_rows:
-        key = (order.user_id or "", int(product_id))
-        if key not in latest:
-            latest[key] = order
+    orders = {o.id: o for o in db.query(Order).filter(Order.id.in_(order_ids)).all()} if order_ids else {}
     return [
         _thread_out_from(
             t,
             user=users.get(t.user_id),
             product=products.get(t.product_id),
-            order=latest.get((t.user_id, t.product_id)),
+            order=orders.get(t.order_id) if t.order_id else None,
         )
         for t in threads
     ]

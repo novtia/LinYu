@@ -70,8 +70,11 @@ export function CommissionProductView({ product }: { product: Product }) {
   useEffect(() => {
     if (!user || pane !== 'talk') return
     let alive = true
+    const url = order?.id
+      ? `/api/commission/threads/mine/${encodeURIComponent(order.id)}`
+      : `/api/commission/threads/mine/product/${product.id}`
     api
-      .get<CommissionThread>(`/api/commission/threads/mine?product_id=${product.id}`)
+      .get<CommissionThread>(url)
       .then((t) => {
         if (alive) setThread(t)
       })
@@ -81,7 +84,7 @@ export function CommissionProductView({ product }: { product: Product }) {
     return () => {
       alive = false
     }
-  }, [user, pane, product.id, showToast])
+  }, [user, pane, product.id, order?.id, showToast])
 
   const quote = useMemo(() => {
     const total = commissionTotal(product.price, words)

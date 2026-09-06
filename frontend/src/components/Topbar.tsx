@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { ShoppingCart } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
@@ -47,21 +48,34 @@ export function Topbar() {
         scrolled ? 'border-[var(--line)] bg-[rgba(243,248,246,0.92)]' : 'border-transparent bg-[rgba(243,248,246,0.78)]'
       } backdrop-blur-[14px]`}
     >
-      <div className="wrap flex h-16 items-center justify-between">
-        <Link to="/" className="inline-flex items-center gap-2.5 font-[family-name:var(--font-display)] text-[1.35rem] font-extrabold tracking-[-0.03em]">
+      <div className="wrap flex h-16 items-center justify-between gap-3">
+        <Link to="/" className="inline-flex shrink-0 items-center gap-2 font-[family-name:var(--font-display)] text-[1.2rem] font-extrabold tracking-[-0.03em] whitespace-nowrap md:gap-2.5 md:text-[1.35rem]">
           <span className="brand-mark" aria-hidden />
           领匣
         </Link>
-        <div className="relative flex items-center gap-2.5">
+        <div className="relative flex shrink-0 items-center gap-1 md:gap-2.5">
           <Link
             to="/orders"
-            className="inline-flex h-10 items-center rounded-xl px-3.5 text-[0.88rem] font-semibold text-ink-soft transition hover:-translate-y-px hover:bg-paper hover:text-ink"
+            className="inline-flex h-10 items-center rounded-xl px-2 text-[0.82rem] font-semibold whitespace-nowrap text-ink-soft transition hover:-translate-y-px hover:bg-paper hover:text-ink md:hidden"
+          >
+            订单
+          </Link>
+          <Link
+            to="/orders"
+            className="hidden h-10 items-center rounded-xl px-3.5 text-[0.88rem] font-semibold whitespace-nowrap text-ink-soft transition hover:-translate-y-px hover:bg-paper hover:text-ink md:inline-flex"
           >
             我的订单
+          </Link>
+          <Link
+            to="/commissions"
+            className="hidden h-10 items-center rounded-xl px-3.5 text-[0.88rem] font-semibold whitespace-nowrap text-ink-soft transition hover:-translate-y-px hover:bg-paper hover:text-ink md:inline-flex"
+          >
+            我的约稿
           </Link>
           <div className="relative" ref={cartRef}>
             <button
               type="button"
+              aria-label="购物车"
               aria-expanded={cartOpen}
               aria-haspopup="dialog"
               onClick={(e) => {
@@ -69,11 +83,12 @@ export function Topbar() {
                 setMenuOpen(false)
                 toggleCart()
               }}
-              className={`inline-flex h-10 items-center gap-2 rounded-xl px-3.5 text-[0.88rem] font-semibold text-white transition hover:-translate-y-px hover:bg-teal-deep ${
+              className={`inline-flex h-10 items-center gap-1.5 rounded-xl px-2.5 text-[0.88rem] font-semibold whitespace-nowrap text-white transition hover:-translate-y-px hover:bg-teal-deep md:gap-2 md:px-3.5 ${
                 cartOpen ? 'bg-teal-deep' : 'bg-ink'
               }`}
             >
-              购物车
+              <ShoppingCart className="h-[18px] w-[18px] md:hidden" />
+              <span className="hidden md:inline">购物车</span>
               <span className="inline-grid min-w-5 place-items-center rounded-md bg-mint px-1.5 text-[0.75rem] font-bold text-ink">
                 {count}
               </span>
@@ -108,7 +123,7 @@ export function Topbar() {
             {menuOpen && user && (
               <div
                 onClick={(e) => e.stopPropagation()}
-                className="absolute top-[calc(100%+10px)] left-1/2 z-45 w-[220px] -translate-x-1/2 rounded-[14px] border border-[var(--line)] bg-white p-2 shadow-[0_18px_40px_-28px_rgba(20,32,28,.35)]"
+                className="absolute top-[calc(100%+10px)] right-0 z-45 w-[min(220px,calc(100vw-24px))] rounded-[14px] border border-[var(--line)] bg-white p-2 shadow-[0_18px_40px_-28px_rgba(20,32,28,.35)] md:left-1/2 md:right-auto md:-translate-x-1/2"
               >
                 <div className="mb-1.5 border-b border-[var(--line)] px-3 py-2.5">
                   <strong className="block text-[0.95rem]">{user.username}</strong>
@@ -129,6 +144,14 @@ export function Topbar() {
                   }}
                 >
                   我的订单
+                </MenuBtn>
+                <MenuBtn
+                  onClick={() => {
+                    setMenuOpen(false)
+                    navigate('/commissions')
+                  }}
+                >
+                  我的约稿
                 </MenuBtn>
                 {user.role === 'admin' && (
                   <MenuBtn

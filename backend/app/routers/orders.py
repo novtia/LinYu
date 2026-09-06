@@ -37,7 +37,7 @@ from ..services.commission import (
     is_commission_mode,
     split_price,
 )
-from ..services.commission_chat import notify_deposit_paid
+from ..services.commission_chat import ensure_thread_for_order, notify_deposit_paid
 from ..services.delivery import random_id
 from ..services.files import delete_stored, is_image_name, save_upload
 from ..services.fulfillment import fulfill_order
@@ -436,6 +436,7 @@ def checkout(
         )
         db.commit()
         db.refresh(order)
+        ensure_thread_for_order(db, order)
         notify_deposit_paid(db, order)
         db.refresh(order)
         return CheckoutOut(order=_order_out(order, include_payload=True, unlock_download=True), pay_url="", deliveries=[])
@@ -496,6 +497,9 @@ def checkout(
     db.add(payment)
     db.commit()
     db.refresh(order)
+    if sale_mode == SALE_COMMISSION:
+        ensure_thread_for_order(db, order)
+        db.commit()
 
     notify_url, return_url = _notify_return_urls(request, adapter, config)
     pay_url = _build_pay_url(
