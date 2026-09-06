@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
@@ -10,7 +11,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from ..database import get_db
 from ..deps import get_admin_user, get_current_user
-from ..models import CommissionMessage, CommissionThread, Order, OrderItem, Product, User
+from ..models import CommissionMessage, CommissionThread, Delivery, Order, OrderItem, Product, User
 from ..schemas import (
     CommissionMessageIn,
     CommissionMessageOut,
@@ -18,7 +19,7 @@ from ..schemas import (
     CommissionThreadListOut,
     CommissionThreadOut,
 )
-from ..services.commission import is_commission_mode
+from ..services.commission import is_commission_mode, split_price
 from ..services.commission_chat import (
     add_message,
     assert_commission_product,
@@ -28,7 +29,8 @@ from ..services.commission_chat import (
     thread_out,
     thread_out_many,
 )
-from ..services.files import image_media_type, is_image_name, resolve_stored_path, save_chat_upload
+from ..services.files import image_media_type, is_image_name, resolve_stored_path, save_chat_upload, save_upload
+from ..services.fulfillment import add_commission_file
 from ..services.ratelimit import limit_or_raise
 
 router = APIRouter(prefix="/api/commission", tags=["commission"])
@@ -83,20 +85,10 @@ def my_thread_for_product(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """商品页内嵌对话：有订单则打开该商品最近一笔，否则建付款前闲聊线程。"""
+    """商品页全局对话：只跟用户+商品走，不绑定任何订单。"""
     product = db.query(Product).filter(Product.id == product_id).first()
     assert_commission_product(product)
-    latest = (
-        db.query(CommissionThread)
-        .filter(
-            CommissionThread.user_id == user.id,
-            CommissionThread.product_id == product_id,
-            CommissionThread.order_id.isnot(None),
-        )
-        .order_by(CommissionThread.updated_at.desc())
-        .first()
-    )
-    thread = latest or get_or_create_thread(db, user.id, product_id)
+    thread = get_or_create_thread(db, user.id, product_id)
     db.commit()
     db.refresh(thread)
     return thread_out(db, thread, user=user, product=product)
@@ -238,6 +230,60 @@ def send_message(
     msg = add_message(db, thread, role=role, msg_type=msg_type, body=text)
     db.commit()
     db.refresh(msg)
+    return message_out(msg, viewer_role=role)
+
+
+@router.post("/threads/{thread_id}/deliver", response_model=CommissionMessageOut)
+async def deliver_manuscript(
+    thread_id: str,
+    files: List[UploadFile] = File(...),
+    viewer: Optional[str] = Query(default=None),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    limit_or_raise(f"chat_deliver:{user.id}", limit=10, window=60)
+    thread = _get_thread(db, thread_id)
+    role = _assert_access(thread, user, viewer)
+    if role != "admin":
+        raise HTTPException(status_code=403, detail="只有作者可以发货")
+    if not thread.order_id:
+        raise HTTPException(status_code=400, detail="该对话还没有订单，无法发货")
+    order = (
+        db.query(Order)
+        .options(selectinload(Order.items), selectinload(Order.deliveries).selectinload(Delivery.files))
+        .filter(Order.id == thread.order_id)
+        .first()
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    if not is_commission_mode(getattr(order, "sale_mode", None)):
+        raise HTTPException(status_code=400, detail="该订单不是约稿订单")
+    if order.status == "completed":
+        raise HTTPException(status_code=400, detail="订单已完成，不能再发货")
+    if order.status not in ("deposit_paid", "awaiting_balance"):
+        raise HTTPException(status_code=400, detail="请等待买家支付定金后再发货")
+    uploads = [f for f in files if f and f.filename]
+    if not uploads:
+        raise HTTPException(status_code=400, detail="请选择稿件文件")
+    count = 0
+    for item in uploads:
+        try:
+            stored, original = await save_upload(item, order.id)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        add_commission_file(db, order, stored, original)
+        count += 1
+    _, balance = split_price(order.total)
+    msg = add_message(
+        db,
+        thread,
+        role="admin",
+        msg_type="delivery",
+        body=json.dumps({"order_id": order.id, "file_count": count, "balance_amount": balance}, ensure_ascii=False),
+    )
+    db.commit()
+    db.refresh(msg)
+    db.refresh(order)
     return message_out(msg, viewer_role=role)
 
 

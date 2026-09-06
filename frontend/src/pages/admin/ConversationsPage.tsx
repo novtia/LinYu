@@ -124,7 +124,9 @@ export function ConversationsPage() {
                 </div>
                 <div className="min-w-0">
                   <b className="block text-[0.88rem]">{t.username}</b>
-                  <div className="truncate font-[family-name:var(--font-mono)] text-[0.7rem] text-ink-mute">{t.order_id || t.product_name}</div>
+                  <div className="truncate font-[family-name:var(--font-mono)] text-[0.7rem] text-ink-mute">
+                    {t.order_id || `${t.product_name} · 商品沟通`}
+                  </div>
                   <div className="truncate text-[0.74rem] text-ink-mute">{t.last_preview || t.product_name}</div>
                 </div>
                 <div className="text-right">
@@ -151,8 +153,20 @@ export function ConversationsPage() {
             active={visible}
             mineAvatar="匣"
             peerAvatar={active.username.slice(0, 1)}
+            orderId={active.order_id}
+            orderStatus={active.order_status}
+            balanceAmount={active.balance_amount}
             onUnread={(unread, threadId) => {
               setThreads((prev) => prev.map((t) => (t.id === threadId ? { ...t, unread_admin: unread } : t)))
+            }}
+            onOrderChange={(status) => {
+              setThreads((prev) =>
+                prev.map((t) =>
+                  t.id === active.id
+                    ? { ...t, order_status: status, last_preview: status === 'awaiting_balance' ? '[稿件已发货]' : t.last_preview }
+                    : t,
+                ),
+              )
             }}
             className="h-full min-h-0 border-0 px-6 pb-5"
             header={
@@ -164,14 +178,14 @@ export function ConversationsPage() {
                   <div>
                     <strong className="block text-[0.95rem]">{active.username}</strong>
                     <span className="text-[0.75rem] text-ink-mute">
-                      {active.order_id ? `${active.order_id} · ` : ''}
+                      {active.order_id ? `${active.order_id} · ` : '商品沟通 · '}
                       {active.product_name}
                       {active.word_count ? ` · ${formatWords(active.word_count)}` : ''}
                     </span>
                   </div>
                 </div>
                 <span className="text-[0.78rem] font-bold text-teal">
-                  {active.order_status ? orderStatusLabel(active.order_status) : '沟通中'}
+                  {active.order_status ? orderStatusLabel(active.order_status) : active.order_id ? '沟通中' : '商品沟通'}
                 </span>
               </div>
             }

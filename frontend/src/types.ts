@@ -226,7 +226,7 @@ export interface Settings {
   site: SiteSettings
 }
 
-export type CommissionMsgType = 'text' | 'image' | 'file' | 'emoji' | 'system'
+export type CommissionMsgType = 'text' | 'image' | 'file' | 'emoji' | 'system' | 'delivery'
 export type CommissionRole = 'user' | 'admin' | 'system'
 
 export interface CommissionMessage {
@@ -257,6 +257,8 @@ export interface CommissionThread {
   has_deposit: boolean
   order_status?: string | null
   word_count?: number | null
+  deposit_amount?: number | null
+  balance_amount?: number | null
   created_at: string
   updated_at: string
 }

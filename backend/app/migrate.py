@@ -561,6 +561,24 @@ def _migrate_commission_thread_order(conn) -> None:
     conn.execute(text("PRAGMA foreign_keys=ON"))
 
 
+def _migrate_product_chat_loose(conn) -> None:
+    """每个用户每个约稿商品只保留一条不挂订单的全局沟通。"""
+    if not _table_exists(conn, "commission_threads"):
+        return
+    indexes = _index_names(conn, "commission_threads")
+    if "uq_commission_thread_user_product_loose" in indexes:
+        return
+    conn.execute(
+        text(
+            """
+            CREATE UNIQUE INDEX uq_commission_thread_user_product_loose
+            ON commission_threads (user_id, product_id)
+            WHERE order_id IS NULL
+            """
+        )
+    )
+
+
 def migrate_schema(engine: Engine) -> None:
     """Add new columns / rebuild legacy tables for SQLite."""
     alterations = {
@@ -600,3 +618,4 @@ def migrate_schema(engine: Engine) -> None:
         _migrate_commission_mode(conn)
         _migrate_commission_chat(conn)
         _migrate_commission_thread_order(conn)
+        _migrate_product_chat_loose(conn)

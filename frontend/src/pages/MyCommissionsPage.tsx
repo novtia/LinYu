@@ -87,13 +87,15 @@ export function MyCommissionsPage() {
   }, [authLoading, user, openAuth])
 
   useEffect(() => {
-    if (!fromPay || payHinted.current) return
+    if (!fromPay || payHinted.current || busy) return
+    const hit = threads.find((t) => t.order_id === orderParam) || threads.find((t) => t.id === activeId)
+    if (!hit && threads.length === 0) return
     payHinted.current = true
-    showToast('定金已支付')
+    showToast(hit?.order_status === 'completed' ? '尾款已支付，稿件已解锁' : '定金已支付')
     const next = new URLSearchParams(searchParams)
     next.delete('pay')
     setSearchParams(next, { replace: true })
-  }, [fromPay, searchParams, setSearchParams, showToast])
+  }, [fromPay, busy, threads, orderParam, activeId, searchParams, setSearchParams, showToast])
 
   const loadList = useCallback(async () => {
     const res = await api.get<CommissionThreadList>('/api/commission/threads/mine')
@@ -294,7 +296,13 @@ export function MyCommissionsPage() {
                 active={visible && !drawerOpen}
                 mineAvatar={user.username.slice(0, 1)}
                 peerAvatar="匣"
+                orderId={active.order_id}
+                orderStatus={active.order_status}
+                balanceAmount={active.balance_amount}
                 onUnread={applyUnread}
+                onOrderChange={(status) => {
+                  setThreads((prev) => prev.map((t) => (t.id === active.id ? { ...t, order_status: status } : t)))
+                }}
                 className="h-full min-h-0 min-w-0 border-0 px-3 pb-4 md:px-6 md:pb-5"
                 header={
                   <div className="mb-2 border-b border-[var(--line)] py-[18px]">

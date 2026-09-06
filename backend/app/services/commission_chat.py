@@ -19,6 +19,8 @@ def _preview(msg_type: str, body: str, file_name: Optional[str]) -> str:
         return "[图片]"
     if msg_type == "file":
         return file_name or "[文件]"
+    if msg_type == "delivery":
+        return "[稿件已发货]"
     if msg_type == "emoji":
         return (body or "").strip() or "[表情]"
     text = (body or "").replace("\n", " ").strip()
@@ -49,20 +51,6 @@ def get_or_create_thread(
         thread = db.query(CommissionThread).filter(CommissionThread.order_id == order_id).first()
         if thread:
             return thread
-        # 把同商品付款前闲聊挂到这笔新订单上
-        loose = (
-            db.query(CommissionThread)
-            .filter(
-                CommissionThread.user_id == user_id,
-                CommissionThread.product_id == product_id,
-                CommissionThread.order_id.is_(None),
-            )
-            .order_by(CommissionThread.updated_at.desc())
-            .first()
-        )
-        if loose:
-            loose.order_id = order_id
-            return loose
         thread = _new_thread(user_id, product_id, order_id)
         db.add(thread)
         db.flush()
@@ -184,7 +172,7 @@ def notify_deposit_paid(db: Session, order: Order) -> None:
 
 def can_recall(msg: CommissionMessage, role: str, now: Optional[datetime] = None) -> bool:
     now = now or datetime.utcnow()
-    if msg.recalled_at or msg.role == "system" or msg.role != role:
+    if msg.recalled_at or msg.role == "system" or msg.type in ("system", "delivery") or msg.role != role:
         return False
     return (now - (msg.created_at or now)).total_seconds() <= RECALL_SECONDS
 
@@ -192,14 +180,15 @@ def can_recall(msg: CommissionMessage, role: str, now: Optional[datetime] = None
 def message_out(msg: CommissionMessage, *, viewer_role: str, now: Optional[datetime] = None) -> CommissionMessageOut:
     now = now or datetime.utcnow()
     recalled = msg.recalled_at is not None
+    delivery = msg.type == "delivery"
     return CommissionMessageOut(
         id=msg.id,
         role=msg.role,
         type=msg.type,
         body="" if recalled else (msg.body or ""),
-        file_name=None if recalled else msg.file_name,
-        file_size=None if recalled else msg.file_size,
-        file_url=None if recalled or not msg.file_path else f"/api/commission/files/{msg.id}",
+        file_name=None if recalled or delivery else msg.file_name,
+        file_size=None if recalled or delivery else msg.file_size,
+        file_url=None if recalled or delivery or not msg.file_path else f"/api/commission/files/{msg.id}",
         created_at=msg.created_at,
         recalled_at=msg.recalled_at,
         can_recall=can_recall(msg, viewer_role, now),
@@ -214,6 +203,9 @@ def _thread_out_from(
     order: Optional[Order],
 ) -> CommissionThreadOut:
     status = order.status if order else None
+    deposit_amount = balance_amount = None
+    if order:
+        deposit_amount, balance_amount = split_price(order.total)
     return CommissionThreadOut(
         id=thread.id,
         user_id=thread.user_id,
@@ -229,6 +221,8 @@ def _thread_out_from(
         has_deposit=bool(status in ("deposit_paid", "awaiting_balance", "completed")),
         order_status=status,
         word_count=order.word_count if order else None,
+        deposit_amount=deposit_amount,
+        balance_amount=balance_amount,
         created_at=thread.created_at,
         updated_at=thread.updated_at,
     )

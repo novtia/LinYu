@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { ApiError, api } from '../lib/api'
 import { setGuestEmail } from '../lib/guestEmail'
 import { useAuth } from '../context/AuthContext'
@@ -12,17 +12,9 @@ import { PaymentMethodPicker } from '../components/PaymentMethodPicker'
 import { ProductMedia } from '../components/ProductMedia'
 import { resolveCheckoutResult } from '../lib/checkout'
 import { MIN_WORDS, commissionTotal, formatPerK, formatWords, formatYuan, splitPrice } from '../lib/commission'
-import { orderStatusLabel } from '../lib/orderStatus'
-import type { CheckoutResult, CommissionThread, Order, Product, PublicPaymentMethod } from '../types'
+import type { CheckoutResult, CommissionThread, Product, PublicPaymentMethod } from '../types'
 
 const FLOW = ['沟通设定', '支付定金', '按章交稿', '支付尾款'] as const
-
-function flowIndex(status?: string | null) {
-  if (status === 'completed') return 3
-  if (status === 'awaiting_balance') return 2
-  if (status === 'deposit_paid') return 1
-  return 0
-}
 
 export function CommissionProductView({ product }: { product: Product }) {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -33,48 +25,22 @@ export function CommissionProductView({ product }: { product: Product }) {
   const [paymentRequired, setPaymentRequired] = useState(false)
   const [buying, setBuying] = useState(false)
   const [checkoutEmail, setCheckoutEmail] = useState('')
-  const [order, setOrder] = useState<Order | null>(null)
   const [thread, setThread] = useState<CommissionThread | null>(null)
   const { user, loading: authLoading, publicSettings, refreshMe, openAuth } = useAuth()
   const { showToast } = useToast()
   const { showPurchaseResult } = usePurchaseResult()
   const debugMode = !!publicSettings?.debugMode
   const needEmail = !authLoading && !user?.email
-  const lockedWords = Boolean(order && order.status !== 'pending' && order.status !== 'failed' && order.status !== 'cancelled')
 
   useEffect(() => {
     if (searchParams.get('pane') === 'talk') setPane('talk')
   }, [searchParams])
 
   useEffect(() => {
-    if (!user) {
-      setOrder(null)
-      return
-    }
-    let alive = true
-    api
-      .get<Order | null>(`/api/orders/mine/for-product/${product.id}`)
-      .then((o) => {
-        if (!alive) return
-        setOrder(o || null)
-        if (o?.word_count && o.word_count >= MIN_WORDS) setWords(o.word_count)
-      })
-      .catch(() => {
-        if (alive) setOrder(null)
-      })
-    return () => {
-      alive = false
-    }
-  }, [user, product.id])
-
-  useEffect(() => {
     if (!user || pane !== 'talk') return
     let alive = true
-    const url = order?.id
-      ? `/api/commission/threads/mine/${encodeURIComponent(order.id)}`
-      : `/api/commission/threads/mine/product/${product.id}`
     api
-      .get<CommissionThread>(url)
+      .get<CommissionThread>(`/api/commission/threads/mine/product/${product.id}`)
       .then((t) => {
         if (alive) setThread(t)
       })
@@ -84,7 +50,7 @@ export function CommissionProductView({ product }: { product: Product }) {
     return () => {
       alive = false
     }
-  }, [user, pane, product.id, order?.id, showToast])
+  }, [user, pane, product.id, showToast])
 
   const quote = useMemo(() => {
     const total = commissionTotal(product.price, words)
@@ -148,15 +114,13 @@ export function CommissionProductView({ product }: { product: Product }) {
       })
       if (needEmail) setGuestEmail(email)
       if (user) await refreshMe()
-      setOrder(res.order)
       const outcome = resolveCheckoutResult(res)
       if (outcome === 'paid' || outcome === 'deposit') {
         showPurchaseResult({
           status: 'success',
-          message: debugMode ? '调试模式：已跳过定金，等待商家交稿。' : '定金已支付，请等待商家交稿。',
+          message: debugMode ? '调试模式：已跳过定金，订单已进入约稿。' : '定金已支付，可在「我的约稿」查看该笔订单。',
           orderId: res.order.id,
         })
-        openTalk()
         return
       }
       if (outcome === 'redirect') {
@@ -173,10 +137,6 @@ export function CommissionProductView({ product }: { product: Product }) {
       setBuying(false)
     }
   }
-
-  const step = flowIndex(order?.status)
-  const paid = Boolean(order && ['deposit_paid', 'awaiting_balance', 'completed'].includes(order.status))
-  const statusLabel = order ? orderStatusLabel(order.status) : '沟通中'
 
   return (
     <main className="pb-16 md:pb-24">
@@ -220,7 +180,6 @@ export function CommissionProductView({ product }: { product: Product }) {
                       min={MIN_WORDS}
                       step={1000}
                       inputMode="numeric"
-                      disabled={lockedWords}
                       value={words}
                       onChange={(e) => {
                         const raw = Number(e.target.value)
@@ -238,7 +197,7 @@ export function CommissionProductView({ product }: { product: Product }) {
                           setWordsOk(true)
                         }
                       }}
-                      className="w-24 border-0 border-b border-ink bg-transparent pb-0.5 text-[1.05rem] font-bold outline-none focus:border-teal focus:text-teal disabled:border-ink-mute disabled:text-ink-mute"
+                      className="w-24 border-0 border-b border-ink bg-transparent pb-0.5 text-[1.05rem] font-bold outline-none focus:border-teal focus:text-teal"
                     />
                     <em className="not-italic text-[0.82rem] font-semibold text-ink-mute">字</em>
                   </label>
@@ -258,10 +217,10 @@ export function CommissionProductView({ product }: { product: Product }) {
               </div>
             </dl>
 
-            {!debugMode && !paid && (
+            {!debugMode ? (
               <PaymentMethodPicker className="mb-4" value={payment?.id || null} onChange={setPayment} onAvailabilityChange={setPaymentRequired} />
-            )}
-            {needEmail && !paid && (
+            ) : null}
+            {needEmail ? (
               <label className="mb-4 block">
                 <span className="mb-1.5 block text-[0.82rem] font-semibold text-ink-soft">收货邮箱</span>
                 <input
@@ -272,32 +231,16 @@ export function CommissionProductView({ product }: { product: Product }) {
                   placeholder="用于发货通知与查询订单"
                 />
               </label>
-            )}
+            ) : null}
 
-            {paid ? (
-              <div className="flex flex-wrap items-center gap-3">
-                <Link
-                  to={`/orders/${order?.id}`}
-                  className="inline-flex h-11 items-center bg-teal px-[18px] font-bold text-white hover:bg-teal-deep"
-                >
-                  查看订单
-                </Link>
-                {order?.status === 'awaiting_balance' && (
-                  <Link to={`/orders/${order.id}`} className="text-[0.86rem] font-semibold text-teal hover:underline">
-                    去付尾款 {formatYuan(quote.balance)}
-                  </Link>
-                )}
-              </div>
-            ) : (
-              <button
-                type="button"
-                disabled={buying || authLoading}
-                className="inline-flex h-11 w-[220px] items-center justify-center bg-teal px-[18px] font-bold text-white hover:bg-teal-deep disabled:opacity-60"
-                onClick={handlePayDeposit}
-              >
-                {buying ? '处理中…' : !user ? '登录后支付定金' : wordsOk ? `支付定金 ${formatYuan(quote.deposit)}` : '请填写字数'}
-              </button>
-            )}
+            <button
+              type="button"
+              disabled={buying || authLoading}
+              className="inline-flex h-11 w-[220px] items-center justify-center bg-teal px-[18px] font-bold text-white hover:bg-teal-deep disabled:opacity-60"
+              onClick={handlePayDeposit}
+            >
+              {buying ? '处理中…' : !user ? '登录后支付定金' : wordsOk ? `支付定金 ${formatYuan(quote.deposit)}` : '请填写字数'}
+            </button>
             <p className="mt-3 text-[0.8rem] text-ink-mute">
               {wordsOk ? `${formatWords(words)} · ${formatPerK(product.price)}` : `至少 ${MIN_WORDS.toLocaleString('zh-CN')} 字`}
               {debugMode ? ' · 调试模式将跳过真实支付' : ''}
@@ -306,12 +249,9 @@ export function CommissionProductView({ product }: { product: Product }) {
         </section>
 
         <ol className="mt-10 grid list-none grid-cols-2 gap-0 p-0 md:grid-cols-4">
-          {FLOW.map((label, i) => (
-            <li
-              key={label}
-              className={`relative pr-4 text-[0.86rem] ${i <= step ? 'font-bold text-ink' : 'text-ink-mute'}`}
-            >
-              <span className={`mb-2.5 block h-[7px] w-[7px] rounded-full ${i <= step ? 'bg-teal' : 'bg-[var(--line-strong)]'}`} />
+          {FLOW.map((label) => (
+            <li key={label} className="relative pr-4 text-[0.86rem] text-ink-soft">
+              <span className="mb-2.5 block h-[7px] w-[7px] rounded-full bg-teal" />
               {label}
             </li>
           ))}
@@ -379,21 +319,13 @@ export function CommissionProductView({ product }: { product: Product }) {
                       <div className="grid h-8 w-8 place-items-center rounded-full bg-teal text-[0.78rem] font-bold text-white">匣</div>
                       <div>
                         <strong className="block text-[0.92rem]">领匣作者</strong>
-                        <span className="text-[0.72rem] text-ink-mute">回复大纲、样章和改稿</span>
+                        <span className="text-[0.72rem] text-ink-mute">本商品的沟通，与订单分开</span>
                       </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-x-[18px] gap-y-3.5 text-[0.75rem] text-ink-mute">
-                      <span className="inline-flex items-center gap-1.5 font-bold text-teal">
-                        <i className="inline-block h-[7px] w-[7px] rounded-full bg-[#1a9a7c]" />
-                        在线
-                      </span>
-                      <span>
-                        <b className="font-bold text-ink">{statusLabel}</b>
-                      </span>
-                      <span>
-                        <b className="font-bold text-ink">{formatWords(order?.word_count || words)}</b>
-                      </span>
-                    </div>
+                    <span className="inline-flex items-center gap-1.5 text-[0.75rem] font-bold text-teal">
+                      <i className="inline-block h-[7px] w-[7px] rounded-full bg-[#1a9a7c]" />
+                      在线
+                    </span>
                   </div>
                 }
               />

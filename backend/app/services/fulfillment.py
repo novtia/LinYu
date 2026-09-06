@@ -10,6 +10,44 @@ from ..seed import load_settings
 from .delivery import random_id
 
 
+def ensure_commission_delivery(db: Session, order: Order) -> Delivery:
+    if order.deliveries:
+        return order.deliveries[0]
+    item = order.items[0] if order.items else None
+    delivery = Delivery(
+        id="d_" + random_id(),
+        order_id=order.id,
+        product_id=item.product_id if item else 0,
+        product_name=item.name if item else "约稿",
+        payload="",
+        created_at=datetime.utcnow(),
+    )
+    db.add(delivery)
+    db.flush()
+    order.deliveries.append(delivery)
+    return delivery
+
+
+def add_commission_file(db: Session, order: Order, stored: str, original: str) -> DeliveryFile:
+    delivery = ensure_commission_delivery(db, order)
+    sort_order = max([f.sort_order for f in (delivery.files or [])], default=-1) + 1
+    row = DeliveryFile(
+        id="df_" + random_id(length=8),
+        delivery_id=delivery.id,
+        file_path=stored,
+        file_name=original,
+        sort_order=sort_order,
+    )
+    db.add(row)
+    db.flush()
+    if not delivery.file_path:
+        delivery.file_path = stored
+        delivery.file_name = original
+    if order.status == "deposit_paid":
+        order.status = "awaiting_balance"
+    return row
+
+
 def fulfill_order(
     db: Session,
     order: Order,

@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { Link } from 'react-router-dom'
 import { FileText, Image as ImageIcon, Paperclip, Smile } from 'lucide-react'
 import { ApiError, api } from '../lib/api'
-import { formatFileSize } from '../lib/commission'
+import { formatFileSize, formatYuan } from '../lib/commission'
 import { useToast } from '../context/ToastContext'
-import type { CommissionMessage, CommissionMessagesResult } from '../types'
+import { PaymentMethodPicker } from './PaymentMethodPicker'
+import type { CheckoutResult, CommissionMessage, CommissionMessagesResult, PublicPaymentMethod } from '../types'
 
 const EMOJIS = ['😀', '😁', '😂', '🥰', '😍', '😘', '🤔', '😅', '😭', '😡', '👍', '👎', '👏', '🙏', '🔥', '✨', '❤️', '🤍', '🌸', '⭐', '🎉', '📌', '✅', '💪', '☕', '🌙', '🎵', '📎']
 const RECALL_MS = 10 * 60 * 1000
@@ -22,7 +24,11 @@ type Props = {
   mineAvatar?: string
   placeholder?: string
   className?: string
+  orderId?: string | null
+  orderStatus?: string | null
+  balanceAmount?: number | null
   onUnread?: (unread: number, threadId: string) => void
+  onOrderChange?: (status: string) => void
 }
 
 function chatPath(path: string, viewer: 'user' | 'admin', extra?: Record<string, string | number>) {
@@ -61,9 +67,102 @@ function recallLeft(iso: string, now: number) {
 }
 
 function isFollow(curr: CommissionMessage, prev?: CommissionMessage) {
-  if (!prev || prev.type === 'system' || curr.type === 'system' || prev.recalled_at || curr.recalled_at) return false
+  if (!prev || prev.type === 'system' || curr.type === 'system' || prev.type === 'delivery' || curr.type === 'delivery') return false
+  if (prev.recalled_at || curr.recalled_at) return false
   if (prev.role !== curr.role) return false
   return parseUtc(curr.created_at).getTime() - parseUtc(prev.created_at).getTime() < 5 * 60 * 1000
+}
+
+function parseDelivery(body: string) {
+  try {
+    const data = JSON.parse(body) as { order_id?: string; file_count?: number; balance_amount?: number }
+    return data && typeof data === 'object' ? data : {}
+  } catch {
+    return {}
+  }
+}
+
+function DeliveryCard({
+  viewer,
+  unlocked,
+  latest,
+  orderId,
+  balanceAmount,
+  onUnlocked,
+}: {
+  viewer: 'user' | 'admin'
+  unlocked: boolean
+  latest: boolean
+  orderId: string
+  balanceAmount: number
+  onUnlocked: () => void
+}) {
+  const { showToast } = useToast()
+  const [method, setMethod] = useState<PublicPaymentMethod | null>(null)
+  const [paying, setPaying] = useState(false)
+
+  if (unlocked) {
+    return (
+      <div className="flex justify-center py-1">
+        <Link
+          to={`/orders/${encodeURIComponent(orderId)}`}
+          className="bg-teal px-3 py-1 text-[0.82rem] font-extrabold text-white"
+        >
+          解锁
+        </Link>
+      </div>
+    )
+  }
+
+  if (viewer === 'admin' || !latest) {
+    return (
+      <div className="mx-auto w-full max-w-[22rem] border border-[var(--line)] bg-fog px-4 py-3 text-center">
+        <div className="text-[0.88rem] font-bold">稿件已发货</div>
+        <p className="mt-1 text-[0.76rem] text-ink-mute">买家支付尾款后解锁</p>
+      </div>
+    )
+  }
+
+  async function pay() {
+    if (!method) {
+      showToast('请选择支付方式')
+      return
+    }
+    setPaying(true)
+    try {
+      const res = await api.post<CheckoutResult>(`/api/orders/${encodeURIComponent(orderId)}/pay-balance`, {
+        payment_method_id: method.id,
+      })
+      if (res.pay_url) {
+        window.location.href = res.pay_url
+        return
+      }
+      if (res.order.status === 'completed') {
+        onUnlocked()
+        showToast('尾款已支付，稿件已解锁')
+      }
+    } catch (e) {
+      showToast(e instanceof ApiError ? e.message : '发起尾款支付失败')
+    } finally {
+      setPaying(false)
+    }
+  }
+
+  return (
+    <div className="mx-auto w-full max-w-[22rem] border border-[var(--line)] bg-fog px-4 py-3">
+      <div className="text-[0.88rem] font-bold">稿件已就绪</div>
+      <p className="mb-3 mt-1 text-[0.76rem] text-ink-mute">支付尾款 {formatYuan(balanceAmount)} 后解锁</p>
+      <PaymentMethodPicker className="mb-3" value={method?.id || null} onChange={setMethod} />
+      <button
+        type="button"
+        disabled={paying}
+        className="h-10 w-full bg-teal text-[0.88rem] font-bold text-white hover:bg-teal-deep disabled:opacity-60"
+        onClick={pay}
+      >
+        {paying ? '跳转支付中…' : `支付尾款 ${formatYuan(balanceAmount)}`}
+      </button>
+    </div>
+  )
 }
 
 function mergeMessages(prev: CommissionMessage[], incoming: CommissionMessage[]) {
@@ -106,7 +205,11 @@ export function CommissionChat({
   mineAvatar = '我',
   placeholder,
   className = '',
+  orderId,
+  orderStatus,
+  balanceAmount,
   onUnread,
+  onOrderChange,
 }: Props) {
   const { showToast } = useToast()
   const [messages, setMessages] = useState<CommissionMessage[]>([])
@@ -115,14 +218,19 @@ export function CommissionChat({
   const [pending, setPending] = useState<PendingFile[]>([])
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [sending, setSending] = useState(false)
+  const [shipping, setShipping] = useState(false)
   const [dragover, setDragover] = useState(false)
   const [now, setNow] = useState(Date.now())
   const [lightbox, setLightbox] = useState<string | null>(null)
+  const [localStatus, setLocalStatus] = useState(orderStatus || '')
   const [visible, setVisible] = useState(typeof document === 'undefined' ? true : document.visibilityState === 'visible')
   const listRef = useRef<HTMLDivElement>(null)
   const areaRef = useRef<HTMLTextAreaElement>(null)
   const imageRef = useRef<HTMLInputElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const shipRef = useRef<HTMLInputElement>(null)
+  const onOrderChangeRef = useRef(onOrderChange)
+  onOrderChangeRef.current = onOrderChange
   const emptyStreak = useRef(0)
   const lastId = useRef(0)
   const readyRef = useRef(false)
@@ -135,6 +243,10 @@ export function CommissionChat({
   function focused() {
     return activeRef.current && document.visibilityState === 'visible'
   }
+
+  useEffect(() => {
+    setLocalStatus(orderStatus || '')
+  }, [orderStatus, threadId])
 
   useEffect(() => {
     const onVis = () => setVisible(document.visibilityState === 'visible')
@@ -345,6 +457,32 @@ export function CommissionChat({
     }
   }
 
+  async function ship(files: FileList | File[]) {
+    if (!threadId || shipping) return
+    const list = Array.from(files)
+    if (!list.length) return
+    setShipping(true)
+    try {
+      const created = await api.uploadMany<CommissionMessage>(
+        chatPath(`/api/commission/threads/${threadId}/deliver`, viewer),
+        list,
+      )
+      setMessages((prev) => {
+        const next = mergeMessages(prev, [created])
+        lastId.current = next.at(-1)?.id || lastId.current
+        return next
+      })
+      setLocalStatus('awaiting_balance')
+      onOrderChangeRef.current?.('awaiting_balance')
+      showToast('已发货，等待买家支付尾款')
+      requestAnimationFrame(() => scrollBottom(true))
+    } catch (e) {
+      showToast(e instanceof ApiError ? e.message : '发货失败')
+    } finally {
+      setShipping(false)
+    }
+  }
+
   async function recall(id: number) {
     try {
       const updated = await api.post<CommissionMessage>(chatPath(`/api/commission/messages/${id}/recall`, viewer))
@@ -398,6 +536,32 @@ export function CommissionChat({
                 <div key={msg.id}>
                   {stamp ? <div className="mb-2 self-center text-center text-[0.72rem] text-ink-mute">{stamp}</div> : null}
                   <div className="self-center bg-fog px-2 py-0.5 text-center text-[0.72rem] text-ink-mute">{msg.body}</div>
+                </div>
+              )
+            }
+            if (msg.type === 'delivery') {
+              const meta = parseDelivery(msg.body)
+              const cardOrder = orderId || meta.order_id || ''
+              const latestDeliveryId = [...messages].reverse().find((m) => m.type === 'delivery' && !m.recalled_at)?.id
+              const unlocked = (localStatus || orderStatus) === 'completed'
+              return (
+                <div key={msg.id}>
+                  {stamp ? <div className="mb-2 text-center text-[0.72rem] text-ink-mute">{stamp}</div> : null}
+                  {msg.recalled_at ? (
+                    <div className="text-center text-[0.8rem] text-ink-mute">已撤回发货</div>
+                  ) : (
+                    <DeliveryCard
+                      viewer={viewer}
+                      unlocked={unlocked}
+                      latest={msg.id === latestDeliveryId}
+                      orderId={cardOrder}
+                      balanceAmount={Number(balanceAmount || meta.balance_amount || 0)}
+                      onUnlocked={() => {
+                        setLocalStatus('completed')
+                        onOrderChangeRef.current?.('completed')
+                      }}
+                    />
+                  )}
                 </div>
               )
             }
@@ -549,14 +713,26 @@ export function CommissionChat({
                 <Paperclip className="h-4 w-4" />
               </button>
             </div>
-            <button
-              type="button"
-              disabled={!threadId || sending}
-              className="h-[34px] bg-teal px-4 text-[0.88rem] font-bold text-white hover:bg-teal-deep disabled:opacity-60"
-              onClick={send}
-            >
-              {sending ? '发送中…' : '发送'}
-            </button>
+            <div className="flex gap-1.5">
+              {viewer === 'admin' && orderId && (localStatus === 'deposit_paid' || localStatus === 'awaiting_balance' || orderStatus === 'deposit_paid' || orderStatus === 'awaiting_balance') ? (
+                <button
+                  type="button"
+                  disabled={!threadId || shipping}
+                  className="h-[34px] border border-ink px-3 text-[0.88rem] font-bold text-ink hover:bg-ink hover:text-white disabled:opacity-60"
+                  onClick={() => shipRef.current?.click()}
+                >
+                  {shipping ? '发货中…' : '发货'}
+                </button>
+              ) : null}
+              <button
+                type="button"
+                disabled={!threadId || sending}
+                className="h-[34px] bg-teal px-4 text-[0.88rem] font-bold text-white hover:bg-teal-deep disabled:opacity-60"
+                onClick={send}
+              >
+                {sending ? '发送中…' : '发送'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -577,6 +753,16 @@ export function CommissionChat({
         hidden
         onChange={(e) => {
           if (e.target.files) addFiles(e.target.files)
+          e.target.value = ''
+        }}
+      />
+      <input
+        ref={shipRef}
+        type="file"
+        hidden
+        multiple
+        onChange={(e) => {
+          if (e.target.files) ship(e.target.files)
           e.target.value = ''
         }}
       />

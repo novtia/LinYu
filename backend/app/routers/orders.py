@@ -40,7 +40,7 @@ from ..services.commission import (
 from ..services.commission_chat import ensure_thread_for_order, notify_deposit_paid
 from ..services.delivery import random_id
 from ..services.files import delete_stored, is_image_name, save_upload
-from ..services.fulfillment import fulfill_order
+from ..services.fulfillment import add_commission_file, fulfill_order
 from ..services.mail import is_valid_email
 from ..services.ratelimit import rate_limit
 
@@ -633,24 +633,6 @@ def _get_order_or_404(db: Session, order_id: str) -> Order:
     return order
 
 
-def _ensure_commission_delivery(db: Session, order: Order) -> Delivery:
-    if order.deliveries:
-        return order.deliveries[0]
-    item = order.items[0] if order.items else None
-    delivery = Delivery(
-        id="d_" + random_id(),
-        order_id=order.id,
-        product_id=item.product_id if item else 0,
-        product_name=item.name if item else "约稿",
-        payload="",
-        created_at=datetime.utcnow(),
-    )
-    db.add(delivery)
-    db.flush()
-    order.deliveries.append(delivery)
-    return delivery
-
-
 @router.post("/{order_id}/pay-balance", response_model=CheckoutOut)
 def pay_balance(
     order_id: str,
@@ -752,25 +734,11 @@ async def upload_order_manuscript(
     if order.status not in ("deposit_paid", "awaiting_balance"):
         raise HTTPException(status_code=400, detail="请等待买家支付定金后再交稿")
 
-    delivery = _ensure_commission_delivery(db, order)
     try:
         stored, original = await save_upload(file, order.id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    sort_order = max([f.sort_order for f in (delivery.files or [])], default=-1) + 1
-    row = DeliveryFile(
-        id="df_" + random_id(length=8),
-        delivery_id=delivery.id,
-        file_path=stored,
-        file_name=original,
-        sort_order=sort_order,
-    )
-    db.add(row)
-    if not delivery.file_path:
-        delivery.file_path = stored
-        delivery.file_name = original
-    if order.status == "deposit_paid":
-        order.status = "awaiting_balance"
+    row = add_commission_file(db, order, stored, original)
     db.commit()
     db.refresh(row)
     return ProductFileOut(id=row.id, file_name=row.file_name, is_image=is_image_name(row.file_name), message="稿件已上传")

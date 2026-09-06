@@ -86,6 +86,26 @@ export const api = {
     }
     return res.json()
   },
+  uploadMany: async <T>(path: string, files: File[], field = 'files'): Promise<T> => {
+    const headers = new Headers()
+    const token = getToken()
+    if (token) headers.set('Authorization', `Bearer ${token}`)
+    const form = new FormData()
+    for (const file of files) form.append(field, file)
+    const res = await fetch(path, { cache: 'no-store', method: 'POST', headers, body: form })
+    if (!res.ok) {
+      let detail = '上传失败'
+      try {
+        const data = await res.json()
+        detail = data.detail || detail
+      } catch {
+        /* ignore */
+      }
+      handleUnauthorized(res.status)
+      throw new ApiError(res.status, String(detail))
+    }
+    return res.json()
+  },
   download: async (path: string, filename?: string) => {
     const headers = new Headers()
     const token = getToken()

@@ -400,6 +400,8 @@ class CommissionThreadOut(BaseModel):
     has_deposit: bool = False
     order_status: Optional[str] = None
     word_count: Optional[int] = None
+    deposit_amount: Optional[float] = None
+    balance_amount: Optional[float] = None
     created_at: datetime
     updated_at: datetime
 
