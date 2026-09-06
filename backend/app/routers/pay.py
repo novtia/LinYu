@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Dict, Optional
+from datetime import datetime
+from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Request
@@ -10,11 +11,12 @@ from fastapi.responses import PlainTextResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Order, PaymentChannel
+from ..models import Order, OrderPayment, PaymentChannel
 from ..payment.providers import get_provider
 from ..payment.providers.alipay_page import AlipayPageProvider
 from ..payment.providers.ezpay import EzpayProvider
 from ..payment.service import parse_config
+from ..services.commission import is_commission_mode
 from ..services.fulfillment import fulfill_order
 
 router = APIRouter(prefix="/api/pay", tags=["pay"])
@@ -69,8 +71,8 @@ _AMOUNT_FIELDS = {
 _DEFAULT_AMOUNT_FIELDS = ("money", "total_amount", "total_fee", "amount")
 
 
-def _amount_ok(order: Order, provider: str, params: Dict[str, Any]) -> bool:
-    """校验回调金额不低于订单金额，避免小额支付换取大额发货。"""
+def _amount_ok(expected: float, provider: str, params: Dict[str, Any], *, label: str) -> bool:
+    """校验回调金额不低于应付金额，避免小额支付换取大额发货。"""
     raw = ""
     for field in _AMOUNT_FIELDS.get(provider, _DEFAULT_AMOUNT_FIELDS):
         value = str(params.get(field) or "").strip()
@@ -78,17 +80,64 @@ def _amount_ok(order: Order, provider: str, params: Dict[str, Any]) -> bool:
             raw = value
             break
     if not raw:
-        logger.warning("订单 %s 回调缺少金额字段，已拒绝：%s", order.id, sorted(params))
+        logger.warning("订单 %s 回调缺少金额字段，已拒绝：%s", label, sorted(params))
         return False
     try:
         paid = round(float(raw), 2)
     except (TypeError, ValueError):
         return False
-    expected = round(float(order.total), 2)
-    if paid + 0.005 < expected:
-        logger.warning("订单 %s 回调金额不足：paid=%s expected=%s", order.id, paid, expected)
+    need = round(float(expected), 2)
+    if paid + 0.005 < need:
+        logger.warning("订单 %s 回调金额不足：paid=%s expected=%s", label, paid, need)
         return False
     return True
+
+
+def _resolve_pay_target(db: Session, out_trade_no: str) -> Tuple[Optional[Order], Optional[OrderPayment]]:
+    payment = db.query(OrderPayment).filter(OrderPayment.id == out_trade_no).first()
+    if payment:
+        order = db.query(Order).filter(Order.id == payment.order_id).first()
+        return order, payment
+    order = db.query(Order).filter(Order.id == out_trade_no).first()
+    return order, None
+
+
+def _order_id_from_out_trade_no(db: Session, out_trade_no: str) -> str:
+    payment = db.query(OrderPayment).filter(OrderPayment.id == out_trade_no).first()
+    if payment:
+        return payment.order_id
+    return out_trade_no
+
+
+def _mark_payment_paid(payment: Optional[OrderPayment], trade_no: Optional[str]) -> None:
+    if not payment:
+        return
+    payment.status = "paid"
+    if not payment.paid_at:
+        payment.paid_at = datetime.utcnow()
+    if trade_no and not payment.trade_no:
+        payment.trade_no = trade_no
+
+
+def _apply_commission_payment(db: Session, order: Order, payment: OrderPayment, trade_no: Optional[str]) -> bool:
+    _mark_payment_paid(payment, trade_no)
+    if payment.kind == "deposit":
+        if order.status == "pending":
+            order.status = "deposit_paid"
+        if not order.paid_at:
+            order.paid_at = datetime.utcnow()
+        if trade_no and not order.trade_no:
+            order.trade_no = trade_no
+        db.commit()
+        return True
+    if payment.kind == "balance":
+        if order.status in ("awaiting_balance", "deposit_paid"):
+            order.status = "completed"
+        if trade_no and not order.trade_no:
+            order.trade_no = trade_no
+        db.commit()
+        return True
+    return False
 
 
 def _process_payment(db: Session, params: Dict[str, Any], *, expect_provider: Optional[str] = None) -> bool:
@@ -97,17 +146,28 @@ def _process_payment(db: Session, params: Dict[str, Any], *, expect_provider: Op
     if not out_trade_no:
         return False
 
-    order = db.query(Order).filter(Order.id == out_trade_no).first()
+    order, payment = _resolve_pay_target(db, out_trade_no)
     if not order:
         return False
 
-    # 已完成：幂等成功
-    if order.status in ("paid", "completed"):
+    if payment and payment.status == "paid":
+        return True
+    if is_commission_mode(order.sale_mode):
+        if payment and payment.kind == "deposit" and order.status in ("deposit_paid", "awaiting_balance", "completed"):
+            _mark_payment_paid(payment, (params.get("trade_no") or "").strip() or None)
+            db.commit()
+            return True
+        if payment and payment.kind == "balance" and order.status == "completed":
+            _mark_payment_paid(payment, (params.get("trade_no") or "").strip() or None)
+            db.commit()
+            return True
+        if payment is None and order.status in ("deposit_paid", "awaiting_balance", "completed", "paid"):
+            return True
+    elif order.status in ("paid", "completed"):
         return True
 
-    channel = None
-    if order.payment_channel_id:
-        channel = db.query(PaymentChannel).filter(PaymentChannel.id == order.payment_channel_id).first()
+    channel_id = (payment.payment_channel_id if payment else None) or order.payment_channel_id
+    channel = db.query(PaymentChannel).filter(PaymentChannel.id == channel_id).first() if channel_id else None
     if not channel:
         return False
 
@@ -134,10 +194,15 @@ def _process_payment(db: Session, params: Dict[str, Any], *, expect_provider: Op
 
     if not _is_paid_status(channel.provider, params):
         return False
-    if not _amount_ok(order, channel.provider, params):
+    expected = payment.amount if payment else order.total
+    if not _amount_ok(expected, channel.provider, params, label=order.id):
         return False
 
     trade_no = (params.get("trade_no") or "").strip() or None
+    if is_commission_mode(order.sale_mode) and payment and payment.kind in ("deposit", "balance"):
+        return _apply_commission_payment(db, order, payment, trade_no)
+
+    _mark_payment_paid(payment, trade_no)
     fulfill_order(db, order, trade_no=trade_no)
     return True
 
@@ -160,7 +225,7 @@ async def ezpay_return(request: Request, db: Session = Depends(get_db)):
             _process_payment(db, params, expect_provider="ezpay")
         except Exception:
             pass
-        return RedirectResponse(_frontend_order_url(out_trade_no), status_code=302)
+        return RedirectResponse(_frontend_order_url(_order_id_from_out_trade_no(db, out_trade_no)), status_code=302)
     base = (os.getenv("FRONTEND_URL") or "http://127.0.0.1:5173").rstrip("/")
     return RedirectResponse(f"{base}/orders", status_code=302)
 
@@ -183,6 +248,6 @@ async def alipay_return(request: Request, db: Session = Depends(get_db)):
             _process_payment(db, params, expect_provider="alipay")
         except Exception:
             pass
-        return RedirectResponse(_frontend_order_url(out_trade_no), status_code=302)
+        return RedirectResponse(_frontend_order_url(_order_id_from_out_trade_no(db, out_trade_no)), status_code=302)
     base = (os.getenv("FRONTEND_URL") or "http://127.0.0.1:5173").rstrip("/")
     return RedirectResponse(f"{base}/orders", status_code=302)

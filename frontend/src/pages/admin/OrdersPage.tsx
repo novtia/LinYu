@@ -32,12 +32,19 @@ export function OrdersPage() {
           <td className="whitespace-nowrap px-[18px] py-3.5 font-[family-name:var(--font-mono)] text-[0.85rem]">{o.id}</td>
           <td className="whitespace-nowrap px-[18px] py-3.5">{o.username}</td>
           <td className="whitespace-nowrap px-[18px] py-3.5 text-[0.85rem] text-ink-soft">{o.email || '—'}</td>
-          <td className="whitespace-nowrap px-[18px] py-3.5">{o.items.map((i) => i.name).join('、')}</td>
+          <td className="whitespace-nowrap px-[18px] py-3.5">
+            {o.items.map((i) => i.name).join('、')}
+            {o.sale_mode === 'commission' ? (
+              <span className="ml-2 inline-flex rounded-md bg-[rgba(15,110,92,.1)] px-1.5 py-0.5 text-[0.72rem] font-semibold text-teal">
+                约稿
+              </span>
+            ) : null}
+          </td>
           <td className="whitespace-nowrap px-[18px] py-3.5">¥{o.total}</td>
           <td className="whitespace-nowrap px-[18px] py-3.5">
             {o.status === 'completed' || o.status === 'paid' ? (
               <Tag green>{orderStatusLabel(o.status)}</Tag>
-            ) : o.status === 'pending' ? (
+            ) : o.status === 'pending' || o.status === 'deposit_paid' || o.status === 'awaiting_balance' ? (
               <Tag>{orderStatusLabel(o.status)}</Tag>
             ) : (
               <Tag red>{orderStatusLabel(o.status)}</Tag>

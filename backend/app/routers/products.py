@@ -10,6 +10,7 @@ from ..database import get_db
 from ..deps import get_admin_user, get_optional_user
 from ..models import Category, Product, ProductFile, User
 from ..schemas import AssetUploadOut, CoverUploadOut, MessageOut, ProductFileOut, ProductIn, ProductOut
+from ..services.commission import SALE_COMMISSION, normalize_sale_mode, split_price
 from ..services.delivery import random_id
 from ..services.files import (
     delete_stored,
@@ -85,6 +86,15 @@ def _validate_category(db: Session, category_id: Optional[int]) -> None:
         raise HTTPException(status_code=400, detail="商品分类不存在")
 
 
+def _validated_sale_mode(body: ProductIn) -> str:
+    mode = normalize_sale_mode(body.sale_mode)
+    if mode == SALE_COMMISSION:
+        deposit, balance = split_price(body.price)
+        if deposit < 0.01 or balance < 0.01:
+            raise HTTPException(status_code=400, detail="约稿商品价格须至少 0.02 元，以便拆分定金与尾款")
+    return mode
+
+
 @router.get("", response_model=List[ProductOut])
 def list_products(
     category_id: Optional[int] = Query(None),
@@ -158,6 +168,7 @@ def create_product(
         cover=body.cover or "p1",
         status=body.status or "on",
         category_id=body.category_id,
+        sale_mode=_validated_sale_mode(body),
     )
     db.add(product)
     db.commit()
@@ -181,6 +192,7 @@ def update_product(
     product.cover = body.cover or "p1"
     product.status = body.status or "on"
     product.category_id = body.category_id
+    product.sale_mode = _validated_sale_mode(body)
     db.commit()
     return _out(_get_product(db, product.id), include_delivery=True)
 

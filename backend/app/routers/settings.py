@@ -20,6 +20,7 @@ from ..schemas import (
     SysSettings,
 )
 from ..seed import load_settings, save_settings
+from ..services.commission import SALE_COMMISSION, SALE_NORMAL, is_commission_mode
 
 router = APIRouter(prefix="/api", tags=["settings"])
 
@@ -31,6 +32,7 @@ def _order_brief(order: Order) -> OrderOut:
         email=order.email or "",
         total=order.total,
         status=order.status,
+        sale_mode=SALE_COMMISSION if is_commission_mode(getattr(order, "sale_mode", None)) else SALE_NORMAL,
         created_at=order.created_at,
         items=[
             OrderItemOut(product_id=it.product_id, name=it.name, price=it.price)

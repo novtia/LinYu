@@ -73,6 +73,11 @@ export function ProductsPage() {
               <button type="button" className="font-medium hover:text-teal" onClick={() => navigate(`/admin/products/${p.id}/edit`)}>
                 {p.name}
               </button>
+              {p.sale_mode === 'commission' ? (
+                <span className="ml-2 inline-flex rounded-md bg-[rgba(15,110,92,.1)] px-1.5 py-0.5 text-[0.72rem] font-semibold text-teal">
+                  约稿
+                </span>
+              ) : null}
             </td>
             <td className="whitespace-nowrap px-[18px] py-3.5 text-ink-soft">{p.category_name || '未分类'}</td>
             <td className="whitespace-nowrap px-[18px] py-3.5">¥{p.price}</td>

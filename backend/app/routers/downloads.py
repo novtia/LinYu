@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 from ..database import get_db
 from ..deps import get_optional_user
 from ..models import Delivery, DeliveryFile, Order, User
+from ..services.commission import is_commission_mode
 from ..services.files import image_media_type, is_image_name, resolve_stored_path
 from .orders import _can_access_order, _deny_order_access
 
@@ -28,7 +29,13 @@ def _file_response(path, filename: str, *, inline: bool) -> FileResponse:
 def _assert_download_access(order: Order, user: Optional[User], email: str) -> None:
     if not _can_access_order(order, user, email):
         _deny_order_access(user, email, action="下载")
-    if not (user and user.role == "admin") and order.status not in ("paid", "completed"):
+    if user and user.role == "admin":
+        return
+    if is_commission_mode(order.sale_mode):
+        if order.status != "completed":
+            raise HTTPException(status_code=403, detail="请先支付尾款后再下载")
+        return
+    if order.status not in ("paid", "completed"):
         raise HTTPException(status_code=403, detail="订单未完成支付")
 
 

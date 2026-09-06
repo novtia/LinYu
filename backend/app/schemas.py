@@ -104,7 +104,7 @@ class ProductFileItemOut(BaseModel):
     download_url: Optional[str] = None
 
     @classmethod
-    def list_from_delivery(cls, d) -> List["ProductFileItemOut"]:
+    def list_from_delivery(cls, d, *, include_url: bool = True) -> List["ProductFileItemOut"]:
         from .services.files import is_image_name
 
         items: List[ProductFileItemOut] = []
@@ -114,7 +114,7 @@ class ProductFileItemOut(BaseModel):
                     id=f.id,
                     file_name=f.file_name,
                     is_image=is_image_name(f.file_name),
-                    download_url=f"/api/downloads/files/{f.id}",
+                    download_url=f"/api/downloads/files/{f.id}" if include_url else None,
                 )
             )
         if not items and getattr(d, "file_path", None):
@@ -124,7 +124,7 @@ class ProductFileItemOut(BaseModel):
                     id=d.id,
                     file_name=name,
                     is_image=is_image_name(name),
-                    download_url=f"/api/downloads/{d.id}",
+                    download_url=f"/api/downloads/{d.id}" if include_url else None,
                 )
             )
         return items
@@ -143,12 +143,16 @@ class ProductOut(BaseModel):
     delivery_content: Optional[str] = None
     file_name: Optional[str] = None
     files: List[ProductFileItemOut] = Field(default_factory=list)
+    sale_mode: str = "normal"
+    deposit_amount: Optional[float] = None
+    balance_amount: Optional[float] = None
 
     class Config:
         from_attributes = True
 
     @classmethod
     def from_orm_product(cls, p, *, include_delivery: bool = False) -> "ProductOut":
+        from .services.commission import is_commission_mode, split_price
         from .services.files import cover_public_url, is_image_name
 
         cat = getattr(p, "category", None)
@@ -162,6 +166,10 @@ class ProductOut(BaseModel):
                         is_image=is_image_name(f.file_name),
                     )
                 )
+        sale_mode = "commission" if is_commission_mode(getattr(p, "sale_mode", None)) else "normal"
+        deposit = balance = None
+        if sale_mode == "commission":
+            deposit, balance = split_price(p.price)
         return cls(
             id=p.id,
             name=p.name,
@@ -175,6 +183,9 @@ class ProductOut(BaseModel):
             delivery_content=(p.delivery_content or "") if include_delivery else None,
             file_name=(files[0].file_name if files else getattr(p, "file_name", None)) if include_delivery else None,
             files=files,
+            sale_mode=sale_mode,
+            deposit_amount=deposit,
+            balance_amount=balance,
         )
 
 
@@ -186,6 +197,7 @@ class ProductIn(BaseModel):
     cover: str = "p1"
     status: str = "on"
     category_id: Optional[int] = None
+    sale_mode: str = "normal"
 
 
 class CoverUploadOut(BaseModel):
@@ -247,18 +259,34 @@ class OrderItemOut(BaseModel):
     files: List[ProductFileItemOut] = Field(default_factory=list)
 
 
+class OrderPaymentOut(BaseModel):
+    id: str
+    kind: str
+    amount: float
+    status: str
+    paid_at: Optional[datetime] = None
+
+
 class OrderOut(BaseModel):
     id: str
     username: str
     email: str = ""
     total: float
     status: str
+    sale_mode: str = "normal"
+    deposit_amount: Optional[float] = None
+    balance_amount: Optional[float] = None
     payment_method: Optional[str] = None
     payment_provider: Optional[str] = None
     trade_no: Optional[str] = None
     paid_at: Optional[datetime] = None
     created_at: datetime
     items: List[OrderItemOut]
+    payments: List[OrderPaymentOut] = Field(default_factory=list)
+
+
+class PayBalanceIn(BaseModel):
+    payment_method_id: str = Field(default="", description="公开支付方式 ID：{channel_id}:{method}")
 
 
 class CheckoutOut(BaseModel):

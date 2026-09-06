@@ -89,7 +89,9 @@ export function DeliveryFileList({
               >
                 下载
               </button>
-            ) : null}
+            ) : (
+              <div className="text-[0.78rem] text-ink-mute">已锁定</div>
+            )}
           </div>
         </li>
       ))}

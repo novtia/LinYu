@@ -29,6 +29,9 @@ export interface Product {
   /** 付费文件原始名，仅管理端可见 */
   file_name?: string | null
   files?: ProductFileItem[]
+  sale_mode?: 'normal' | 'commission'
+  deposit_amount?: number | null
+  balance_amount?: number | null
 }
 
 export interface ProductFileItem {
@@ -67,18 +70,30 @@ export interface OrderItem {
   files?: ProductFileItem[]
 }
 
+export interface OrderPayment {
+  id: string
+  kind: 'deposit' | 'balance' | 'full' | string
+  amount: number
+  status: string
+  paid_at?: string | null
+}
+
 export interface Order {
   id: string
   username: string
   email?: string
   total: number
   status: string
+  sale_mode?: 'normal' | 'commission'
+  deposit_amount?: number | null
+  balance_amount?: number | null
   payment_method?: string | null
   payment_provider?: string | null
   trade_no?: string | null
   paid_at?: string | null
   created_at: string
   items: OrderItem[]
+  payments?: OrderPayment[]
 }
 
 export interface CheckoutResult {

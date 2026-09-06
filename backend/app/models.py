@@ -63,6 +63,8 @@ class Product(Base):
     file_path: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     file_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(8), default="on")  # on | off
+    # normal = 一次付清立即发货；commission = 定金 / 交稿 / 尾款解锁
+    sale_mode: Mapped[str] = mapped_column(String(16), default="normal", server_default="normal")
     category_id: Mapped[Optional[int]] = mapped_column(ForeignKey("categories.id"), nullable=True)
 
     category: Mapped[Optional["Category"]] = relationship(back_populates="products")
@@ -94,7 +96,8 @@ class Order(Base):
     username: Mapped[str] = mapped_column(String(64))
     email: Mapped[str] = mapped_column(String(128), index=True, default="")
     total: Mapped[float] = mapped_column(Float)
-    status: Mapped[str] = mapped_column(String(16), default="pending")  # pending | paid | completed | failed | cancelled
+    status: Mapped[str] = mapped_column(String(16), default="pending")  # pending | deposit_paid | awaiting_balance | paid | completed | failed | cancelled
+    sale_mode: Mapped[str] = mapped_column(String(16), default="normal", server_default="normal")
     payment_channel_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     payment_method: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     payment_provider: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
@@ -105,6 +108,7 @@ class Order(Base):
     user: Mapped[Optional["User"]] = relationship(back_populates="orders")
     items: Mapped[List["OrderItem"]] = relationship(back_populates="order", cascade="all, delete-orphan")
     deliveries: Mapped[List["Delivery"]] = relationship(back_populates="order", cascade="all, delete-orphan")
+    payments: Mapped[List["OrderPayment"]] = relationship(back_populates="order", cascade="all, delete-orphan")
 
 
 class OrderItem(Base):
@@ -117,6 +121,24 @@ class OrderItem(Base):
     price: Mapped[float] = mapped_column(Float)
 
     order: Mapped["Order"] = relationship(back_populates="items")
+
+
+class OrderPayment(Base):
+    __tablename__ = "order_payments"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    order_id: Mapped[str] = mapped_column(String(64), ForeignKey("orders.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(16))  # deposit | balance | full
+    amount: Mapped[float] = mapped_column(Float)
+    status: Mapped[str] = mapped_column(String(16), default="pending")  # pending | paid
+    trade_no: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    payment_channel_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    payment_method: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    payment_provider: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    order: Mapped["Order"] = relationship(back_populates="payments")
 
 
 class Delivery(Base):

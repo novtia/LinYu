@@ -3,12 +3,14 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ApiError, api } from '../lib/api'
 import { getGuestEmail, orderPath, setGuestEmail } from '../lib/guestEmail'
 import { orderStatusClass, orderStatusLabel } from '../lib/orderStatus'
+import { formatYuan } from '../lib/commission'
 import { useAuth } from '../context/AuthContext'
 import { usePurchaseResult } from '../context/PurchaseResultContext'
 import { useToast } from '../context/ToastContext'
 import { MarkdownContent } from '../components/MarkdownContent'
 import { DeliveryFileList } from '../components/DeliveryFileList'
-import type { Order, ProductFileItem } from '../types'
+import { PaymentMethodPicker } from '../components/PaymentMethodPicker'
+import type { CheckoutResult, Order, ProductFileItem, PublicPaymentMethod } from '../types'
 
 function fmtTime(iso: string) {
   const d = new Date(iso)
@@ -19,7 +21,7 @@ export function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const [searchParams, setSearchParams] = useSearchParams()
   const fromPay = searchParams.get('pay') === '1'
-  const { user, loading } = useAuth()
+  const { user, loading, publicSettings } = useAuth()
   const { showToast } = useToast()
   const { showPurchaseResult } = usePurchaseResult()
   const [order, setOrder] = useState<Order | null>(null)
@@ -28,8 +30,16 @@ export function OrderDetailPage() {
   const [needEmail, setNeedEmail] = useState(false)
   const [emailInput, setEmailInput] = useState(getGuestEmail())
   const [emailKey, setEmailKey] = useState(0)
+  const [balancePayment, setBalancePayment] = useState<PublicPaymentMethod | null>(null)
+  const [payingBalance, setPayingBalance] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const navigate = useNavigate()
   const resultShown = useRef(false)
+
+  function reloadOrder() {
+    if (!id) return
+    return api.get<Order>(user ? `/api/orders/${id}` : orderPath(id)).then(setOrder)
+  }
 
   useEffect(() => {
     if (loading) return
@@ -72,13 +82,26 @@ export function OrderDetailPage() {
   useEffect(() => {
     const hasAccess = !!user || !!getGuestEmail()
     if (!fromPay || !id || !hasAccess || !order) return
-    if (order.status === 'completed' || order.status === 'paid') {
+    const commission = order.sale_mode === 'commission'
+    if (order.status === 'completed' || (!commission && order.status === 'paid')) {
       if (!resultShown.current) {
         resultShown.current = true
         showPurchaseResult({
           status: 'success',
           orderId: order.id,
-          message: '支付成功，商品已自动发货，可在下方查看发放内容。',
+          message: commission ? '尾款已支付，稿件已解锁，可在下方下载。' : '支付成功，商品已自动发货，可在下方查看发放内容。',
+        })
+        setSearchParams({}, { replace: true })
+      }
+      return
+    }
+    if (commission && (order.status === 'deposit_paid' || order.status === 'awaiting_balance')) {
+      if (!resultShown.current) {
+        resultShown.current = true
+        showPurchaseResult({
+          status: 'success',
+          orderId: order.id,
+          message: order.status === 'awaiting_balance' ? '稿件已就绪，请支付尾款后下载。' : '定金已支付，请等待商家交稿。',
         })
         setSearchParams({}, { replace: true })
       }
@@ -103,14 +126,25 @@ export function OrderDetailPage() {
       try {
         const next = await api.get<Order>(user ? `/api/orders/${id}` : orderPath(id))
         setOrder(next)
-        if (next.status === 'completed' || next.status === 'paid') {
+        const nextCommission = next.sale_mode === 'commission'
+        const settled =
+          next.status === 'completed' ||
+          (!nextCommission && next.status === 'paid') ||
+          (nextCommission && (next.status === 'deposit_paid' || next.status === 'awaiting_balance'))
+        if (settled) {
           window.clearInterval(timer)
           if (!resultShown.current) {
             resultShown.current = true
             showPurchaseResult({
               status: 'success',
               orderId: next.id,
-              message: '支付成功，商品已自动发货，可在下方查看发放内容。',
+              message: nextCommission
+                ? next.status === 'completed'
+                  ? '尾款已支付，稿件已解锁，可在下方下载。'
+                  : next.status === 'awaiting_balance'
+                    ? '稿件已就绪，请支付尾款后下载。'
+                    : '定金已支付，请等待商家交稿。'
+                : '支付成功，商品已自动发货，可在下方查看发放内容。',
             })
             setSearchParams({}, { replace: true })
           }
@@ -192,8 +226,65 @@ export function OrderDetailPage() {
     )
   }
 
-  const delivered = order.status === 'completed' || order.status === 'paid'
+  const commission = order.sale_mode === 'commission'
+  const delivered = order.status === 'completed' || (!commission && order.status === 'paid')
   const waitingPay = order.status === 'pending'
+  const isAdmin = user?.role === 'admin'
+  const deposit = order.deposit_amount ?? 0
+  const balance = order.balance_amount ?? 0
+
+  async function handlePayBalance() {
+    if (!id) return
+    if (!balancePayment && !(publicSettings?.debugMode && isAdmin)) {
+      showToast('请选择支付方式')
+      return
+    }
+    setPayingBalance(true)
+    try {
+      const res = await api.post<CheckoutResult>(`/api/orders/${id}/pay-balance`, {
+        payment_method_id: balancePayment?.id || '',
+      })
+      if (res.pay_url) {
+        window.location.href = res.pay_url
+        return
+      }
+      setOrder(res.order)
+      showPurchaseResult({
+        status: 'success',
+        orderId: res.order.id,
+        message: '尾款已支付，稿件已解锁。',
+      })
+    } catch (e) {
+      showToast(e instanceof ApiError ? e.message : '发起尾款支付失败')
+    } finally {
+      setPayingBalance(false)
+    }
+  }
+
+  async function handleUploadManuscript(file: File) {
+    if (!id) return
+    setUploading(true)
+    try {
+      await api.upload(`/api/orders/${id}/files`, file)
+      await reloadOrder()
+      showToast('稿件已上传')
+    } catch (e) {
+      showToast(e instanceof ApiError ? e.message : '上传失败')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function handleDeleteManuscript(fileId: string) {
+    if (!id) return
+    try {
+      await api.delete(`/api/orders/${id}/files/${fileId}`)
+      await reloadOrder()
+      showToast('已删除稿件')
+    } catch (e) {
+      showToast(e instanceof ApiError ? e.message : '删除失败')
+    }
+  }
 
   return (
     <main className="pb-20 pt-8">
@@ -209,18 +300,60 @@ export function OrderDetailPage() {
               <p className="mt-1 font-[family-name:var(--font-mono)] text-[0.85rem] text-ink-mute">{order.id}</p>
             </div>
             <span className={`inline-flex rounded-md px-2.5 py-1 text-[0.78rem] font-semibold ${orderStatusClass(order.status)}`}>
-              {orderStatusLabel(order.status)}
+              {commission ? `约稿 · ${orderStatusLabel(order.status)}` : orderStatusLabel(order.status)}
             </span>
           </div>
           <div className="grid gap-3 text-[0.92rem] sm:grid-cols-3">
             <Meta label="下单时间" value={fmtTime(order.created_at)} />
             <Meta label="买家" value={order.username} />
             <Meta label="合计" value={`¥${order.total}`} />
+            {commission ? (
+              <>
+                <Meta label="定金" value={formatYuan(deposit)} />
+                <Meta label="尾款" value={formatYuan(balance)} />
+              </>
+            ) : null}
           </div>
           {waitingPay && (
             <p className="mt-4 rounded-xl bg-[rgba(196,165,116,.16)] px-3.5 py-3 text-[0.86rem] text-[#8a6a2f]">
-              订单待支付。若你已完成付款，请稍候刷新本页；支付结果确认后将自动发货。
+              {commission
+                ? '订单待付定金。若你已完成付款，请稍候刷新本页。'
+                : '订单待支付。若你已完成付款，请稍候刷新本页；支付结果确认后将自动发货。'}
             </p>
+          )}
+          {commission && order.status === 'deposit_paid' && (
+            <p className="mt-4 rounded-xl bg-[rgba(196,165,116,.16)] px-3.5 py-3 text-[0.86rem] text-[#8a6a2f]">
+              定金已到账，等待商家上传稿件。
+            </p>
+          )}
+          {commission && order.status === 'awaiting_balance' && (
+            <div className="mt-4 rounded-xl border border-[var(--line)] bg-paper p-4">
+              <p className="mb-3 text-[0.86rem] text-ink-soft">稿件已就绪，支付尾款 {formatYuan(balance)} 后即可下载。</p>
+              <PaymentMethodPicker className="mb-3" value={balancePayment?.id || null} onChange={setBalancePayment} />
+              <button
+                type="button"
+                disabled={payingBalance}
+                className="h-11 rounded-xl bg-teal px-5 text-[0.9rem] font-semibold text-white hover:bg-teal-deep disabled:opacity-60"
+                onClick={handlePayBalance}
+              >
+                {payingBalance ? '跳转支付中…' : `支付尾款 ${formatYuan(balance)}`}
+              </button>
+            </div>
+          )}
+          {commission && isAdmin && (order.status === 'deposit_paid' || order.status === 'awaiting_balance') && (
+            <div className="mt-4 rounded-xl border border-dashed border-[var(--line-strong)] bg-paper px-4 py-3">
+              <div className="mb-2 text-[0.82rem] font-semibold text-ink-soft">上传稿件</div>
+              <input
+                type="file"
+                disabled={uploading}
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  e.target.value = ''
+                  if (file) handleUploadManuscript(file)
+                }}
+              />
+              {uploading ? <p className="mt-2 text-[0.8rem] text-ink-mute">上传中…</p> : null}
+            </div>
           )}
         </div>
 
@@ -235,9 +368,9 @@ export function OrderDetailPage() {
                   <strong className="text-[0.98rem]">{it.name}</strong>
                   <span className="font-semibold text-teal">¥{it.price}</span>
                 </div>
-                {!delivered ? (
+                {!delivered && !(commission && (it.files?.length || order.status === 'awaiting_balance')) ? (
                   <div className="rounded-xl bg-paper px-3.5 py-3 text-[0.86rem] text-ink-mute">
-                    {waitingPay ? '支付成功后自动发放' : '尚未发放'}
+                    {waitingPay ? (commission ? '支付定金后进入交稿流程' : '支付成功后自动发放') : commission && order.status === 'deposit_paid' ? '等待商家交稿' : '尚未发放'}
                   </div>
                 ) : (
                   <div className="rounded-xl bg-paper px-3.5 py-3">
@@ -264,6 +397,9 @@ export function OrderDetailPage() {
                     ) : null}
                     {(it.files && it.files.length > 0) || it.download_url ? (
                       <div className={it.payload ? 'mt-3' : ''}>
+                        {commission && !delivered ? (
+                          <p className="mb-2 text-[0.8rem] text-ink-mute">稿件已上传，支付尾款后解锁下载。</p>
+                        ) : null}
                         <DeliveryFileList
                           files={
                             it.files && it.files.length
@@ -285,6 +421,18 @@ export function OrderDetailPage() {
                             }
                           }}
                         />
+                        {isAdmin && commission && !delivered && it.files?.length
+                          ? it.files.map((f) => (
+                              <button
+                                key={`del-${f.id}`}
+                                type="button"
+                                className="mt-2 mr-3 text-[0.78rem] text-danger hover:underline"
+                                onClick={() => handleDeleteManuscript(f.id)}
+                              >
+                                删除 {f.file_name}
+                              </button>
+                            ))
+                          : null}
                       </div>
                     ) : null}
                     {!it.payload && !(it.files && it.files.length) && !it.download_url ? (

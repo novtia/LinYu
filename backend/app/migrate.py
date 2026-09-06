@@ -372,6 +372,35 @@ def _migrate_multi_files(conn) -> None:
             )
 
 
+def _migrate_commission_mode(conn) -> None:
+    """约稿销售模式：商品/订单 sale_mode + 分笔付款表。"""
+    if _table_exists(conn, "products") and "sale_mode" not in _table_columns(conn, "products"):
+        conn.execute(text("ALTER TABLE products ADD COLUMN sale_mode VARCHAR(16) DEFAULT 'normal'"))
+    if _table_exists(conn, "orders") and "sale_mode" not in _table_columns(conn, "orders"):
+        conn.execute(text("ALTER TABLE orders ADD COLUMN sale_mode VARCHAR(16) DEFAULT 'normal'"))
+    conn.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS order_payments (
+                id VARCHAR(64) NOT NULL PRIMARY KEY,
+                order_id VARCHAR(64) NOT NULL,
+                kind VARCHAR(16) NOT NULL,
+                amount FLOAT NOT NULL,
+                status VARCHAR(16),
+                trade_no VARCHAR(128),
+                payment_channel_id VARCHAR(64),
+                payment_method VARCHAR(32),
+                payment_provider VARCHAR(32),
+                created_at DATETIME,
+                paid_at DATETIME,
+                FOREIGN KEY(order_id) REFERENCES orders (id)
+            )
+            """
+        )
+    )
+    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_order_payments_order_id ON order_payments (order_id)"))
+
+
 def migrate_schema(engine: Engine) -> None:
     """Add new columns / rebuild legacy tables for SQLite."""
     alterations = {
@@ -407,3 +436,4 @@ def migrate_schema(engine: Engine) -> None:
         _migrate_orders_guest_email(conn)
         _backfill_paid_file_links(conn)
         _migrate_multi_files(conn)
+        _migrate_commission_mode(conn)

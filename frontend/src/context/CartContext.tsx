@@ -121,6 +121,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [items])
 
   const addProduct = useCallback((p: Product, payment?: PublicPaymentMethod | null, options?: { openDrawer?: boolean; quantity?: number }) => {
+    if (p.sale_mode === 'commission') return
     const addQty = clampCartQty(options?.quantity ?? 1)
     const nextPayment = paymentFrom(payment)
     setItems((prev) => {

@@ -16,7 +16,11 @@ logger = logging.getLogger("lingxia.seed")
 
 def seed_if_empty(db: Session) -> None:
     """仅在空库时写入管理员与默认站点设置。"""
-    if not db.query(User).filter(User.username == "admin").first():
+    has_bootstrap_admin = (
+        db.query(User).filter(User.id == "u_admin").first()
+        or db.query(User).filter(User.username == "admin").first()
+    )
+    if not has_bootstrap_admin:
         password = (os.getenv("ADMIN_INITIAL_PASSWORD") or "").strip()
         generated = not password
         if generated:

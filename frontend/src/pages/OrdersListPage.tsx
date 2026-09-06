@@ -137,7 +137,14 @@ export function OrdersListPage() {
                   <span className="font-[family-name:var(--font-mono)]">{o.id}</span>
                   <span>{fmtTime(o.created_at)}</span>
                 </div>
-                <div className="mb-2 font-semibold text-ink">{o.items.map((i) => i.name).join('、')}</div>
+                <div className="mb-2 font-semibold text-ink">
+                  {o.sale_mode === 'commission' ? (
+                    <span className="mr-2 inline-flex rounded-md bg-[rgba(15,110,92,.1)] px-1.5 py-0.5 text-[0.72rem] font-semibold text-teal">
+                      约稿
+                    </span>
+                  ) : null}
+                  {o.items.map((i) => i.name).join('、')}
+                </div>
                 <div className="flex items-center justify-between">
                   <span className={`inline-flex rounded-md px-2 py-1 text-[0.75rem] font-semibold ${orderStatusClass(o.status)}`}>
                     {orderStatusLabel(o.status)}

@@ -3,6 +3,10 @@ export function orderStatusLabel(status: string): string {
   switch (status) {
     case 'pending':
       return '待支付'
+    case 'deposit_paid':
+      return '已付定金，待交稿'
+    case 'awaiting_balance':
+      return '待付尾款'
     case 'paid':
       return '已支付'
     case 'completed':
@@ -21,6 +25,8 @@ export function orderStatusTone(status: string): 'teal' | 'warn' | 'mute' | 'dan
     case 'completed':
     case 'paid':
       return 'teal'
+    case 'deposit_paid':
+    case 'awaiting_balance':
     case 'pending':
       return 'warn'
     case 'failed':

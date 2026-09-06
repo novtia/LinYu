@@ -113,17 +113,26 @@ export function ShopPage() {
                           >
                             详情
                           </Link>
-                          <button
-                            type="button"
-                            className="h-10 rounded-xl bg-ink px-4 text-[0.88rem] font-semibold text-white transition hover:bg-teal-deep"
-                            onClick={() => {
-                              addProduct(p)
-                              showToast('已加入购物车：' + p.name)
-                            }}
-                          >
-                            <span className="buy-full">加入购物车</span>
-                            <span className="buy-short">加购</span>
-                          </button>
+                          {p.sale_mode === 'commission' ? (
+                            <Link
+                              to={`/product/${p.id}`}
+                              className="inline-flex h-10 items-center rounded-xl bg-ink px-4 text-[0.88rem] font-semibold text-white transition hover:bg-teal-deep"
+                            >
+                              约稿
+                            </Link>
+                          ) : (
+                            <button
+                              type="button"
+                              className="h-10 rounded-xl bg-ink px-4 text-[0.88rem] font-semibold text-white transition hover:bg-teal-deep"
+                              onClick={() => {
+                                addProduct(p)
+                                showToast('已加入购物车：' + p.name)
+                              }}
+                            >
+                              <span className="buy-full">加入购物车</span>
+                              <span className="buy-short">加购</span>
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>

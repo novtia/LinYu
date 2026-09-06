@@ -13,6 +13,7 @@ import { QuantityStepper, clampCartQty } from '../components/QuantityStepper'
 import { ProductDeliveryPanel, type DeliveryUnlock } from '../components/ProductDeliveryPanel'
 import { ProductMedia } from '../components/ProductMedia'
 import { resolveCheckoutResult } from '../lib/checkout'
+import { formatYuan, isCommissionProduct, splitPrice } from '../lib/commission'
 import type { CheckoutResult, Order, Product, PublicPaymentMethod } from '../types'
 
 function emptyUnlock(): DeliveryUnlock {
@@ -31,7 +32,7 @@ export function ProductDetailPage() {
   const [checkoutEmail, setCheckoutEmail] = useState('')
   const [quantity, setQuantity] = useState(1)
   const { addProduct } = useCart()
-  const { user, loading: authLoading, publicSettings, refreshMe } = useAuth()
+  const { user, loading: authLoading, publicSettings, refreshMe, openAuth } = useAuth()
   const { showToast } = useToast()
   const { showPurchaseResult } = usePurchaseResult()
   const needEmail = !authLoading && !user?.email
@@ -64,7 +65,9 @@ export function ProductDetailPage() {
           const hit = order.items.find(
             (it) =>
               it.product_id === product.id &&
-              (Boolean(it.payload) || Boolean(it.download_url) || Boolean(it.files && it.files.length)),
+              (order.sale_mode === 'commission'
+                ? order.status === 'completed'
+                : Boolean(it.payload) || Boolean(it.download_url) || Boolean(it.files && it.files.length)),
           )
           if (hit) {
             setUnlock({
@@ -99,7 +102,9 @@ export function ProductDetailPage() {
   }
 
   const debugMode = !!publicSettings?.debugMode
-  const isFree = product.price === 0
+  const commission = isCommissionProduct(product)
+  const orderHalves = splitPrice(product.price * clampCartQty(quantity))
+  const isFree = !commission && product.price === 0
 
   function ensurePayment(): boolean {
     if (debugMode || isFree) return true
@@ -111,7 +116,7 @@ export function ProductDetailPage() {
   }
 
   function handleAddCart() {
-    if (!product) return
+    if (!product || commission) return
     const qty = clampCartQty(quantity)
     addProduct(product, payment, { openDrawer: true, quantity: qty })
     showToast(qty > 1 ? `已加入购物车：${product.name} ×${qty}` : `已加入购物车：${product.name}`)
@@ -119,6 +124,11 @@ export function ProductDetailPage() {
 
   async function handleBuyNow() {
     if (!product) return
+    if (commission && !user) {
+      openAuth('login')
+      showToast('约稿商品请先登录')
+      return
+    }
     if (!ensurePayment()) return
     if (publicSettings?.maintain) {
       showToast('站点维护中，暂停下单')
@@ -142,18 +152,29 @@ export function ProductDetailPage() {
       if (needEmailNow) setGuestEmail(email)
       if (user) await refreshMe()
       const outcome = resolveCheckoutResult(res)
-      if (outcome === 'paid') {
-        const hit = res.order.items.find(
-          (it) =>
-            it.product_id === product.id &&
-            (Boolean(it.payload) || Boolean(it.download_url) || Boolean(it.files && it.files.length)),
-        )
-        if (hit) {
-          setUnlock({ unlocked: true, orderId: res.order.id })
+      if (outcome === 'paid' || outcome === 'deposit') {
+        if (outcome === 'paid') {
+          const hit = res.order.items.find(
+            (it) =>
+              it.product_id === product.id &&
+              (Boolean(it.payload) || Boolean(it.download_url) || Boolean(it.files && it.files.length)),
+          )
+          if (hit) {
+            setUnlock({ unlocked: true, orderId: res.order.id })
+          }
         }
         showPurchaseResult({
           status: 'success',
-          message: debugMode ? '调试模式：已跳过支付并完成发货' : isFree ? '免费领取成功，商品已发放。' : '订单已生成，商品已发货。',
+          message:
+            outcome === 'deposit'
+              ? debugMode
+                ? '调试模式：已跳过定金，等待商家交稿。'
+                : '定金已支付，请等待商家交稿。'
+              : debugMode
+                ? '调试模式：已跳过支付并完成发货'
+                : isFree
+                  ? '免费领取成功，商品已发放。'
+                  : '订单已生成，商品已发货。',
           orderId: res.order.id,
         })
         return
@@ -199,11 +220,18 @@ export function ProductDetailPage() {
 
         <div className="pt-8 md:pt-10">
           <div className="mb-8 max-w-3xl">
-            {product.category_name && (
-              <div className="mb-3 inline-flex rounded-lg bg-paper px-2.5 py-1 text-[0.78rem] font-semibold text-ink-soft">
-                {product.category_name}
-              </div>
-            )}
+            <div className="mb-3 flex flex-wrap gap-2">
+              {product.category_name && (
+                <div className="inline-flex rounded-lg bg-paper px-2.5 py-1 text-[0.78rem] font-semibold text-ink-soft">
+                  {product.category_name}
+                </div>
+              )}
+              {commission && (
+                <div className="inline-flex rounded-lg bg-[rgba(15,110,92,.1)] px-2.5 py-1 text-[0.78rem] font-semibold text-teal">
+                  约稿
+                </div>
+              )}
+            </div>
             <h1 className="font-[family-name:var(--font-display)] text-[clamp(1.8rem,3.2vw,2.6rem)] font-extrabold tracking-[-0.03em] text-ink">
               {product.name}
             </h1>
@@ -222,9 +250,16 @@ export function ProductDetailPage() {
             <aside className="w-full self-start">
               <div className="rounded-[22px] border border-[var(--line)] bg-white p-5 shadow-[0_22px_48px_-40px_rgba(20,32,28,.4)] md:p-6">
                 <div className="mb-5 flex items-end justify-between gap-3 border-b border-[var(--line)] pb-5">
-                  <span className="font-[family-name:var(--font-display)] text-[2.2rem] font-bold tracking-tight text-ink">
-                    ¥{product.price}
-                  </span>
+                  <div>
+                    <span className="font-[family-name:var(--font-display)] text-[2.2rem] font-bold tracking-tight text-ink">
+                      ¥{product.price}
+                    </span>
+                    {commission ? (
+                      <div className="mt-1 text-[0.82rem] text-ink-mute">
+                        约稿 · 定金 {formatYuan(orderHalves.deposit)} · 尾款 {formatYuan(orderHalves.balance)}
+                      </div>
+                    ) : null}
+                  </div>
                   {quantity > 1 && (
                     <span className="mb-1 text-[0.82rem] text-ink-mute">
                       小计 ¥{Math.round(product.price * quantity * 100) / 100}
@@ -256,6 +291,11 @@ export function ProductDetailPage() {
                     <span className="mb-1.5 block text-[0.82rem] font-semibold text-ink-soft">购买数量</span>
                     <QuantityStepper value={quantity} onChange={setQuantity} />
                   </div>
+                  {commission && (
+                    <div className="mb-5 rounded-xl border border-[rgba(15,110,92,.2)] bg-[rgba(15,110,92,.06)] px-3.5 py-3 text-[0.82rem] text-ink-soft">
+                      需登录下单。先按件数支付定金，商家交稿后再付尾款才能下载文件。
+                    </div>
+                  )}
 
                   {needEmail && (
                     <label className="mb-5 block">
@@ -271,21 +311,35 @@ export function ProductDetailPage() {
                     </label>
                   )}
 
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <button
-                      type="button"
-                      className="h-12 rounded-xl border border-[var(--line-strong)] bg-white text-[0.95rem] font-semibold text-ink hover:border-teal hover:text-teal"
-                      onClick={handleAddCart}
-                    >
-                      加入购物车
-                    </button>
+                  <div className={commission ? '' : 'grid grid-cols-2 gap-2.5'}>
+                    {!commission && (
+                      <button
+                        type="button"
+                        className="h-12 rounded-xl border border-[var(--line-strong)] bg-white text-[0.95rem] font-semibold text-ink hover:border-teal hover:text-teal"
+                        onClick={handleAddCart}
+                      >
+                        加入购物车
+                      </button>
+                    )}
                     <button
                       type="button"
                       disabled={buying || authLoading}
-                      className="h-12 rounded-xl bg-teal text-[0.95rem] font-semibold text-white transition hover:bg-teal-deep disabled:opacity-60"
+                      className="h-12 w-full rounded-xl bg-teal text-[0.95rem] font-semibold text-white transition hover:bg-teal-deep disabled:opacity-60"
                       onClick={handleBuyNow}
                     >
-                      {buying ? (debugMode || isFree ? '处理中…' : '跳转支付中…') : debugMode ? '调试购买' : isFree ? '免费领取' : '购买'}
+                      {buying
+                        ? debugMode || isFree
+                          ? '处理中…'
+                          : '跳转支付中…'
+                        : debugMode
+                          ? '调试购买'
+                          : isFree
+                            ? '免费领取'
+                            : commission
+                              ? user
+                                ? `支付定金 ${formatYuan(orderHalves.deposit)}`
+                                : '登录后支付定金'
+                              : '购买'}
                     </button>
                   </div>
 
@@ -297,9 +351,11 @@ export function ProductDetailPage() {
                 </div>
 
                 <ul className="mt-6 grid gap-2 border-t border-[var(--line)] pt-5 text-[0.82rem] text-ink-soft">
-                  {(isFree
-                    ? ['点击购买立即发货', '内容仅买家可见', '支持在「我的订单」随时查看']
-                    : ['付款成功自动发货', '内容仅买家可见', '支持在「我的订单」随时查看']
+                  {(commission
+                    ? ['须登录账号购买', '先付一半定金，商家交稿后再付尾款', '尾款到账后才能下载稿件']
+                    : isFree
+                      ? ['点击购买立即发货', '内容仅买家可见', '支持在「我的订单」随时查看']
+                      : ['付款成功自动发货', '内容仅买家可见', '支持在「我的订单」随时查看']
                   ).map((t) => (
                     <li key={t} className="flex items-center gap-2">
                       <span className="grid h-[18px] w-[18px] place-items-center rounded-full bg-[rgba(15,110,92,.12)] text-[0.65rem] text-teal">

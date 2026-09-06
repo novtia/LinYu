@@ -5,6 +5,7 @@ import { useToast } from '../../context/ToastContext'
 import { CoverCropModal } from '../../components/CoverCropModal'
 import { MarkdownContent } from '../../components/MarkdownContent'
 import { ProductFilePicker } from '../../components/ProductFilePicker'
+import { formatYuan, splitPrice } from '../../lib/commission'
 import type { Category, Product, ProductFileItem } from '../../types'
 
 const COVERS = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6']
@@ -31,6 +32,7 @@ export function ProductFormPage() {
     delivery_content: '',
     status: 'on',
     category_id: '' as string,
+    sale_mode: 'normal' as 'normal' | 'commission',
   })
   const [files, setFiles] = useState<ProductFileItem[]>([])
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
@@ -81,6 +83,7 @@ export function ProductFormPage() {
           delivery_content: p.delivery_content || '',
           status: p.status,
           category_id: p.category_id != null ? String(p.category_id) : '',
+          sale_mode: p.sale_mode === 'commission' ? 'commission' : 'normal',
         })
         setFiles(p.files || [])
       })
@@ -124,6 +127,10 @@ export function ProductFormPage() {
       setError('请填写完整且有效的信息')
       return
     }
+    if (form.sale_mode === 'commission' && price < 0.02) {
+      setError('约稿商品价格须至少 0.02 元，以便拆分定金与尾款')
+      return
+    }
     setSaving(true)
     setError('')
     try {
@@ -135,6 +142,7 @@ export function ProductFormPage() {
         delivery_content: form.delivery_content,
         status: form.status,
         category_id: form.category_id ? Number(form.category_id) : null,
+        sale_mode: form.sale_mode,
       }
       const saved = isEdit
         ? await api.put<Product>(`/api/products/${id}`, body)
@@ -142,8 +150,10 @@ export function ProductFormPage() {
       if (pendingCover) {
         await api.upload(`/api/products/${saved.id}/cover`, pendingCover)
       }
-      for (const file of pendingFiles) {
-        await api.upload(`/api/products/${saved.id}/files`, file)
+      if (form.sale_mode !== 'commission') {
+        for (const file of pendingFiles) {
+          await api.upload(`/api/products/${saved.id}/files`, file)
+        }
       }
       showToast(isEdit ? '商品已更新' : '商品已创建')
       navigate('/admin/products')
@@ -214,6 +224,18 @@ export function ProductFormPage() {
           </label>
 
           <label className="grid gap-1.5">
+            <span className="text-[0.82rem] font-semibold text-ink-soft">销售模式</span>
+            <select
+              className="h-11 rounded-xl border border-[var(--line-strong)] bg-white px-3"
+              value={form.sale_mode}
+              onChange={(e) => setForm({ ...form, sale_mode: e.target.value as 'normal' | 'commission' })}
+            >
+              <option value="normal">普通商品（一次付清，自动发货）</option>
+              <option value="commission">约稿商品（先付定金，交稿后再付尾款）</option>
+            </select>
+          </label>
+
+          <label className="grid gap-1.5">
             <span className="text-[0.82rem] font-semibold text-ink-soft">价格（元）</span>
             <input
               className="h-11 rounded-xl border border-[var(--line-strong)] bg-white px-3.5"
@@ -224,7 +246,11 @@ export function ProductFormPage() {
               onChange={(e) => setForm({ ...form, price: e.target.value })}
               required
             />
-            <span className="text-[0.78rem] text-ink-mute">填 0 表示免费，用户点击购买后直接发货</span>
+            <span className="text-[0.78rem] text-ink-mute">
+              {form.sale_mode === 'commission'
+                ? `约稿总价；买家先付定金 ${formatYuan(splitPrice(Number(form.price) || 0).deposit)}，交稿后再付尾款 ${formatYuan(splitPrice(Number(form.price) || 0).balance)}`
+                : '填 0 表示免费，用户点击购买后直接发货'}
+            </span>
           </label>
 
           <label className="grid gap-1.5">
@@ -363,15 +389,22 @@ export function ProductFormPage() {
             />
           </label>
 
-          <ProductFilePicker
-            productId={id ? Number(id) : null}
-            files={files}
-            pending={pendingFiles}
-            onPendingChange={setPendingFiles}
-            onRemoveSaved={removeSavedFile}
-            onError={setError}
-          />
+          {form.sale_mode === 'commission' ? (
+            <div className="rounded-xl border border-[var(--line)] bg-paper px-3.5 py-3 text-[0.86rem] text-ink-soft md:col-span-2">
+              约稿商品的稿件在买家付定金后，于对应订单详情中上传。买家付清尾款后才能下载。
+            </div>
+          ) : (
+            <ProductFilePicker
+              productId={id ? Number(id) : null}
+              files={files}
+              pending={pendingFiles}
+              onPendingChange={setPendingFiles}
+              onRemoveSaved={removeSavedFile}
+              onError={setError}
+            />
+          )}
 
+          {form.sale_mode !== 'commission' && (
           <div className="grid gap-1.5 md:col-span-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-[0.82rem] font-semibold text-ink-soft">发货文本</span>
@@ -414,6 +447,7 @@ export function ProductFormPage() {
             )}
             <p className="text-[0.8rem] text-ink-mute">支持 Markdown 排版；文件请在上方「商品文件」中上传，不要写入公开链接。</p>
           </div>
+          )}
         </div>
 
         <div className="flex items-center justify-between gap-3 border-t border-[var(--line)] bg-paper px-5 py-4">
