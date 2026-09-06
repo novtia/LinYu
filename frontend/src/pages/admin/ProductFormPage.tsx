@@ -128,7 +128,7 @@ export function ProductFormPage() {
       return
     }
     if (form.sale_mode === 'commission' && price < 0.02) {
-      setError('约稿商品价格须至少 0.02 元，以便拆分定金与尾款')
+      setError('约稿单价须至少 0.02 元/千字，以便拆分定金与尾款')
       return
     }
     setSaving(true)
@@ -236,7 +236,9 @@ export function ProductFormPage() {
           </label>
 
           <label className="grid gap-1.5">
-            <span className="text-[0.82rem] font-semibold text-ink-soft">价格（元）</span>
+            <span className="text-[0.82rem] font-semibold text-ink-soft">
+              {form.sale_mode === 'commission' ? '单价（元/千字）' : '价格（元）'}
+            </span>
             <input
               className="h-11 rounded-xl border border-[var(--line-strong)] bg-white px-3.5"
               type="number"
@@ -248,7 +250,7 @@ export function ProductFormPage() {
             />
             <span className="text-[0.78rem] text-ink-mute">
               {form.sale_mode === 'commission'
-                ? `约稿总价；买家先付定金 ${formatYuan(splitPrice(Number(form.price) || 0).deposit)}，交稿后再付尾款 ${formatYuan(splitPrice(Number(form.price) || 0).balance)}`
+                ? `按千字计价。1000 字合计 ${formatYuan(Number(form.price) || 0)}，定金 ${formatYuan(splitPrice(Number(form.price) || 0).deposit)}，尾款 ${formatYuan(splitPrice(Number(form.price) || 0).balance)}`
                 : '填 0 表示免费，用户点击购买后直接发货'}
             </span>
           </label>

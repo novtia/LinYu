@@ -152,7 +152,7 @@ class ProductOut(BaseModel):
 
     @classmethod
     def from_orm_product(cls, p, *, include_delivery: bool = False) -> "ProductOut":
-        from .services.commission import is_commission_mode, split_price
+        from .services.commission import is_commission_mode
         from .services.files import cover_public_url, is_image_name
 
         cat = getattr(p, "category", None)
@@ -167,9 +167,6 @@ class ProductOut(BaseModel):
                     )
                 )
         sale_mode = "commission" if is_commission_mode(getattr(p, "sale_mode", None)) else "normal"
-        deposit = balance = None
-        if sale_mode == "commission":
-            deposit, balance = split_price(p.price)
         return cls(
             id=p.id,
             name=p.name,
@@ -184,8 +181,8 @@ class ProductOut(BaseModel):
             file_name=(files[0].file_name if files else getattr(p, "file_name", None)) if include_delivery else None,
             files=files,
             sale_mode=sale_mode,
-            deposit_amount=deposit,
-            balance_amount=balance,
+            deposit_amount=None,
+            balance_amount=None,
         )
 
 
@@ -228,6 +225,7 @@ class CheckoutIn(BaseModel):
     items: List[CartItemIn] = Field(min_length=1)
     payment_method_id: str = Field(default="", description="公开支付方式 ID：{channel_id}:{method}；调试模式可留空")
     email: Optional[str] = Field(default=None, description="收货邮箱；游客必填，已登录则使用账号邮箱")
+    word_count: Optional[int] = Field(default=None, description="约稿字数，最少 1000")
 
 
 class OrderLookupIn(BaseModel):
@@ -269,6 +267,7 @@ class OrderPaymentOut(BaseModel):
 
 class OrderOut(BaseModel):
     id: str
+    user_id: Optional[str] = None
     username: str
     email: str = ""
     total: float
@@ -276,6 +275,7 @@ class OrderOut(BaseModel):
     sale_mode: str = "normal"
     deposit_amount: Optional[float] = None
     balance_amount: Optional[float] = None
+    word_count: Optional[int] = None
     payment_method: Optional[str] = None
     payment_provider: Optional[str] = None
     trade_no: Optional[str] = None
@@ -359,6 +359,53 @@ class MessageOut(BaseModel):
 class ResetPasswordOut(BaseModel):
     password: str
     message: str
+
+
+class CommissionMessageIn(BaseModel):
+    body: str = Field(default="", max_length=4000)
+    type: str = Field(default="text")
+
+
+class CommissionMessageOut(BaseModel):
+    id: int
+    role: str
+    type: str
+    body: str = ""
+    file_name: Optional[str] = None
+    file_size: Optional[int] = None
+    file_url: Optional[str] = None
+    created_at: datetime
+    recalled_at: Optional[datetime] = None
+    can_recall: bool = False
+
+
+class CommissionMessagesOut(BaseModel):
+    messages: List[CommissionMessageOut] = Field(default_factory=list)
+    unread: int = 0
+    has_more: bool = False
+
+
+class CommissionThreadOut(BaseModel):
+    id: str
+    user_id: str
+    username: str
+    product_id: int
+    product_name: str
+    unread_admin: int = 0
+    unread_user: int = 0
+    last_preview: Optional[str] = None
+    last_at: Optional[datetime] = None
+    last_kind: Optional[str] = None
+    has_deposit: bool = False
+    order_status: Optional[str] = None
+    word_count: Optional[int] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class CommissionThreadListOut(BaseModel):
+    items: List[CommissionThreadOut] = Field(default_factory=list)
+    total: int = 0
 
 
 TokenOut.model_rebuild()

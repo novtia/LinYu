@@ -309,11 +309,31 @@ export function OrderDetailPage() {
             <Meta label="合计" value={`¥${order.total}`} />
             {commission ? (
               <>
+                <Meta label="字数" value={order.word_count ? `${order.word_count.toLocaleString('zh-CN')} 字` : '—'} />
                 <Meta label="定金" value={formatYuan(deposit)} />
                 <Meta label="尾款" value={formatYuan(balance)} />
               </>
             ) : null}
           </div>
+          {commission && order.items[0] ? (
+            <p className="mt-4">
+              {user?.role === 'admin' && order.user_id ? (
+                <Link
+                  to={`/admin/conversations?user=${encodeURIComponent(order.user_id)}&product=${order.items[0].product_id}`}
+                  className="text-[0.86rem] font-semibold text-teal hover:underline"
+                >
+                  打开约稿对话
+                </Link>
+              ) : (
+                <Link
+                  to={`/product/${order.items[0].product_id}?pane=talk`}
+                  className="text-[0.86rem] font-semibold text-teal hover:underline"
+                >
+                  与作者沟通
+                </Link>
+              )}
+            </p>
+          ) : null}
           {waitingPay && (
             <p className="mt-4 rounded-xl bg-[rgba(196,165,116,.16)] px-3.5 py-3 text-[0.86rem] text-[#8a6a2f]">
               {commission
@@ -366,7 +386,7 @@ export function OrderDetailPage() {
               <div key={i} className="px-5 py-4">
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <strong className="text-[0.98rem]">{it.name}</strong>
-                  <span className="font-semibold text-teal">¥{it.price}</span>
+                  <span className="font-semibold text-teal">{commission ? `¥${it.price}/k` : `¥${it.price}`}</span>
                 </div>
                 {!delivered && !(commission && (it.files?.length || order.status === 'awaiting_balance')) ? (
                   <div className="rounded-xl bg-paper px-3.5 py-3 text-[0.86rem] text-ink-mute">

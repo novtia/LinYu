@@ -80,6 +80,7 @@ export interface OrderPayment {
 
 export interface Order {
   id: string
+  user_id?: string | null
   username: string
   email?: string
   total: number
@@ -87,6 +88,7 @@ export interface Order {
   sale_mode?: 'normal' | 'commission'
   deposit_amount?: number | null
   balance_amount?: number | null
+  word_count?: number | null
   payment_method?: string | null
   payment_provider?: string | null
   trade_no?: string | null
@@ -222,6 +224,51 @@ export interface SiteSettings {
 export interface Settings {
   sys: SysSettings
   site: SiteSettings
+}
+
+export type CommissionMsgType = 'text' | 'image' | 'file' | 'emoji' | 'system'
+export type CommissionRole = 'user' | 'admin' | 'system'
+
+export interface CommissionMessage {
+  id: number
+  role: CommissionRole
+  type: CommissionMsgType
+  body: string
+  file_name?: string | null
+  file_size?: number | null
+  file_url?: string | null
+  created_at: string
+  recalled_at?: string | null
+  can_recall?: boolean
+}
+
+export interface CommissionThread {
+  id: string
+  user_id: string
+  username: string
+  product_id: number
+  product_name: string
+  unread_admin: number
+  unread_user: number
+  last_preview?: string | null
+  last_at?: string | null
+  last_kind?: string | null
+  has_deposit: boolean
+  order_status?: string | null
+  word_count?: number | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CommissionMessagesResult {
+  messages: CommissionMessage[]
+  unread: number
+  has_more: boolean
+}
+
+export interface CommissionThreadList {
+  items: CommissionThread[]
+  total: number
 }
 
 export interface Dashboard {

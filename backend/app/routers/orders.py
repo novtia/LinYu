@@ -28,7 +28,16 @@ from ..schemas import (
     ProductFileOut,
 )
 from ..seed import load_settings
-from ..services.commission import SALE_COMMISSION, SALE_NORMAL, is_commission_mode, split_price
+from ..services.commission import (
+    MAX_WORDS,
+    MIN_WORDS,
+    SALE_COMMISSION,
+    SALE_NORMAL,
+    commission_total,
+    is_commission_mode,
+    split_price,
+)
+from ..services.commission_chat import notify_deposit_paid
 from ..services.delivery import random_id
 from ..services.files import delete_stored, is_image_name, save_upload
 from ..services.fulfillment import fulfill_order
@@ -159,6 +168,7 @@ def _order_out(order: Order, include_payload: bool = False, *, unlock_download: 
     ]
     return OrderOut(
         id=order.id,
+        user_id=order.user_id,
         username=order.username,
         email=order.email or "",
         total=order.total,
@@ -166,6 +176,7 @@ def _order_out(order: Order, include_payload: bool = False, *, unlock_download: 
         sale_mode=SALE_COMMISSION if commission else SALE_NORMAL,
         deposit_amount=deposit_amount,
         balance_amount=balance_amount,
+        word_count=getattr(order, "word_count", None),
         payment_method=order.payment_method,
         payment_provider=order.payment_provider,
         trade_no=order.trade_no,
@@ -219,6 +230,7 @@ def _make_order(
     payment_provider: str | None = None,
     trade_no: str | None = None,
     paid_at: datetime | None = None,
+    word_count: int | None = None,
 ) -> Order:
     return Order(
         id=order_id,
@@ -234,6 +246,7 @@ def _make_order(
         trade_no=trade_no,
         paid_at=paid_at,
         created_at=datetime.utcnow(),
+        word_count=word_count,
     )
 
 
@@ -369,20 +382,27 @@ def checkout(
     if commission_lines and len(commission_lines) != len(lines):
         raise HTTPException(status_code=400, detail="约稿商品请单独下单，不能与普通商品一起结算")
     sale_mode = SALE_COMMISSION if commission_lines else SALE_NORMAL
+    word_count = None
+    deposit_amount = balance_amount = 0.0
     if sale_mode == SALE_COMMISSION:
         if not user:
             raise HTTPException(status_code=401, detail="约稿商品请先登录后再购买")
-        if len({p.id for p in lines}) != 1:
-            raise HTTPException(status_code=400, detail="约稿商品每次只能购买同一种，请单独下单")
-        if len(lines) > 99:
-            raise HTTPException(status_code=400, detail="约稿数量不能超过 99")
-        deposit_amount, balance_amount = split_price(sum(p.price for p in lines))
+        if len(lines) != 1:
+            raise HTTPException(status_code=400, detail="约稿商品每次只能购买一种，请按字数下单")
+        word_count = body.word_count
+        if word_count is None or int(word_count) < MIN_WORDS:
+            raise HTTPException(status_code=400, detail=f"约稿至少 {MIN_WORDS} 字")
+        if int(word_count) > MAX_WORDS:
+            raise HTTPException(status_code=400, detail="字数超出范围")
+        word_count = int(word_count)
+        total = commission_total(lines[0].price, word_count)
+        deposit_amount, balance_amount = split_price(total)
         if deposit_amount < 0.01 or balance_amount < 0.01:
-            raise HTTPException(status_code=400, detail="约稿商品价格须至少 0.02 元")
+            raise HTTPException(status_code=400, detail="按当前字数计算后金额过低，请增加字数")
+    else:
+        total = round(sum(p.price for p in lines), 2)
 
     email = _resolve_checkout_email(db, user, body.email)
-
-    total = round(sum(p.price for p in lines), 2)
     # 时间戳 + 随机后缀：避免同毫秒并发下单撞主键，也降低订单号可预测性
     order_id = "LX" + str(int(datetime.utcnow().timestamp() * 1000)) + random_id(length=4)
 
@@ -398,6 +418,7 @@ def checkout(
             payment_provider="debug",
             trade_no=f"DEBUG-{order_id}",
             paid_at=datetime.utcnow(),
+            word_count=word_count,
         )
         db.add(order)
         for p in lines:
@@ -414,6 +435,8 @@ def checkout(
             )
         )
         db.commit()
+        db.refresh(order)
+        notify_deposit_paid(db, order)
         db.refresh(order)
         return CheckoutOut(order=_order_out(order, include_payload=True, unlock_download=True), pay_url="", deliveries=[])
 
@@ -442,6 +465,7 @@ def checkout(
         payment_channel_id=channel.id,
         payment_method=hit.method,
         payment_provider=channel.provider,
+        word_count=word_count,
     )
     db.add(order)
     for p in lines:
@@ -456,7 +480,7 @@ def checkout(
     if sale_mode == SALE_COMMISSION:
         pay_kind = "deposit"
         pay_amount = deposit_amount
-        pay_name = f"{lines[0].name} 定金" if len(lines) == 1 else f"{lines[0].name} ×{len(lines)} 定金"
+        pay_name = f"{lines[0].name} 定金"
     else:
         pay_kind = "full"
         pay_amount = total
@@ -509,6 +533,33 @@ def my_orders(
         .all()
     )
     return [_order_out(o, include_payload=True) for o in orders]
+
+
+@router.get("/mine/for-product/{product_id}", response_model=Optional[OrderOut])
+def my_order_for_product(
+    product_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user_email = _normalize_email(user.email)
+    cond = [Order.user_id == user.id]
+    if user_email:
+        cond.append(Order.email == user_email)
+    order = (
+        db.query(Order)
+        .join(OrderItem, OrderItem.order_id == Order.id)
+        .options(
+            selectinload(Order.items),
+            selectinload(Order.payments),
+            selectinload(Order.deliveries).selectinload(Delivery.files),
+        )
+        .filter(or_(*cond), OrderItem.product_id == product_id)
+        .order_by(Order.created_at.desc())
+        .first()
+    )
+    if not order:
+        return None
+    return _order_out(order, include_payload=True)
 
 
 @router.post(

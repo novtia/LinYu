@@ -10,6 +10,7 @@ import {
   Package,
   PanelLeftClose,
   PanelLeftOpen,
+  MessageSquare,
   Send,
   Settings2,
   ShoppingBag,
@@ -59,6 +60,7 @@ const NAV_GROUPS: NavGroup[] = [
     icon: ShoppingBag,
     items: [
       { to: '/admin/orders', label: '订单管理', short: '订单', icon: ClipboardList },
+      { to: '/admin/conversations', label: '约稿对话', short: '对话', icon: MessageSquare },
       { to: '/admin/deliveries', label: '发放记录', short: '发放', icon: Send },
     ],
   },
@@ -81,6 +83,7 @@ const TITLES: Record<string, string> = {
   '/admin/categories': '分类管理',
   '/admin/users': '用户管理',
   '/admin/orders': '订单管理',
+  '/admin/conversations': '约稿对话',
   '/admin/deliveries': '发放记录',
   '/admin/payment': '支付接入',
   '/admin/payment/new': '添加渠道',

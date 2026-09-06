@@ -133,6 +133,16 @@ button.switch.on::after { transform: translateX(20px); }
 }
 .buy-short { display: none; }
 
+.chat-bubble {
+  display: inline-block;
+  width: -moz-fit-content;
+  width: fit-content;
+  max-width: 100%;
+  white-space: pre-wrap;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
 .product-slot-filler { visibility: hidden; pointer-events: none; }
 
 /* 商品详情 Markdown */

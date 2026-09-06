@@ -21,6 +21,7 @@ import { PaymentPage } from './pages/admin/PaymentPage'
 import { PaymentChannelFormPage } from './pages/admin/PaymentChannelFormPage'
 import { SystemPage } from './pages/admin/SystemPage'
 import { WebsitePage } from './pages/admin/WebsitePage'
+import { ConversationsPage } from './pages/admin/ConversationsPage'
 
 export default function App() {
   return (
@@ -45,6 +46,7 @@ export default function App() {
                   <Route path="categories" element={<CategoriesPage />} />
                   <Route path="users" element={<UsersPage />} />
                   <Route path="orders" element={<OrdersPage />} />
+                  <Route path="conversations" element={<ConversationsPage />} />
                   <Route path="deliveries" element={<DeliveriesPage />} />
                   <Route path="payment" element={<PaymentPage />} />
                   <Route path="payment/new" element={<PaymentChannelFormPage />} />

@@ -401,6 +401,68 @@ def _migrate_commission_mode(conn) -> None:
     conn.execute(text("CREATE INDEX IF NOT EXISTS ix_order_payments_order_id ON order_payments (order_id)"))
 
 
+def _migrate_commission_chat(conn) -> None:
+    """Rebuild leftover empty commission chat tables onto the thread/message schema."""
+    cols = _table_columns(conn, "commission_messages") if _table_exists(conn, "commission_messages") else {}
+    if cols and "thread_id" not in cols:
+        conn.execute(text("DROP TABLE IF EXISTS commission_messages"))
+    if _table_exists(conn, "commission_files"):
+        conn.execute(text("DROP TABLE IF EXISTS commission_files"))
+    if _table_exists(conn, "commission_payments"):
+        conn.execute(text("DROP TABLE IF EXISTS commission_payments"))
+    if _table_exists(conn, "commissions"):
+        conn.execute(text("DROP TABLE IF EXISTS commissions"))
+    conn.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS commission_threads (
+                id VARCHAR(64) NOT NULL PRIMARY KEY,
+                user_id VARCHAR(64) NOT NULL,
+                product_id INTEGER NOT NULL,
+                unread_admin INTEGER DEFAULT 0 NOT NULL,
+                unread_user INTEGER DEFAULT 0 NOT NULL,
+                last_preview VARCHAR(255),
+                last_at DATETIME,
+                last_kind VARCHAR(16),
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                CONSTRAINT uq_commission_thread_user_product UNIQUE (user_id, product_id),
+                FOREIGN KEY(user_id) REFERENCES users (id)
+            )
+            """
+        )
+    )
+    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_commission_threads_updated_at ON commission_threads (updated_at)"))
+    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_commission_threads_unread_admin ON commission_threads (unread_admin)"))
+    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_commission_threads_user_id ON commission_threads (user_id)"))
+    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_commission_threads_product_id ON commission_threads (product_id)"))
+    conn.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS commission_messages (
+                id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                thread_id VARCHAR(64) NOT NULL,
+                role VARCHAR(16) NOT NULL,
+                type VARCHAR(16) NOT NULL,
+                body TEXT,
+                file_path VARCHAR(512),
+                file_name VARCHAR(255),
+                file_size INTEGER,
+                created_at DATETIME NOT NULL,
+                recalled_at DATETIME,
+                FOREIGN KEY(thread_id) REFERENCES commission_threads (id)
+            )
+            """
+        )
+    )
+    conn.execute(
+        text(
+            "CREATE INDEX IF NOT EXISTS ix_commission_messages_thread_created ON commission_messages (thread_id, created_at)"
+        )
+    )
+    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_commission_messages_thread_id ON commission_messages (thread_id)"))
+
+
 def migrate_schema(engine: Engine) -> None:
     """Add new columns / rebuild legacy tables for SQLite."""
     alterations = {
@@ -421,6 +483,7 @@ def migrate_schema(engine: Engine) -> None:
             ("payment_provider", "VARCHAR(32)"),
             ("trade_no", "VARCHAR(128)"),
             ("paid_at", "DATETIME"),
+            ("word_count", "INTEGER"),
         ],
     }
     with engine.begin() as conn:
@@ -437,3 +500,4 @@ def migrate_schema(engine: Engine) -> None:
         _backfill_paid_file_links(conn)
         _migrate_multi_files(conn)
         _migrate_commission_mode(conn)
+        _migrate_commission_chat(conn)

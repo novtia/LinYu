@@ -91,7 +91,7 @@ def _validated_sale_mode(body: ProductIn) -> str:
     if mode == SALE_COMMISSION:
         deposit, balance = split_price(body.price)
         if deposit < 0.01 or balance < 0.01:
-            raise HTTPException(status_code=400, detail="约稿商品价格须至少 0.02 元，以便拆分定金与尾款")
+            raise HTTPException(status_code=400, detail="约稿单价须至少 0.02 元/千字，以便拆分定金与尾款")
     return mode
 
 

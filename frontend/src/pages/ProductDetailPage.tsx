@@ -14,6 +14,7 @@ import { ProductDeliveryPanel, type DeliveryUnlock } from '../components/Product
 import { ProductMedia } from '../components/ProductMedia'
 import { resolveCheckoutResult } from '../lib/checkout'
 import { formatYuan, isCommissionProduct, splitPrice } from '../lib/commission'
+import { CommissionProductView } from './CommissionProductView'
 import type { CheckoutResult, Order, Product, PublicPaymentMethod } from '../types'
 
 function emptyUnlock(): DeliveryUnlock {
@@ -58,24 +59,21 @@ export function ProductDetailPage() {
     if (!user || !product) return
     let alive = true
     api
-      .get<Order[]>('/api/orders/mine')
-      .then((orders) => {
-        if (!alive) return
-        for (const order of orders) {
-          const hit = order.items.find(
-            (it) =>
-              it.product_id === product.id &&
-              (order.sale_mode === 'commission'
-                ? order.status === 'completed'
-                : Boolean(it.payload) || Boolean(it.download_url) || Boolean(it.files && it.files.length)),
-          )
-          if (hit) {
-            setUnlock({
-              unlocked: true,
-              orderId: order.id,
-            })
-            return
-          }
+      .get<Order | null>(`/api/orders/mine/for-product/${product.id}`)
+      .then((order) => {
+        if (!alive || !order) return
+        const hit = order.items.find(
+          (it) =>
+            it.product_id === product.id &&
+            (order.sale_mode === 'commission'
+              ? order.status === 'completed'
+              : Boolean(it.payload) || Boolean(it.download_url) || Boolean(it.files && it.files.length)),
+        )
+        if (hit) {
+          setUnlock({
+            unlocked: true,
+            orderId: order.id,
+          })
         }
       })
       .catch(() => {
@@ -103,6 +101,9 @@ export function ProductDetailPage() {
 
   const debugMode = !!publicSettings?.debugMode
   const commission = isCommissionProduct(product)
+  if (commission) {
+    return <CommissionProductView product={product} />
+  }
   const orderHalves = splitPrice(product.price * clampCartQty(quantity))
   const isFree = !commission && product.price === 0
 
@@ -343,11 +344,9 @@ export function ProductDetailPage() {
                     </button>
                   </div>
 
-                  {!debugMode && !isFree && payment && (
-                    <p className="mt-3 text-[0.78rem] text-ink-mute">
-                      当前渠道：{payment.label} · {payment.channel_name}
-                    </p>
-                  )}
+                  {!debugMode && !isFree && payment ? (
+                    <p className="mt-3 text-[0.78rem] text-ink-mute">将跳转 {payment.label} 完成支付</p>
+                  ) : null}
                 </div>
 
                 <ul className="mt-6 grid gap-2 border-t border-[var(--line)] pt-5 text-[0.82rem] text-ink-soft">

@@ -104,7 +104,7 @@ export function ShopPage() {
                       <p className="flex-1 text-[0.9rem] leading-relaxed text-ink-soft line-clamp-3">{p.desc}</p>
                       <div className="mt-1 flex items-center justify-between gap-3">
                         <div className="font-[family-name:var(--font-display)] text-[1.35rem] font-bold tracking-tight">
-                          ¥{p.price}
+                          {p.sale_mode === 'commission' ? `¥${p.price}/k` : `¥${p.price}`}
                         </div>
                         <div className="flex gap-2">
                           <Link

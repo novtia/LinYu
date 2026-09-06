@@ -36,7 +36,7 @@ export function OrdersPage() {
             {o.items.map((i) => i.name).join('、')}
             {o.sale_mode === 'commission' ? (
               <span className="ml-2 inline-flex rounded-md bg-[rgba(15,110,92,.1)] px-1.5 py-0.5 text-[0.72rem] font-semibold text-teal">
-                约稿
+                约稿{o.word_count ? ` · ${o.word_count.toLocaleString('zh-CN')}字` : ''}
               </span>
             ) : null}
           </td>
@@ -55,6 +55,14 @@ export function OrdersPage() {
             <Link to={`/orders/${o.id}`} className="text-[0.82rem] font-semibold text-teal hover:underline">
               详情
             </Link>
+            {o.sale_mode === 'commission' && o.user_id && o.items[0] ? (
+              <Link
+                to={`/admin/conversations?user=${encodeURIComponent(o.user_id)}&product=${o.items[0].product_id}`}
+                className="ml-3 text-[0.82rem] font-semibold text-teal hover:underline"
+              >
+                对话
+              </Link>
+            ) : null}
           </td>
         </tr>
       ))}

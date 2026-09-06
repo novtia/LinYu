@@ -16,7 +16,9 @@ UPLOAD_DIR = BASE_DIR / "uploads"
 COVER_DIR = UPLOAD_DIR / "covers"
 FILE_DIR = UPLOAD_DIR / "files"
 ASSET_DIR = UPLOAD_DIR / "assets"
+CHAT_DIR = UPLOAD_DIR / "chat"
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50MB
+MAX_CHAT_IMAGE_BYTES = 8 * 1024 * 1024  # 8MB
 MAX_COVER_BYTES = 5 * 1024 * 1024  # 5MB
 COVER_EXTENSIONS: Set[str] = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}
 # assets 目录由 Nginx/StaticFiles 公开提供，禁止可在站点源下执行的类型
@@ -34,6 +36,7 @@ def ensure_upload_dir() -> Path:
     COVER_DIR.mkdir(parents=True, exist_ok=True)
     FILE_DIR.mkdir(parents=True, exist_ok=True)
     ASSET_DIR.mkdir(parents=True, exist_ok=True)
+    CHAT_DIR.mkdir(parents=True, exist_ok=True)
     return UPLOAD_DIR
 
 
@@ -143,3 +146,29 @@ def is_image_name(name: str) -> bool:
 
 def image_media_type(name: str) -> str:
     return IMAGE_MEDIA_TYPES.get(Path(name or "").suffix.lower(), "application/octet-stream")
+
+
+CHAT_EXTENSIONS: Set[str] = IMAGE_EXTENSIONS | {
+    ".pdf",
+    ".txt",
+    ".md",
+    ".doc",
+    ".docx",
+    ".zip",
+    ".rar",
+    ".7z",
+}
+
+
+async def save_chat_upload(file: UploadFile) -> tuple[str, str, int]:
+    """Save a chat attachment; returns (relative_path, original_filename, size)."""
+    ensure_upload_dir()
+    original = safe_filename(file.filename or "file.bin")
+    ext = Path(original).suffix.lower()
+    if ext not in CHAT_EXTENSIONS:
+        raise ValueError("不支持的附件类型，请上传图片或文档")
+    stored = f"{uuid.uuid4().hex[:16]}_{original}"
+    dest = CHAT_DIR / stored
+    limit = MAX_CHAT_IMAGE_BYTES if ext in IMAGE_EXTENSIONS else MAX_UPLOAD_BYTES
+    await _save_to(file, dest, limit)
+    return f"chat/{stored}", original, int(dest.stat().st_size)

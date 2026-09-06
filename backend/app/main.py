@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from .auth import check_secret_config
 from .database import Base, SessionLocal, engine
 from .migrate import migrate_schema
-from .routers import auth, captcha, categories, deliveries, downloads, orders, pay, payment, payment_channels, products, settings, users
+from .routers import auth, captcha, categories, commission_chat, deliveries, downloads, orders, pay, payment, payment_channels, products, settings, users
 from .seed import seed_if_empty
 from .services.files import ASSET_DIR, COVER_DIR, ensure_upload_dir
 
@@ -76,6 +76,7 @@ app.include_router(captcha.router)
 app.include_router(categories.router)
 app.include_router(products.router)
 app.include_router(orders.router)
+app.include_router(commission_chat.router)
 app.include_router(pay.router)
 app.include_router(users.router)
 app.include_router(deliveries.router)

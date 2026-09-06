@@ -129,6 +129,9 @@ def _apply_commission_payment(db: Session, order: Order, payment: OrderPayment, 
         if trade_no and not order.trade_no:
             order.trade_no = trade_no
         db.commit()
+        from ..services.commission_chat import notify_deposit_paid
+
+        notify_deposit_paid(db, order)
         return True
     if payment.kind == "balance":
         if order.status in ("awaiting_balance", "deposit_paid"):

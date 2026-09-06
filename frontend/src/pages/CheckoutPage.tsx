@@ -164,12 +164,6 @@ export function CheckoutPage() {
               />
             )}
 
-            {!debugMode && !isFree && payment && (
-              <p className="mb-4 text-[0.78rem] text-ink-mute">
-                将使用：{payment.label} · {payment.channel_name}
-              </p>
-            )}
-
             {needEmail && (
               <label className="mb-5 block">
                 <span className="mb-1.5 block text-[0.82rem] font-semibold text-ink-soft">收货邮箱</span>

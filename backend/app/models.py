@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List, Optional
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -104,6 +104,7 @@ class Order(Base):
     trade_no: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    word_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     user: Mapped[Optional["User"]] = relationship(back_populates="orders")
     items: Mapped[List["OrderItem"]] = relationship(back_populates="order", cascade="all, delete-orphan")
@@ -200,3 +201,47 @@ class Captcha(Base):
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     code: Mapped[str] = mapped_column(String(8))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class CommissionThread(Base):
+    __tablename__ = "commission_threads"
+    __table_args__ = (
+        UniqueConstraint("user_id", "product_id", name="uq_commission_thread_user_product"),
+        Index("ix_commission_threads_updated_at", "updated_at"),
+        Index("ix_commission_threads_unread_admin", "unread_admin"),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.id"), index=True)
+    product_id: Mapped[int] = mapped_column(Integer, index=True)
+    unread_admin: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    unread_user: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    last_preview: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    last_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    last_kind: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    messages: Mapped[List["CommissionMessage"]] = relationship(
+        back_populates="thread",
+        cascade="all, delete-orphan",
+        order_by="CommissionMessage.id",
+    )
+
+
+class CommissionMessage(Base):
+    __tablename__ = "commission_messages"
+    __table_args__ = (Index("ix_commission_messages_thread_created", "thread_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    thread_id: Mapped[str] = mapped_column(String(64), ForeignKey("commission_threads.id"), index=True)
+    role: Mapped[str] = mapped_column(String(16))  # user | admin | system
+    type: Mapped[str] = mapped_column(String(16), default="text")  # text | image | file | emoji | system
+    body: Mapped[str] = mapped_column(Text, default="")
+    file_path: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    file_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    file_size: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    recalled_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    thread: Mapped["CommissionThread"] = relationship(back_populates="messages")

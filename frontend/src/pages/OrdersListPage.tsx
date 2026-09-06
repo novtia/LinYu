@@ -144,6 +144,9 @@ export function OrdersListPage() {
                     </span>
                   ) : null}
                   {o.items.map((i) => i.name).join('、')}
+                  {o.sale_mode === 'commission' && o.word_count ? (
+                    <span className="ml-2 text-[0.78rem] font-normal text-ink-mute">{o.word_count.toLocaleString('zh-CN')} 字</span>
+                  ) : null}
                 </div>
                 <div className="flex items-center justify-between">
                   <span className={`inline-flex rounded-md px-2 py-1 text-[0.75rem] font-semibold ${orderStatusClass(o.status)}`}>

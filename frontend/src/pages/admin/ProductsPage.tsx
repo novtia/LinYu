@@ -80,7 +80,7 @@ export function ProductsPage() {
               ) : null}
             </td>
             <td className="whitespace-nowrap px-[18px] py-3.5 text-ink-soft">{p.category_name || '未分类'}</td>
-            <td className="whitespace-nowrap px-[18px] py-3.5">¥{p.price}</td>
+            <td className="whitespace-nowrap px-[18px] py-3.5">{p.sale_mode === 'commission' ? `¥${p.price}/k` : `¥${p.price}`}</td>
             <td className="whitespace-nowrap px-[18px] py-3.5">
               <Tag green={p.status === 'on'}>{p.status === 'on' ? '在售' : '下架'}</Tag>
             </td>

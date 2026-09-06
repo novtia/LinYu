@@ -87,6 +87,16 @@ class SlidingWindowLimiter:
 limiter = SlidingWindowLimiter()
 
 
+def limit_or_raise(key: str, *, limit: int, window: int, detail: str = "操作过于频繁，请稍后再试") -> None:
+    wait = limiter.hit(key, limit, window)
+    if wait > 0:
+        raise HTTPException(
+            status_code=429,
+            detail=detail,
+            headers={"Retry-After": str(int(wait) + 1)},
+        )
+
+
 def rate_limit(
     name: str,
     *,
