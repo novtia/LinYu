@@ -37,7 +37,7 @@ export function CartDropdown() {
       role="dialog"
       aria-label="购物车"
       onClick={(e) => e.stopPropagation()}
-      className="fixed top-[4.5rem] right-3 left-3 z-50 max-h-[min(72vh,520px)] overflow-hidden rounded-[16px] border border-[var(--line)] bg-white p-4 shadow-[0_22px_48px_-28px_rgba(20,32,28,.45)] md:absolute md:top-[calc(100%+10px)] md:right-auto md:left-1/2 md:w-[360px] md:max-h-[min(46vh,420px)] md:-translate-x-1/2"
+      className="fixed top-[4.25rem] right-3 left-3 z-50 max-h-[min(72vh,520px)] overflow-hidden rounded-[16px] border border-[var(--line)] bg-white p-4 shadow-[0_22px_48px_-28px_rgba(20,32,28,.45)] md:absolute md:top-[calc(100%+10px)] md:right-auto md:left-1/2 md:w-[360px] md:max-h-[min(46vh,420px)] md:-translate-x-1/2"
     >
       <div className="mb-3 flex items-center justify-between gap-3">
         <h3 className="min-w-0 font-[family-name:var(--font-display)] text-[1.05rem] font-bold tracking-tight">

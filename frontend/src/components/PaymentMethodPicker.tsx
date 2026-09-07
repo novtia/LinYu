@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Check } from 'lucide-react'
 import { fetchPublicPaymentMethods } from '../lib/payment'
 import type { PublicPaymentMethod } from '../types'
 
@@ -7,6 +8,8 @@ type PaymentMethodPickerProps = {
   onChange: (method: PublicPaymentMethod | null) => void
   onAvailabilityChange?: (available: boolean) => void
   className?: string
+  variant?: 'chips' | 'cards'
+  hideLabel?: boolean
 }
 
 function MethodMark({ method }: { method: string }) {
@@ -52,6 +55,8 @@ export function PaymentMethodPicker({
   onChange,
   onAvailabilityChange,
   className = '',
+  variant = 'chips',
+  hideLabel = false,
 }: PaymentMethodPickerProps) {
   const [methods, setMethods] = useState<PublicPaymentMethod[]>([])
   const [loading, setLoading] = useState(true)
@@ -103,36 +108,69 @@ export function PaymentMethodPicker({
 
   return (
     <div className={className}>
-      <div className="mb-2 text-[0.72rem] tracking-[0.06em] text-ink-mute">支付方式</div>
-      <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="支付方式">
-        {methods.map((m) => {
-          const active = value === m.id
-          return (
-            <button
-              key={m.id}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              onClick={() => onChange(m)}
-              className={`inline-flex h-11 min-w-[7.5rem] items-center gap-2 rounded-xl border px-3 text-left transition ${
-                active
-                  ? methodTone(m.method)
-                  : 'border-[var(--line)] bg-white text-ink hover:border-[var(--line-strong)]'
-              }`}
-            >
-              <MethodMark method={m.method} />
-              <span className="min-w-0">
-                <span className="block text-[0.88rem] font-bold leading-none">{m.label}</span>
-                {showChannel ? (
-                  <span className={`mt-1 block truncate text-[0.68rem] ${active ? 'opacity-80' : 'text-ink-mute'}`}>
-                    {m.channel_name}
-                  </span>
-                ) : null}
-              </span>
-            </button>
-          )
-        })}
-      </div>
+      {hideLabel || variant === 'cards' ? null : (
+        <div className="mb-2 text-[0.72rem] tracking-[0.06em] text-ink-mute">支付方式</div>
+      )}
+      {variant === 'cards' ? (
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3" role="radiogroup" aria-label="支付方式">
+          {methods.map((m) => {
+            const active = value === m.id
+            return (
+              <button
+                key={m.id}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => onChange(m)}
+                className={`order-pay-card relative flex items-center gap-2.5 px-3.5 py-3 text-left ${active ? 'on' : ''}`}
+              >
+                <MethodMark method={m.method} />
+                <span className="min-w-0">
+                  <b className="block text-[0.86rem] font-bold">{m.label}</b>
+                  <small className="mt-0.5 block text-[0.7rem] text-ink-mute">{m.channel_name || m.provider_name}</small>
+                </span>
+                <span
+                  className={`absolute top-2 right-2 grid place-items-center text-teal transition ${
+                    active ? 'scale-100 opacity-100' : 'scale-[.6] opacity-0'
+                  }`}
+                >
+                  <Check className="h-3.5 w-3.5" strokeWidth={2.4} />
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="支付方式">
+          {methods.map((m) => {
+            const active = value === m.id
+            return (
+              <button
+                key={m.id}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => onChange(m)}
+                className={`inline-flex h-11 min-w-[7.5rem] items-center gap-2 rounded-xl border px-3 text-left transition ${
+                  active
+                    ? methodTone(m.method)
+                    : 'border-[var(--line)] bg-white text-ink hover:border-[var(--line-strong)]'
+                }`}
+              >
+                <MethodMark method={m.method} />
+                <span className="min-w-0">
+                  <span className="block text-[0.88rem] font-bold leading-none">{m.label}</span>
+                  {showChannel ? (
+                    <span className={`mt-1 block truncate text-[0.68rem] ${active ? 'opacity-80' : 'text-ink-mute'}`}>
+                      {m.channel_name}
+                    </span>
+                  ) : null}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
