@@ -242,6 +242,9 @@ class DeliveryOut(BaseModel):
     download_url: Optional[str] = None
     files: List[ProductFileItemOut] = Field(default_factory=list)
     created_at: datetime
+    username: str = ""
+    email: str = ""
+    sale_mode: str = "normal"
 
     class Config:
         from_attributes = True
@@ -295,12 +298,60 @@ class CheckoutOut(BaseModel):
     deliveries: List[DeliveryOut] = Field(default_factory=list)
 
 
+class DashboardTrendPoint(BaseModel):
+    date: str  # YYYY-MM-DD（上海时区）
+    orders: int
+    revenue: float
+
+
+class DashboardTodoOut(BaseModel):
+    key: str
+    label: str
+    count: int
+    hint: str
+    to: str
+    urgent: bool = False
+
+
+class DashboardConvOut(BaseModel):
+    id: str
+    user_id: str
+    username: str
+    product_id: int
+    product_name: str
+    order_id: Optional[str] = None
+    preview: str = ""
+    last_at: Optional[datetime] = None
+    unread: int = 0
+
+
+class DashboardSystemOut(BaseModel):
+    payments: str
+    mail_ok: bool
+    mail_label: str
+    db_name: str
+    db_size: str
+    users: int
+    products_on: int
+
+
 class DashboardOut(BaseModel):
     today_orders: int
+    yesterday_orders: int
+    today_revenue: float
+    yesterday_revenue: float
+    pending: int
+    pending_overdue: int
+    unread_threads: int
+    unread_users: int
     users: int
     products_on: int
     deliveries: int
     recent_orders: List[OrderOut]
+    trend: List[DashboardTrendPoint] = Field(default_factory=list)
+    todos: List[DashboardTodoOut] = Field(default_factory=list)
+    conversations: List[DashboardConvOut] = Field(default_factory=list)
+    system: DashboardSystemOut
 
 
 class MailSettings(BaseModel):

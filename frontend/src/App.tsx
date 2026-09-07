@@ -48,8 +48,10 @@ export default function App() {
                   <Route path="categories" element={<CategoriesPage />} />
                   <Route path="users" element={<UsersPage />} />
                   <Route path="orders" element={<OrdersPage />} />
+                  <Route path="orders/:id" element={<OrdersPage />} />
                   <Route path="conversations" element={<ConversationsPage />} />
                   <Route path="deliveries" element={<DeliveriesPage />} />
+                  <Route path="deliveries/:id" element={<DeliveriesPage />} />
                   <Route path="payment" element={<PaymentPage />} />
                   <Route path="payment/new" element={<PaymentChannelFormPage />} />
                   <Route path="payment/:id" element={<PaymentChannelFormPage />} />

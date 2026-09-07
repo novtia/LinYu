@@ -1,0 +1,719 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>领匣 · 约稿详情 Demo</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230f6e5c'/></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+SC:wght@400;500;600;700;800&family=Sora:wght@400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@0.544.0/dist/umd/lucide.min.js"></script>
+  <style>
+    :root {
+      --ink: #14201c;
+      --ink-soft: #3d4f48;
+      --ink-mute: #6b7c74;
+      --paper: #e8f1ee;
+      --fog: #f4f8f6;
+      --line: rgba(20, 32, 28, 0.09);
+      --line-strong: rgba(20, 32, 28, 0.16);
+      --teal: #0f6e5c;
+      --teal-deep: #0a5245;
+      --mint: #7fd4b8;
+      --warn: #8a6a2f;
+      --warn-dot: #c4a574;
+      --danger: #b42318;
+      --font-display: "Syne", "Noto Sans SC", sans-serif;
+      --font-body: "Sora", "Noto Sans SC", sans-serif;
+      --font-mono: "JetBrains Mono", "Noto Sans SC", monospace;
+      --ease: cubic-bezier(.22, .8, .2, 1);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      font-family: var(--font-body);
+      color: var(--ink);
+      background-color: #eef5f2;
+      background-image:
+        radial-gradient(1200px 700px at 85% -10%, rgba(127, 212, 184, 0.35), transparent 55%),
+        radial-gradient(900px 600px at -5% 20%, rgba(196, 165, 116, 0.18), transparent 50%),
+        linear-gradient(180deg, #f7fbf9 0%, var(--fog) 42%, #eef5f2 100%);
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+      -webkit-font-smoothing: antialiased;
+    }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    a { color: inherit; text-decoration: none; }
+    .hidden { display: none !important; }
+    @keyframes riseIn { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+
+    .demo-bar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 80;
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      height: 48px; padding: 0 20px; background: #14201c; color: #eef8f4;
+    }
+    .demo-bar strong { font-family: var(--font-display); font-size: .95rem; letter-spacing: -.02em; }
+    .demo-bar span { color: rgba(238,248,244,.55); font-size: .78rem; }
+    .demo-bar .jump {
+      display: inline-flex; align-items: center; gap: 6px;
+      height: 30px; padding: 0 12px; border: 1px solid rgba(238,248,244,.25); border-radius: 8px;
+      background: transparent; color: rgba(238,248,244,.8); font-size: .78rem; font-weight: 600;
+    }
+    .demo-bar .jump:hover { border-color: var(--mint); color: #fff; }
+
+    .brand-mark {
+      width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
+      background: linear-gradient(135deg, var(--teal) 0%, #1a9a7c 60%, var(--mint) 100%);
+      position: relative; overflow: hidden;
+    }
+    .brand-mark::after {
+      content: ""; position: absolute; inset: 7px 7px 7px 11px;
+      border: 2px solid rgba(255,255,255,.92); border-left: 0; border-radius: 0 4px 4px 0;
+    }
+
+    /* ---------- 前台顶栏 ---------- */
+    .shop-top {
+      position: fixed; top: 48px; left: 0; right: 0; z-index: 70;
+      display: flex; align-items: center; gap: 30px;
+      height: 60px; padding: 0 max(20px, calc((100% - 1120px) / 2));
+      background: rgba(247,251,249,.82); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--line);
+    }
+    .shop-brand {
+      display: flex; align-items: center; gap: 10px;
+      font-family: var(--font-display); font-weight: 800; font-size: 1.08rem; letter-spacing: -.02em;
+    }
+    .shop-brand small { font-family: var(--font-mono); font-size: .62rem; color: var(--ink-mute); letter-spacing: .18em; margin-top: 3px; }
+    .shop-nav { display: flex; gap: 24px; }
+    .shop-nav a {
+      position: relative; height: 60px; display: inline-flex; align-items: center;
+      color: var(--ink-mute); font-size: .86rem; font-weight: 600;
+    }
+    .shop-nav a:hover { color: var(--ink); }
+    .shop-nav a.active { color: var(--ink); font-weight: 700; }
+    .shop-nav a.active::after {
+      content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--teal);
+    }
+    .shop-right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+    .cart-btn {
+      position: relative; width: 36px; height: 36px; border-radius: 10px;
+      border: 1px solid var(--line-strong); background: #fff; color: var(--ink-soft);
+      display: grid; place-items: center; transition: .2s var(--ease);
+    }
+    .cart-btn:hover { border-color: var(--teal); color: var(--teal); }
+    .cart-btn .dot-n {
+      position: absolute; top: -5px; right: -5px; min-width: 16px; height: 16px; padding: 0 4px;
+      border-radius: 99px; background: var(--teal); color: #fff;
+      font-size: .62rem; font-weight: 800; display: grid; place-items: center;
+      border: 2px solid #f7fbf9;
+    }
+    .avatar {
+      width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+      background: var(--ink); color: #fff; font-size: .8rem; font-weight: 700; cursor: pointer;
+    }
+
+    .wrap { width: min(1120px, calc(100% - 40px)); margin-inline: auto; }
+    .page { padding: 140px 0 80px; }
+
+    /* ---------- 面包屑 ---------- */
+    .crumb { display: flex; align-items: center; gap: 8px; margin-bottom: 22px; font-size: .8rem; color: var(--ink-mute); flex-wrap: wrap; }
+    .crumb a { cursor: pointer; transition: .2s; }
+    .crumb a:hover { color: var(--teal); }
+    .crumb i { opacity: .5; }
+    .crumb b { color: var(--ink); font-weight: 600; }
+
+    /* ---------- 报价区 ---------- */
+    .quote-sec {
+      display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 46px;
+      animation: riseIn .5s var(--ease) both;
+    }
+    .cm-cover {
+      position: relative; overflow: hidden; border-radius: 20px; aspect-ratio: 3/4;
+      background: linear-gradient(150deg, #14201c, #1d3a32 55%, #0f6e5c);
+      border: 1px solid var(--line);
+      box-shadow: 0 26px 50px -36px rgba(20,32,28,.5);
+    }
+    .cm-cover::after {
+      content: ""; position: absolute; inset: 0; opacity: .22;
+      background-image:
+        radial-gradient(circle at 20% 30%, #fff 1.5px, transparent 2px),
+        radial-gradient(circle at 70% 60%, #fff 1px, transparent 1.5px);
+      background-size: 28px 28px, 18px 18px;
+    }
+    .cm-cover .c-ico {
+      position: absolute; inset: 0; display: grid; place-items: center; z-index: 2;
+      color: var(--mint);
+    }
+    .cm-cover .c-serial {
+      position: absolute; top: 16px; left: 16px; z-index: 2;
+      font-family: var(--font-mono); font-size: .62rem; letter-spacing: .14em; color: rgba(255,255,255,.7);
+    }
+    .cm-cover .c-tag {
+      position: absolute; left: 16px; bottom: 16px; z-index: 2;
+      border-radius: 8px; background: rgba(20,32,28,.72); backdrop-filter: blur(4px);
+      padding: 5px 10px; font-family: var(--font-mono); font-size: .66rem; color: var(--mint); letter-spacing: .08em;
+    }
+
+    .quote { min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px; margin-bottom: 14px;
+      font-family: var(--font-mono); font-size: .68rem; letter-spacing: .16em; color: var(--teal); font-weight: 700;
+    }
+    .eyebrow::before { content: ""; width: 20px; height: 1.5px; background: var(--teal); }
+    .quote h1 {
+      margin: 0 0 10px; font-family: var(--font-display); font-weight: 800;
+      font-size: clamp(1.8rem, 3.4vw, 2.5rem); letter-spacing: -.045em; line-height: 1.15;
+    }
+    .quote .sub { margin: 0; color: var(--ink-mute); font-size: .9rem; line-height: 1.8; max-width: 46ch; }
+
+    .rate { margin-top: 22px; font-family: var(--font-display); font-weight: 800; font-size: 3rem; letter-spacing: -.05em; line-height: 1; }
+    .rate small { font-size: 1.05rem; color: var(--ink-mute); letter-spacing: 0; font-weight: 700; margin-left: 3px; }
+
+    /* 报价格子：发丝线四分 */
+    .q-grid {
+      display: grid; grid-template-columns: 1.5fr repeat(3, 1fr);
+      margin-top: 22px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    }
+    .q-cell { padding: 15px 0 14px; min-width: 0; }
+    .q-cell + .q-cell { border-left: 1px solid var(--line); padding-left: 18px; }
+    .q-cell dt { margin-bottom: 7px; color: var(--ink-mute); font-size: .7rem; letter-spacing: .08em; }
+    .q-cell dd { margin: 0; font-family: var(--font-mono); font-weight: 700; font-size: 1.02rem; letter-spacing: -.02em; }
+    .q-cell dd.teal { color: var(--teal); }
+    .words-input { display: inline-flex; align-items: baseline; gap: 5px; }
+    .words-input input {
+      width: 92px; border: 0; border-bottom: 1.5px solid var(--ink); background: transparent;
+      padding: 0 0 2px; outline: none; font-family: var(--font-mono); font-weight: 700; font-size: 1.02rem;
+      letter-spacing: -.02em; transition: border-color .2s;
+    }
+    .words-input input:focus { border-color: var(--teal); }
+    .words-input input.err { border-color: var(--danger); color: var(--danger); }
+    .words-input em { font-style: normal; font-size: .76rem; color: var(--ink-mute); font-weight: 600; }
+
+    .presets { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+    .presets button {
+      height: 30px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 99px;
+      background: transparent; color: var(--ink-mute); font-size: .76rem; font-weight: 600;
+      font-family: var(--font-mono); transition: .18s var(--ease);
+    }
+    .presets button:hover { color: var(--ink); border-color: var(--ink); }
+    .presets button.on { color: var(--teal); border-color: var(--teal); background: rgba(15,110,92,.07); }
+
+    /* 支付方式 */
+    .f-label { display: block; margin: 20px 0 8px; font-size: .78rem; font-weight: 600; color: var(--ink-soft); letter-spacing: .04em; }
+    .methods { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .m-card {
+      position: relative; display: flex; align-items: center; gap: 9px; text-align: left;
+      border: 1px solid var(--line-strong); border-radius: 12px; background: #fff;
+      padding: 10px 11px; transition: .2s var(--ease);
+    }
+    .m-card:hover { border-color: var(--teal); }
+    .m-card.on { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(15,110,92,.12); }
+    .m-ico {
+      width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
+      background: rgba(15,110,92,.1); color: var(--teal); display: grid; place-items: center;
+    }
+    .m-card b { display: block; font-size: .8rem; }
+    .m-card small { display: block; margin-top: 1px; color: var(--ink-mute); font-size: .66rem; }
+    .m-check {
+      position: absolute; top: 7px; right: 7px; color: var(--teal);
+      opacity: 0; transform: scale(.6); transition: .18s var(--ease); display: grid; place-items: center;
+    }
+    .m-card.on .m-check { opacity: 1; transform: none; }
+
+    .quote-cta { display: flex; align-items: center; gap: 16px; margin-top: 22px; flex-wrap: wrap; }
+    .btn-teal {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      height: 52px; padding: 0 26px; border: 0; border-radius: 13px; background: var(--teal); color: #fff;
+      font-weight: 800; font-size: .98rem; transition: .2s var(--ease);
+    }
+    .btn-teal:hover { background: var(--teal-deep); }
+    .cta-note { font-family: var(--font-mono); font-size: .74rem; color: var(--ink-mute); }
+
+    .checks { list-style: none; margin: 22px 0 0; padding: 16px 0 0; border-top: 1px solid var(--line); display: grid; gap: 9px; }
+    .checks li { display: flex; align-items: center; gap: 9px; font-size: .8rem; color: var(--ink-soft); }
+    .checks li > i {
+      width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0;
+      background: rgba(15,110,92,.12); color: var(--teal); display: grid; place-items: center;
+    }
+
+    /* ---------- 流程 ---------- */
+    .flow4 {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px;
+      margin-top: 52px; padding-top: 26px; border-top: 1px solid var(--line);
+      animation: riseIn .5s var(--ease) .06s both;
+    }
+    .flow4 li { list-style: none; }
+    .flow4 .n {
+      width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+      border: 1.5px solid var(--teal); color: var(--teal);
+      font-family: var(--font-mono); font-size: .7rem; font-weight: 700; margin-bottom: 11px;
+    }
+    .flow4 b { display: block; font-size: .9rem; letter-spacing: -.01em; }
+    .flow4 span { display: block; margin-top: 5px; color: var(--ink-mute); font-size: .76rem; line-height: 1.65; }
+
+    /* ---------- 页签 ---------- */
+    .pane-sec { margin-top: 52px; animation: riseIn .5s var(--ease) .12s both; }
+    .tabs { display: flex; gap: 26px; border-bottom: 1px solid var(--line); }
+    .tabs button {
+      position: relative; height: 46px; padding: 0 2px; border: 0; background: none;
+      color: var(--ink-mute); font-size: .9rem; font-weight: 600;
+      display: inline-flex; align-items: center; gap: 7px;
+    }
+    .tabs button:hover { color: var(--ink); }
+    .tabs button.on { color: var(--ink); }
+    .tabs button.on::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--ink); }
+    .tabs .online { width: 7px; height: 7px; border-radius: 50%; background: #1a9a7c; }
+
+    /* 约稿说明 */
+    .brief-stats {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px;
+      padding: 24px 0; border-bottom: 1px solid var(--line);
+    }
+    .brief-stats small { display: block; margin-bottom: 6px; color: var(--ink-mute); font-size: .7rem; letter-spacing: .08em; }
+    .brief-stats b { font-size: .95rem; font-weight: 700; }
+    .md { padding-top: 14px; color: var(--ink-soft); font-size: .93rem; line-height: 1.9; max-width: 720px; }
+    .md h3 {
+      margin: 1.6em 0 .6em; font-family: var(--font-display); font-weight: 800;
+      font-size: 1.12rem; letter-spacing: -.02em; color: var(--ink);
+    }
+    .md p { margin: .8em 0; }
+    .md ul { margin: .8em 0; padding-left: 1.2em; }
+    .md li { margin: .3em 0; }
+    .md blockquote {
+      margin: 1.1em 0; padding: 4px 0 4px 16px;
+      border-left: 3px solid var(--teal); color: var(--ink-mute); font-size: .88rem;
+    }
+    .md strong { color: var(--ink); }
+    .md code {
+      font-family: var(--font-mono); font-size: .85em;
+      background: rgba(232,241,238,.9); border-radius: 6px; padding: .12em .4em;
+    }
+
+    /* 对话 mock */
+    .talk { padding-top: 26px; }
+    .chat-card {
+      max-width: 720px; border: 1px solid var(--line); border-radius: 20px; background: #fff; overflow: hidden;
+    }
+    .chat-head {
+      display: flex; align-items: center; gap: 11px; padding: 14px 18px;
+      border-bottom: 1px solid var(--line);
+    }
+    .chat-head .c-av {
+      width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+      background: linear-gradient(135deg, var(--teal), #1a9a7c); color: #fff; font-size: .82rem; font-weight: 800;
+    }
+    .chat-head b { display: block; font-size: .9rem; }
+    .chat-head small { display: block; margin-top: 2px; color: var(--ink-mute); font-size: .7rem; }
+    .chat-head .st-online {
+      margin-left: auto; display: inline-flex; align-items: center; gap: 6px;
+      color: var(--teal); font-size: .74rem; font-weight: 700;
+    }
+    .chat-head .st-online i { width: 7px; height: 7px; border-radius: 50%; background: #1a9a7c; }
+    .chat-body { padding: 20px 18px; display: grid; gap: 14px; background: var(--fog); }
+    .msg { display: flex; gap: 9px; align-items: flex-end; max-width: 82%; }
+    .msg .m-av {
+      width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center;
+      font-size: .72rem; font-weight: 800;
+    }
+    .msg.peer .m-av { background: linear-gradient(135deg, var(--teal), #1a9a7c); color: #fff; }
+    .msg.mine { justify-self: end; flex-direction: row-reverse; }
+    .msg.mine .m-av { background: var(--ink); color: #fff; }
+    .bubble {
+      padding: 10px 13px; font-size: .85rem; line-height: 1.65; word-break: break-word;
+      background: #fff; border: 1px solid var(--line); border-radius: 4px 14px 14px 14px; color: var(--ink);
+    }
+    .msg.mine .bubble { background: var(--teal); border-color: var(--teal); color: #fff; border-radius: 14px 4px 14px 14px; }
+    .msg .m-time { display: block; margin-top: 5px; font-family: var(--font-mono); font-size: .62rem; color: var(--ink-mute); }
+    .msg.mine .m-time { text-align: right; }
+    .file-bubble {
+      display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+      background: #fff; border: 1px solid var(--line); border-radius: 4px 14px 14px 14px; min-width: 220px;
+    }
+    .file-bubble .fb-ico {
+      width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
+      background: rgba(15,110,92,.1); color: var(--teal); display: grid; place-items: center;
+    }
+    .file-bubble b { display: block; font-size: .8rem; }
+    .file-bubble small { display: block; margin-top: 2px; color: var(--ink-mute); font-size: .66rem; font-family: var(--font-mono); }
+    .sys-line { justify-self: center; font-size: .7rem; color: var(--ink-mute); display: flex; align-items: center; gap: 6px; }
+    .chat-input {
+      display: flex; gap: 10px; padding: 13px 14px; border-top: 1px solid var(--line); background: #fff;
+    }
+    .chat-input input {
+      flex: 1; min-width: 0; height: 40px; border: 1px solid var(--line-strong); border-radius: 11px;
+      padding: 0 14px; outline: none; font-size: .86rem; background: var(--fog);
+    }
+    .chat-input input:focus { border-color: var(--teal); background: #fff; }
+    .chat-input button {
+      height: 40px; padding: 0 18px; border: 0; border-radius: 11px;
+      background: var(--teal); color: #fff; font-weight: 700; font-size: .84rem;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .chat-input button:hover { background: var(--teal-deep); }
+
+    footer { border-top: 1px solid var(--line); padding: 26px 0 30px; margin-top: 20px; }
+    .foot-inner {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+      color: var(--ink-mute); font-size: .8rem;
+    }
+    .foot-inner .f-brand { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--ink-soft); }
+    .foot-inner .f-brand .brand-mark { width: 20px; height: 20px; border-radius: 6px; }
+    .foot-links { display: flex; gap: 20px; }
+    .foot-links a { cursor: pointer; }
+    .foot-links a:hover { color: var(--teal); }
+    .foot-inner .mono { font-family: var(--font-mono); font-size: .72rem; }
+
+    .toast {
+      position: fixed; right: 20px; bottom: 20px; z-index: 100;
+      padding: 10px 14px; background: var(--ink); color: #fff; font-size: .84rem; border-radius: 4px;
+      opacity: 0; transform: translateY(8px); transition: .25s var(--ease); pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: none; }
+
+    @media (max-width: 980px) {
+      .quote-sec { grid-template-columns: 1fr; gap: 26px; }
+      .cm-cover { max-width: 260px; }
+      .flow4 { grid-template-columns: repeat(2, 1fr); }
+      .brief-stats { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 640px) {
+      .shop-nav { display: none; }
+      .page { padding-top: 126px; }
+      .q-grid { grid-template-columns: 1fr 1fr; }
+      .q-cell + .q-cell { border-left: 0; padding-left: 0; }
+      .q-cell:nth-child(even) { border-left: 1px solid var(--line); padding-left: 16px; }
+      .q-cell:nth-child(n+3) { border-top: 1px solid var(--line); }
+      .methods { grid-template-columns: 1fr; }
+      .msg { max-width: 94%; }
+      .demo-bar span, .demo-bar .jump { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-bar">
+    <strong>约稿详情 Demo</strong>
+    <div style="display:flex;align-items:center;gap:12px">
+      <span>前台 · 定制约稿 · 实时报价 + 双页签（说明 / 沟通）</span>
+      <a class="jump" href="product.html">商品详情 Demo <i data-lucide="arrow-up-right"></i></a>
+    </div>
+  </div>
+
+  <header class="shop-top">
+    <a class="shop-brand" href="shop.html"><span class="brand-mark"></span>领匣<small>LINGXIA</small></a>
+    <nav class="shop-nav">
+      <a href="shop.html">商城</a>
+      <a href="#" class="active">约稿</a>
+      <a href="orders.html">我的订单</a>
+    </nav>
+    <div class="shop-right">
+      <button class="cart-btn" type="button" data-act="打开购物车"><i data-lucide="shopping-bag"></i><span class="dot-n">2</span></button>
+      <div class="avatar" data-act="打开个人中心">林</div>
+    </div>
+  </header>
+
+  <main class="page">
+    <div class="wrap">
+      <nav class="crumb">
+        <a href="shop.html">商城</a><i data-lucide="chevron-right" style="width:12px;height:12px"></i>
+        <a href="shop.html">定制约稿</a><i data-lucide="chevron-right" style="width:12px;height:12px"></i>
+        <b>你来点梗我来写</b>
+      </nav>
+
+      <!-- 报价区 -->
+      <section class="quote-sec">
+        <div class="cm-cover">
+          <span class="c-serial">LX-COMMISSION-01</span>
+          <span class="c-ico"><i data-lucide="pen-line" style="width:44px;height:44px"></i></span>
+          <span class="c-tag">定制约稿</span>
+        </div>
+
+        <div class="quote">
+          <p class="eyebrow">COMMISSION STUDIO</p>
+          <h1>定制约稿 · 你来点梗我来写</h1>
+          <p class="sub">先把人设、尺度和禁触说清楚，确认档期后付定金。大纲通过再按章交稿，全文交付后付尾款解锁。</p>
+
+          <div class="rate">¥64<small>.00 /k</small></div>
+
+          <dl class="q-grid">
+            <div class="q-cell">
+              <dt>约稿字数</dt>
+              <dd>
+                <label class="words-input">
+                  <input type="number" id="words" value="20000" min="1000" step="1000" inputmode="numeric" />
+                  <em>字</em>
+                </label>
+              </dd>
+            </div>
+            <div class="q-cell">
+              <dt>合计</dt>
+              <dd id="q-total">¥1,280</dd>
+            </div>
+            <div class="q-cell">
+              <dt>定金 50%</dt>
+              <dd class="teal" id="q-deposit">¥640</dd>
+            </div>
+            <div class="q-cell">
+              <dt>尾款</dt>
+              <dd id="q-balance">¥640</dd>
+            </div>
+          </dl>
+
+          <div class="presets" id="presets">
+            <button type="button" data-w="1000">1,000 字</button>
+            <button type="button" data-w="8000">8,000 字</button>
+            <button type="button" data-w="15000">15,000 字</button>
+            <button type="button" class="on" data-w="20000">20,000 字</button>
+            <button type="button" data-w="30000">30,000 字</button>
+          </div>
+
+          <span class="f-label">支付方式（定金）</span>
+          <div class="methods" id="methods">
+            <button type="button" class="m-card on" data-m="m1">
+              <span class="m-ico"><i data-lucide="wallet" style="width:15px;height:15px"></i></span>
+              <span><b>支付宝</b><small>官方直连</small></span>
+              <span class="m-check"><i data-lucide="check" style="width:13px;height:13px"></i></span>
+            </button>
+            <button type="button" class="m-card" data-m="m2">
+              <span class="m-ico"><i data-lucide="qr-code" style="width:15px;height:15px"></i></span>
+              <span><b>支付宝</b><small>易支付</small></span>
+              <span class="m-check"><i data-lucide="check" style="width:13px;height:13px"></i></span>
+            </button>
+            <button type="button" class="m-card" data-m="m3">
+              <span class="m-ico"><i data-lucide="scan-line" style="width:15px;height:15px"></i></span>
+              <span><b>微信支付</b><small>易支付</small></span>
+              <span class="m-check"><i data-lucide="check" style="width:13px;height:13px"></i></span>
+            </button>
+          </div>
+
+          <div class="quote-cta">
+            <button class="btn-teal" type="button" data-pay-deposit><i data-lucide="pen-line" style="width:15px;height:15px"></i><span id="cta-label">支付定金 ¥640</span></button>
+            <span class="cta-note" id="cta-note">2 万字 · ¥64.00/k</span>
+          </div>
+
+          <ul class="checks">
+            <li><i><i data-lucide="check" style="width:11px;height:11px"></i></i>须登录账号购买，沟通记录与订单绑定</li>
+            <li><i><i data-lucide="check" style="width:11px;height:11px"></i></i>先付定金开工，交稿验收后再付尾款</li>
+            <li><i><i data-lucide="check" style="width:11px;height:11px"></i></i>尾款到账后解锁全文下载</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- 流程 -->
+      <ol class="flow4">
+        <li><span class="n">1</span><b>沟通设定</b><span>人设、尺度、禁触先聊清楚，不定稿不收费</span></li>
+        <li><span class="n">2</span><b>支付定金</b><span>定金 50% 锁定档期，超时未付自动取消</span></li>
+        <li><span class="n">3</span><b>按章交稿</b><span>大纲确认后动笔，分章交付可随时反馈</span></li>
+        <li><span class="n">4</span><b>支付尾款</b><span>全文交付满意后付尾款，解锁下载</span></li>
+      </ol>
+
+      <!-- 页签 -->
+      <section class="pane-sec">
+        <nav class="tabs" id="tabs">
+          <button type="button" class="on" data-pane="brief">约稿说明</button>
+          <button type="button" data-pane="talk">与作者沟通<span class="online"></span></button>
+        </nav>
+
+        <div id="pane-brief">
+          <div class="brief-stats">
+            <div><small>计价</small><b>¥64.00 / 千字</b></div>
+            <div><small>起步</small><b>1,000 字</b></div>
+            <div><small>交付</small><b>定金后按章交稿</b></div>
+            <div><small>解锁</small><b>尾款后下载全文</b></div>
+          </div>
+          <div class="md">
+            <h3>题材范围</h3>
+            <p>主攻现言、校园、都市、修仙与悬疑短篇；长篇定制需先沟通大纲与排期。不接违反平台规范的内容，边界请在沟通阶段说明。</p>
+            <h3>约稿流程</h3>
+            <ul>
+              <li><strong>沟通设定</strong>：在「与作者沟通」页签发送人设、 CP 、尺度与禁触点，确认档期与大纲。</li>
+              <li><strong>支付定金</strong>：按字数报价的 50% 支付定金，定金到账后开始动笔。</li>
+              <li><strong>按章交稿</strong>：万字以上默认分 2–3 次交稿，每次可在对话中提出一次免费修改。</li>
+              <li><strong>支付尾款</strong>：全文验收满意后支付尾款，解锁 <code>DOCX</code> 与 <code>EPUB</code> 双格式下载。</li>
+            </ul>
+            <h3>修改与退款</h3>
+            <p>大纲阶段可无限次调整；动笔后每章含一次免费修改。定金支付后 24 小时内可申请全额退款，进入创作后定金不退，可协商转让档期。</p>
+            <blockquote>定制内容为买断授权，署名权归作者所有；商用授权请单独沟通。</blockquote>
+          </div>
+        </div>
+
+        <div id="pane-talk" class="talk hidden">
+          <div class="chat-card">
+            <div class="chat-head">
+              <div class="c-av">匣</div>
+              <div><b>领匣作者</b><small>本商品的沟通，与订单分开</small></div>
+              <span class="st-online"><i></i>在线</span>
+            </div>
+            <div class="chat-body">
+              <div class="msg peer">
+                <div class="m-av">匣</div>
+                <div>
+                  <div class="bubble">你好呀～想约什么题材？可以先把人设、尺度和雷点发我。</div>
+                  <span class="m-time">12:30</span>
+                </div>
+              </div>
+              <div class="msg mine">
+                <div class="m-av">林</div>
+                <div>
+                  <div class="bubble">想约一篇校园番外，8 千字左右，甜一点，不要刀。</div>
+                  <span class="m-time">12:32</span>
+                </div>
+              </div>
+              <div class="msg peer">
+                <div class="m-av">匣</div>
+                <div>
+                  <div class="bubble">收到！校园甜番外。我今晚先出大纲发你确认，没问题就可以拍定金啦。</div>
+                  <span class="m-time">12:33</span>
+                </div>
+              </div>
+              <div class="msg peer">
+                <div class="m-av">匣</div>
+                <div>
+                  <div class="file-bubble">
+                    <span class="fb-ico"><i data-lucide="file-text" style="width:16px;height:16px"></i></span>
+                    <span><b>大纲-校园番外.docx</b><small>12 KB</small></span>
+                  </div>
+                  <span class="m-time">21:05</span>
+                </div>
+              </div>
+              <div class="sys-line"><i data-lucide="pen-line" style="width:11px;height:11px"></i>大纲已发送，等待确认</div>
+              <div class="msg mine">
+                <div class="m-av">林</div>
+                <div>
+                  <div class="bubble">大纲 OK，就按这个写！</div>
+                  <span class="m-time">21:20</span>
+                </div>
+              </div>
+            </div>
+            <div class="chat-input">
+              <input placeholder="输入消息…（Demo 不可发送）" id="chat-in" />
+              <button type="button" data-act="发送消息"><i data-lucide="send" style="width:14px;height:14px"></i>发送</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap foot-inner">
+      <span class="f-brand"><span class="brand-mark"></span>© 2026 领匣 Lingxia</span>
+      <div class="foot-links">
+        <a href="shop.html">商品</a>
+        <a href="#">约稿</a>
+        <a href="orders.html">我的订单</a>
+        <a href="#" data-act="回到顶部">回到顶部</a>
+      </div>
+      <span class="mono">xingx.shop</span>
+    </div>
+  </footer>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const $ = (id) => document.getElementById(id)
+    const toastEl = $("toast")
+    let toastTimer = 0
+    function toast(text) {
+      toastEl.textContent = text
+      toastEl.classList.add("show")
+      clearTimeout(toastTimer)
+      toastTimer = setTimeout(() => toastEl.classList.remove("show"), 2200)
+    }
+    function refreshIcons() {
+      if (window.lucide) lucide.createIcons({ attrs: { width: 15, height: 15, "stroke-width": 1.8 } })
+    }
+
+    /* ---------- 报价计算（与前端 lib/commission 一致：定金向下取整到分） ---------- */
+    const RATE = 64
+    const MIN_WORDS = 1000
+    let words = 20000
+    let wordsOk = true
+
+    function fmt(n) {
+      const v = Math.round(n * 100) / 100
+      return Number.isInteger(v) ? "¥" + v.toLocaleString("zh-CN") : "¥" + v.toFixed(2)
+    }
+    function fmtWords(n) {
+      if (n >= 10000) return (n % 10000 === 0 ? n / 10000 : (n / 10000).toFixed(1).replace(/\.0$/, "")) + " 万字"
+      return n.toLocaleString("zh-CN") + " 字"
+    }
+    function applyQuote() {
+      const total = Math.round((words / 1000) * RATE * 100) / 100
+      const cents = Math.round(total * 100)
+      const deposit = Math.floor(cents / 2) / 100
+      const balance = (cents - Math.floor(cents / 2)) / 100
+      $("q-total").textContent = wordsOk ? fmt(total) : "—"
+      $("q-deposit").textContent = wordsOk ? fmt(deposit) : "—"
+      $("q-balance").textContent = wordsOk ? fmt(balance) : "—"
+      $("cta-label").textContent = wordsOk ? `支付定金 ${fmt(deposit)}` : `至少 ${MIN_WORDS.toLocaleString("zh-CN")} 字`
+      $("cta-note").textContent = wordsOk ? `${fmtWords(words)} · ¥64.00/k` : `最少 ${MIN_WORDS.toLocaleString("zh-CN")} 字起约`
+      $("words").classList.toggle("err", !wordsOk)
+      document.querySelectorAll("#presets button").forEach((b) =>
+        b.classList.toggle("on", wordsOk && Number(b.dataset.w) === words))
+    }
+    $("words").addEventListener("input", (e) => {
+      const raw = Number(e.target.value)
+      if (!Number.isFinite(raw) || raw < MIN_WORDS) { words = raw; wordsOk = false }
+      else { words = Math.round(raw); wordsOk = true }
+      applyQuote()
+    })
+    $("words").addEventListener("blur", () => {
+      if (!wordsOk) { words = MIN_WORDS; wordsOk = true; $("words").value = words }
+      applyQuote()
+    })
+    $("presets").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-w]")
+      if (!b) return
+      words = Number(b.dataset.w)
+      wordsOk = true
+      $("words").value = words
+      applyQuote()
+    })
+
+    /* ---------- 支付方式 ---------- */
+    $("methods").addEventListener("click", (e) => {
+      const m = e.target.closest("[data-m]")
+      if (!m) return
+      document.querySelectorAll("#methods [data-m]").forEach((b) => b.classList.toggle("on", b === m))
+    })
+
+    /* ---------- 页签 ---------- */
+    $("tabs").addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-pane]")
+      if (!btn) return
+      document.querySelectorAll("#tabs [data-pane]").forEach((b) => b.classList.toggle("on", b === btn))
+      const talk = btn.dataset.pane === "talk"
+      $("pane-brief").classList.toggle("hidden", talk)
+      $("pane-talk").classList.toggle("hidden", !talk)
+      refreshIcons()
+    })
+
+    /* ---------- 交互 ---------- */
+    document.addEventListener("click", (e) => {
+      if (e.target.closest("[data-pay-deposit]")) {
+        toast(wordsOk ? "Demo：跳转收银台支付定金" : `至少 ${MIN_WORDS.toLocaleString("zh-CN")} 字起约`)
+        return
+      }
+      const act = e.target.closest("[data-act]")
+      if (act) {
+        e.preventDefault()
+        toast(`Demo：${act.dataset.act}`)
+      }
+    })
+    $("chat-in").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); toast("Demo：发送消息") }
+    })
+
+    if (location.hash === "#pane=talk") {
+      document.querySelectorAll("#tabs [data-pane]").forEach((b) => b.classList.toggle("on", b.dataset.pane === "talk"))
+      $("pane-brief").classList.add("hidden")
+      $("pane-talk").classList.remove("hidden")
+    }
+    applyQuote()
+    refreshIcons()
+  </script>
+</body>
+</html>

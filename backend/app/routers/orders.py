@@ -785,8 +785,12 @@ def admin_orders(
 ):
     orders = (
         db.query(Order)
-        .options(selectinload(Order.items), selectinload(Order.payments))
+        .options(
+            selectinload(Order.items),
+            selectinload(Order.payments),
+            selectinload(Order.deliveries).selectinload(Delivery.files),
+        )
         .order_by(Order.created_at.desc())
         .all()
     )
-    return [_order_out(o, include_payload=False) for o in orders]
+    return [_order_out(o, include_payload=True, unlock_download=True) for o in orders]

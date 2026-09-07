@@ -480,24 +480,39 @@ def _migrate_commission_thread_order(conn) -> None:
         conn.execute(text("ALTER TABLE commission_threads ADD COLUMN order_id VARCHAR(64)"))
 
     if _table_exists(conn, "orders") and _table_exists(conn, "order_items"):
-        conn.execute(
-            text(
-                """
-                UPDATE commission_threads
-                SET order_id = (
+        loose = conn.execute(
+            text("SELECT id, user_id, product_id FROM commission_threads WHERE order_id IS NULL")
+        ).fetchall()
+        used = {
+            row[0]
+            for row in conn.execute(
+                text("SELECT order_id FROM commission_threads WHERE order_id IS NOT NULL")
+            ).fetchall()
+            if row[0]
+        }
+        for thread_id, user_id, product_id in loose:
+            candidates = conn.execute(
+                text(
+                    """
                     SELECT o.id
                     FROM orders o
                     JOIN order_items i ON i.order_id = o.id
-                    WHERE o.user_id = commission_threads.user_id
-                      AND i.product_id = commission_threads.product_id
+                    WHERE o.user_id = :uid
+                      AND i.product_id = :pid
                       AND o.sale_mode = 'commission'
                     ORDER BY o.created_at DESC
-                    LIMIT 1
-                )
-                WHERE order_id IS NULL
-                """
+                    """
+                ),
+                {"uid": user_id, "pid": product_id},
+            ).fetchall()
+            pick = next((oid for (oid,) in candidates if oid and oid not in used), None)
+            if not pick:
+                continue
+            conn.execute(
+                text("UPDATE commission_threads SET order_id = :oid WHERE id = :tid"),
+                {"oid": pick, "tid": thread_id},
             )
-        )
+            used.add(pick)
 
     indexes = _index_names(conn, "commission_threads")
     table_sql = conn.execute(

@@ -114,6 +114,9 @@ export interface Delivery {
   download_url?: string | null
   files?: ProductFileItem[]
   created_at: string
+  username?: string
+  email?: string
+  sale_mode?: 'normal' | 'commission'
 }
 
 export interface PublicSettings {
@@ -274,10 +277,58 @@ export interface CommissionThreadList {
   total: number
 }
 
+export interface DashboardTrendPoint {
+  date: string
+  orders: number
+  revenue: number
+}
+
+export interface DashboardTodo {
+  key: string
+  label: string
+  count: number
+  hint: string
+  to: string
+  urgent: boolean
+}
+
+export interface DashboardConv {
+  id: string
+  user_id: string
+  username: string
+  product_id: number
+  product_name: string
+  order_id?: string | null
+  preview: string
+  last_at?: string | null
+  unread: number
+}
+
+export interface DashboardSystem {
+  payments: string
+  mail_ok: boolean
+  mail_label: string
+  db_name: string
+  db_size: string
+  users: number
+  products_on: number
+}
+
 export interface Dashboard {
   today_orders: number
+  yesterday_orders: number
+  today_revenue: number
+  yesterday_revenue: number
+  pending: number
+  pending_overdue: number
+  unread_threads: number
+  unread_users: number
   users: number
   products_on: number
   deliveries: number
   recent_orders: Order[]
+  trend: DashboardTrendPoint[]
+  todos: DashboardTodo[]
+  conversations: DashboardConv[]
+  system: DashboardSystem
 }

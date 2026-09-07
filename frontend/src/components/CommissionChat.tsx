@@ -105,7 +105,7 @@ function DeliveryCard({
     return (
       <div className="flex justify-center py-1">
         <Link
-          to={`/orders/${encodeURIComponent(orderId)}`}
+          to={viewer === 'admin' ? `/admin/orders/${encodeURIComponent(orderId)}` : `/orders/${encodeURIComponent(orderId)}`}
           className="bg-teal px-3 py-1 text-[0.82rem] font-extrabold text-white"
         >
           解锁

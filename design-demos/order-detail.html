@@ -1,0 +1,773 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>领匣 · 订单详情 Demo</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230f6e5c'/></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+SC:wght@400;500;600;700;800&family=Sora:wght@400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@0.544.0/dist/umd/lucide.min.js"></script>
+  <style>
+    :root {
+      --ink: #14201c;
+      --ink-soft: #3d4f48;
+      --ink-mute: #6b7c74;
+      --paper: #e8f1ee;
+      --fog: #f4f8f6;
+      --line: rgba(20, 32, 28, 0.09);
+      --line-strong: rgba(20, 32, 28, 0.16);
+      --teal: #0f6e5c;
+      --teal-deep: #0a5245;
+      --mint: #7fd4b8;
+      --warn: #8a6a2f;
+      --warn-dot: #c4a574;
+      --danger: #b42318;
+      --font-display: "Syne", "Noto Sans SC", sans-serif;
+      --font-body: "Sora", "Noto Sans SC", sans-serif;
+      --font-mono: "JetBrains Mono", "Noto Sans SC", monospace;
+      --ease: cubic-bezier(.22, .8, .2, 1);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      font-family: var(--font-body);
+      color: var(--ink);
+      background-color: #eef5f2;
+      background-image:
+        radial-gradient(1200px 700px at 85% -10%, rgba(127, 212, 184, 0.35), transparent 55%),
+        radial-gradient(900px 600px at -5% 20%, rgba(196, 165, 116, 0.18), transparent 50%),
+        linear-gradient(180deg, #f7fbf9 0%, var(--fog) 42%, #eef5f2 100%);
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+      -webkit-font-smoothing: antialiased;
+    }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    a { color: inherit; text-decoration: none; }
+    .hidden { display: none !important; }
+
+    .demo-bar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 80;
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      height: 48px; padding: 0 20px; background: #14201c; color: #eef8f4;
+    }
+    .demo-bar strong { font-family: var(--font-display); font-size: .95rem; letter-spacing: -.02em; }
+    .demo-bar span { color: rgba(238,248,244,.55); font-size: .78rem; }
+    .demo-bar .jump {
+      display: inline-flex; align-items: center; gap: 6px;
+      height: 30px; padding: 0 12px; border: 1px solid rgba(238,248,244,.25); border-radius: 8px;
+      background: transparent; color: rgba(238,248,244,.8); font-size: .78rem; font-weight: 600;
+    }
+    .demo-bar .jump:hover { border-color: var(--mint); color: #fff; }
+    .state-sel {
+      height: 30px; padding: 0 8px; border: 1px solid rgba(238,248,244,.25); border-radius: 8px;
+      background: #1d2f29; color: #eef8f4; font-size: .78rem; font-weight: 600; outline: none;
+      cursor: pointer;
+    }
+
+    .brand-mark {
+      width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
+      background: linear-gradient(135deg, var(--teal) 0%, #1a9a7c 60%, var(--mint) 100%);
+      position: relative; overflow: hidden;
+    }
+    .brand-mark::after {
+      content: ""; position: absolute; inset: 7px 7px 7px 11px;
+      border: 2px solid rgba(255,255,255,.92); border-left: 0; border-radius: 0 4px 4px 0;
+    }
+
+    /* ---------- 前台顶栏 ---------- */
+    .shop-top {
+      position: fixed; top: 48px; left: 0; right: 0; z-index: 70;
+      display: flex; align-items: center; gap: 30px;
+      height: 60px; padding: 0 max(20px, calc((100% - 1120px) / 2));
+      background: rgba(247,251,249,.82); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--line);
+    }
+    .shop-brand {
+      display: flex; align-items: center; gap: 10px;
+      font-family: var(--font-display); font-weight: 800; font-size: 1.08rem; letter-spacing: -.02em;
+    }
+    .shop-brand small { font-family: var(--font-mono); font-size: .62rem; color: var(--ink-mute); letter-spacing: .18em; margin-top: 3px; }
+    .shop-nav { display: flex; gap: 24px; }
+    .shop-nav a {
+      position: relative; height: 60px; display: inline-flex; align-items: center;
+      color: var(--ink-mute); font-size: .86rem; font-weight: 600;
+    }
+    .shop-nav a:hover { color: var(--ink); }
+    .shop-nav a.active { color: var(--ink); font-weight: 700; }
+    .shop-nav a.active::after {
+      content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--teal);
+    }
+    .shop-right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+    .cart-btn {
+      position: relative; width: 36px; height: 36px; border-radius: 10px;
+      border: 1px solid var(--line-strong); background: #fff; color: var(--ink-soft);
+      display: grid; place-items: center; transition: .2s var(--ease);
+    }
+    .cart-btn:hover { border-color: var(--teal); color: var(--teal); }
+    .cart-btn .dot-n {
+      position: absolute; top: -5px; right: -5px; min-width: 16px; height: 16px; padding: 0 4px;
+      border-radius: 99px; background: var(--teal); color: #fff;
+      font-size: .62rem; font-weight: 800; display: grid; place-items: center;
+      border: 2px solid #f7fbf9;
+    }
+    .avatar {
+      width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+      background: var(--ink); color: #fff; font-size: .8rem; font-weight: 700; cursor: pointer;
+    }
+
+    /* ---------- 页面 ---------- */
+    .page { width: min(920px, calc(100% - 40px)); margin: 0 auto; padding: 140px 0 90px; }
+    @keyframes riseIn { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
+
+    .back {
+      display: inline-flex; align-items: center; gap: 6px; margin-bottom: 18px;
+      color: var(--ink-mute); font-size: .84rem; font-weight: 600; transition: .2s var(--ease);
+    }
+    .back:hover { color: var(--teal); }
+
+    /* ---------- 状态主卡 ---------- */
+    .hero {
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 32px;
+      background: #fff; border: 1px solid var(--line); border-radius: 24px;
+      padding: 30px 34px 28px; animation: riseIn .45s var(--ease) both;
+    }
+    .hero-l { min-width: 0; }
+    .hero-id { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: .8rem; color: var(--ink-mute); letter-spacing: -.01em; }
+    .hero-id button {
+      border: 0; background: none; padding: 3px; color: var(--ink-mute);
+      display: grid; place-items: center; border-radius: 6px; transition: .2s;
+    }
+    .hero-id button:hover { color: var(--teal); background: var(--paper); }
+    .hero h1 {
+      margin: 14px 0 10px; font-family: var(--font-display); font-weight: 800;
+      font-size: clamp(1.9rem, 4vw, 2.5rem); letter-spacing: -.045em; line-height: 1.1;
+      display: flex; align-items: center; gap: 14px;
+    }
+    .hero h1 .dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+    .dot.teal { background: var(--teal); box-shadow: 0 0 0 4px rgba(15,110,92,.14); }
+    .dot.warn { background: var(--warn-dot); box-shadow: 0 0 0 4px rgba(196,165,116,.2); }
+    .dot.danger { background: var(--danger); box-shadow: 0 0 0 4px rgba(180,35,24,.12); }
+    .dot.mute { background: var(--line-strong); }
+    .hint { margin: 0; color: var(--ink-mute); font-size: .9rem; line-height: 1.75; max-width: 48ch; }
+    .hint b { color: var(--warn); font-weight: 700; }
+
+    .hero-r { flex-shrink: 0; text-align: right; padding-top: 4px; }
+    .hero-r > small { display: block; color: var(--ink-mute); font-size: .72rem; letter-spacing: .1em; margin-bottom: 8px; }
+    .hero-r .big {
+      font-family: var(--font-display); font-weight: 800; font-size: 2.55rem;
+      letter-spacing: -.05em; line-height: 1;
+    }
+    .hero-r .big small { font-size: 1.05rem; color: var(--ink-mute); letter-spacing: 0; margin-left: 2px; }
+    .hero-split { margin-top: 14px; display: grid; gap: 5px; justify-items: end; }
+    .hs { display: flex; align-items: baseline; gap: 8px; font-size: .76rem; color: var(--ink-mute); }
+    .hs b { font-family: var(--font-mono); font-size: .78rem; font-weight: 700; color: var(--ink-soft); }
+    .hs .tag { font-weight: 700; font-size: .72rem; }
+    .hs .tag.ok { color: var(--teal); }
+    .hs .tag.wait { color: var(--warn); }
+
+    /* ---------- 流程步进 ---------- */
+    .steps {
+      list-style: none; margin: 36px 2px 0; padding: 0;
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      animation: riseIn .45s var(--ease) .05s both;
+    }
+    .steps li { position: relative; min-width: 0; }
+    .steps li + li::before {
+      content: ""; position: absolute; top: 6px; left: calc(14px - 100%); right: 100%;
+      height: 2px; background: var(--line-strong);
+    }
+    .steps li + li:is(.done, .now)::before { background: var(--teal); }
+    .s-dot {
+      width: 14px; height: 14px; border-radius: 50%; background: #fff;
+      border: 2px solid var(--line-strong); display: grid; place-items: center;
+      position: relative; z-index: 1; color: #fff;
+    }
+    li.done .s-dot { background: var(--teal); border-color: var(--teal); }
+    li.now .s-dot {
+      background: var(--teal); border-color: var(--teal);
+      box-shadow: 0 0 0 4px rgba(15,110,92,.16);
+      animation: nowPulse 1.8s var(--ease) infinite;
+    }
+    @keyframes nowPulse {
+      0%, 100% { box-shadow: 0 0 0 4px rgba(15,110,92,.16); }
+      50% { box-shadow: 0 0 0 7px rgba(15,110,92,.08); }
+    }
+    .steps b { display: block; margin-top: 11px; font-size: .84rem; font-weight: 700; }
+    li.todo b { color: var(--ink-mute); font-weight: 600; }
+    li.now b { color: var(--teal-deep); }
+    .steps time { display: block; margin-top: 3px; font-family: var(--font-mono); font-size: .68rem; color: var(--ink-mute); }
+    .steps .cur { display: block; margin-top: 3px; font-size: .68rem; font-weight: 700; color: var(--teal); }
+
+    /* ---------- 支付面板 ---------- */
+    .pay {
+      margin-top: 30px; border-radius: 24px; padding: 26px 30px 24px;
+      border: 1px solid rgba(15,110,92,.35);
+      background: linear-gradient(180deg, rgba(232,241,238,.65), #fff 55%);
+      animation: riseIn .45s var(--ease) .1s both;
+    }
+    .pay-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+    .pay-head h2 { margin: 0 0 5px; font-family: var(--font-display); font-size: 1.18rem; letter-spacing: -.02em; }
+    .pay-sub { margin: 0; color: var(--ink-mute); font-size: .78rem; }
+    .pay-amt { font-family: var(--font-display); font-weight: 800; font-size: 1.9rem; letter-spacing: -.045em; line-height: 1; }
+    .methods { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 20px; }
+    .m-card {
+      position: relative; display: flex; align-items: center; gap: 11px; text-align: left;
+      border: 1px solid var(--line-strong); border-radius: 14px; background: #fff;
+      padding: 13px 14px; transition: .2s var(--ease);
+    }
+    .m-card:hover { border-color: var(--teal); }
+    .m-card.on { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(15,110,92,.12); }
+    .m-ico {
+      width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+      background: rgba(15,110,92,.1); color: var(--teal); display: grid; place-items: center;
+    }
+    .m-card b { display: block; font-size: .86rem; }
+    .m-card small { display: block; margin-top: 2px; color: var(--ink-mute); font-size: .7rem; }
+    .m-check {
+      position: absolute; top: 9px; right: 9px; color: var(--teal);
+      opacity: 0; transform: scale(.6); transition: .18s var(--ease);
+      display: grid; place-items: center;
+    }
+    .m-card.on .m-check { opacity: 1; transform: none; }
+    .pay-btn {
+      margin-top: 20px; width: 100%; height: 52px; border: 0; border-radius: 14px;
+      background: var(--teal); color: #fff; font-weight: 800; font-size: 1rem; letter-spacing: .01em;
+      display: flex; align-items: center; justify-content: center; gap: 9px;
+      transition: .2s var(--ease);
+    }
+    .pay-btn:hover { background: var(--teal-deep); }
+    .pay-note {
+      margin: 13px 0 0; display: flex; align-items: center; justify-content: center; gap: 7px;
+      color: var(--ink-mute); font-size: .74rem;
+    }
+    .pay-note i { flex-shrink: 0; }
+
+    /* ---------- 提货单（发放内容 + 订单信息） ---------- */
+    .ticket2 {
+      margin-top: 30px; background: #fff; border: 1px solid var(--line); border-radius: 24px;
+      animation: riseIn .45s var(--ease) .15s both;
+    }
+    .sec { padding: 24px 30px 26px; }
+    .tear2 { position: relative; margin: 0 26px; border-top: 1.5px dashed var(--line-strong); }
+    .tear2::before, .tear2::after {
+      content: ""; position: absolute; top: -8.5px; width: 15px; height: 15px; border-radius: 50%;
+      background: #eef5f2; border: 1px solid var(--line);
+    }
+    .tear2::before { left: -34px; }
+    .tear2::after { right: -34px; }
+
+    .sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+    .sec-head h2 { margin: 0; font-family: var(--font-display); font-size: 1.14rem; letter-spacing: -.02em; }
+    .sec-head small { color: var(--ink-mute); font-size: .74rem; }
+
+    .item-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 16px 0 12px; }
+    .item-head b { font-size: .98rem; letter-spacing: -.01em; }
+    .item-head .i-price { font-family: var(--font-mono); font-size: .86rem; font-weight: 700; white-space: nowrap; }
+
+    .payload {
+      position: relative; background: var(--fog); border: 1px solid var(--line);
+      border-radius: 14px; padding: 16px 18px 14px;
+      color: var(--ink-soft); font-size: .88rem; line-height: 1.8;
+    }
+    .payload p { margin: 0 0 .6em; }
+    .payload p:last-child { margin-bottom: 0; }
+    .payload .pq {
+      margin: .6em 0 0; padding-left: 12px; border-left: 3px solid var(--teal);
+      color: var(--ink-mute); font-size: .84rem;
+    }
+    .copy-line {
+      margin-top: 12px; display: inline-flex; align-items: center; gap: 6px;
+      border: 0; background: none; padding: 0;
+      color: var(--teal); font-size: .78rem; font-weight: 700;
+    }
+    .copy-line:hover { text-decoration: underline; }
+
+    .files { margin-top: 14px; border-top: 1px solid var(--line); }
+    .f-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+    .f-row:last-child { border-bottom: 0; }
+    .f-ico {
+      width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+      background: rgba(15,110,92,.1); color: var(--teal); display: grid; place-items: center;
+    }
+    .f-row .f-meta { min-width: 0; }
+    .f-row b { display: block; font-size: .86rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .f-row small { display: block; margin-top: 2px; color: var(--ink-mute); font-size: .7rem; font-family: var(--font-mono); }
+    .f-dl {
+      margin-left: auto; flex-shrink: 0;
+      display: inline-flex; align-items: center; gap: 6px;
+      height: 34px; padding: 0 13px; border: 1px solid var(--line-strong); border-radius: 9px;
+      background: transparent; color: var(--ink); font-size: .78rem; font-weight: 700;
+      transition: .2s var(--ease);
+    }
+    .f-dl:hover { border-color: var(--teal); color: var(--teal); }
+    .f-lock {
+      margin-left: auto; flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px;
+      color: var(--ink-mute); font-size: .76rem; font-weight: 600;
+    }
+    .files.locked .f-row { opacity: .55; }
+    .lock-banner {
+      margin-top: 14px; display: flex; align-items: flex-start; gap: 9px;
+      background: rgba(196,165,116,.14); border-radius: 12px; padding: 11px 14px;
+      color: var(--warn); font-size: .8rem; line-height: 1.6;
+    }
+    .lock-banner i { flex-shrink: 0; margin-top: 2px; }
+
+    .hold {
+      border: 1.5px dashed var(--line-strong); border-radius: 16px;
+      padding: 30px 20px; text-align: center; color: var(--ink-mute);
+    }
+    .hold .h-ico {
+      width: 46px; height: 46px; margin: 0 auto 12px; border-radius: 14px;
+      background: var(--paper); color: var(--teal); display: grid; place-items: center;
+    }
+    .hold b { display: block; color: var(--ink-soft); font-size: .9rem; margin-bottom: 5px; }
+    .hold p { margin: 0; font-size: .8rem; line-height: 1.7; }
+
+    /* 订单信息 kv */
+    .kv { display: grid; grid-template-columns: 1fr 1fr; gap: 0 44px; margin-top: 10px; }
+    .kv .row {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 18px;
+      padding: 11px 0; border-bottom: 1px solid var(--line); font-size: .84rem;
+    }
+    .kv dt { color: var(--ink-mute); white-space: nowrap; flex-shrink: 0; }
+    .kv dd { margin: 0; font-weight: 600; text-align: right; word-break: break-all; }
+    .kv dd.mono { font-family: var(--font-mono); font-size: .78rem; letter-spacing: -.01em; display: inline-flex; align-items: center; gap: 7px; }
+    .kv dd.mono button {
+      border: 0; background: none; padding: 2px; color: var(--ink-mute);
+      display: grid; place-items: center; border-radius: 5px;
+    }
+    .kv dd.mono button:hover { color: var(--teal); background: var(--paper); }
+
+    /* ---------- 约稿对话横幅 ---------- */
+    .chat {
+      margin-top: 26px; display: flex; align-items: center; gap: 14px;
+      background: #fff; border: 1px solid var(--line); border-radius: 20px; padding: 16px 20px;
+      animation: riseIn .45s var(--ease) .2s both;
+    }
+    .c-av {
+      width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0;
+      background: linear-gradient(135deg, var(--teal), #1a9a7c); color: #fff;
+      display: grid; place-items: center; font-size: .9rem; font-weight: 800;
+    }
+    .chat .c-body { min-width: 0; }
+    .chat b { font-size: .9rem; }
+    .chat p {
+      margin: 3px 0 0; color: var(--ink-mute); font-size: .78rem;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .chat .ghost-btn { margin-left: auto; }
+
+    .ghost-btn {
+      display: inline-flex; align-items: center; gap: 7px; flex-shrink: 0;
+      height: 38px; padding: 0 15px; border: 1px solid var(--line-strong); border-radius: 10px;
+      background: rgba(255,255,255,.6); color: var(--ink); font-weight: 600; font-size: .84rem;
+      transition: .2s var(--ease);
+    }
+    .ghost-btn:hover { border-color: var(--ink); background: #fff; }
+
+    .foot-acts { display: flex; gap: 10px; margin-top: 30px; }
+
+    .toast {
+      position: fixed; right: 20px; bottom: 20px; z-index: 100;
+      padding: 10px 14px; background: var(--ink); color: #fff; font-size: .84rem; border-radius: 4px;
+      opacity: 0; transform: translateY(8px); transition: .25s var(--ease); pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: none; }
+
+    @media (max-width: 760px) {
+      .shop-nav { display: none; }
+      .page { padding-top: 124px; }
+      .hero { flex-direction: column; gap: 22px; padding: 24px 22px; }
+      .hero-r { text-align: left; }
+      .hero-split { justify-items: start; }
+      .steps b { font-size: .72rem; }
+      .steps time, .steps .cur { font-size: .62rem; }
+      .methods { grid-template-columns: 1fr; }
+      .pay { padding: 22px 20px; }
+      .sec { padding: 20px 20px 22px; }
+      .tear2 { margin: 0 18px; }
+      .tear2::before { left: -26px; }
+      .tear2::after { right: -26px; }
+      .kv { grid-template-columns: 1fr; }
+      .demo-bar span, .demo-bar .jump { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-bar">
+    <strong>订单详情 Demo</strong>
+    <div style="display:flex;align-items:center;gap:12px">
+      <span>前台 · 状态主卡 + 流程步进 + 提货单</span>
+      <select class="state-sel" id="state-sel">
+        <option value="c_pending">约稿 · 待付定金</option>
+        <option value="c_deposit">约稿 · 创作进行中</option>
+        <option value="c_balance" selected>约稿 · 待付尾款</option>
+        <option value="c_done">约稿 · 交付完成</option>
+        <option value="n_pending">商品 · 等待支付</option>
+        <option value="n_paid">商品 · 已完成</option>
+      </select>
+      <a class="jump" href="orders.html">我的订单 Demo <i data-lucide="arrow-up-right"></i></a>
+    </div>
+  </div>
+
+  <header class="shop-top">
+    <a class="shop-brand" href="#" data-act="返回商城首页"><span class="brand-mark"></span>领匣<small>LINGXIA</small></a>
+    <nav class="shop-nav">
+      <a href="#" data-act="返回商城">商城</a>
+      <a href="#" data-act="打开约稿">约稿</a>
+      <a href="orders.html" class="active">我的订单</a>
+    </nav>
+    <div class="shop-right">
+      <button class="cart-btn" type="button" data-act="打开购物车"><i data-lucide="shopping-bag"></i><span class="dot-n">2</span></button>
+      <div class="avatar" data-act="打开个人中心">林</div>
+    </div>
+  </header>
+
+  <main class="page">
+    <a class="back" href="orders.html"><i data-lucide="arrow-left"></i>我的订单</a>
+
+    <section class="hero" id="hero"></section>
+    <ol class="steps" id="steps"></ol>
+    <section class="pay hidden" id="pay"></section>
+
+    <section class="ticket2">
+      <div class="sec" id="deliver"></div>
+      <div class="tear2"></div>
+      <div class="sec" id="meta"></div>
+    </section>
+
+    <section class="chat hidden" id="chat">
+      <div class="c-av">作</div>
+      <div class="c-body">
+        <b>与作者沟通</b>
+        <p id="chat-preview">最新：大纲已确认，今晚交初稿。</p>
+      </div>
+      <button class="ghost-btn" type="button" data-act="打开约稿对话"><i data-lucide="message-square"></i>打开对话</button>
+    </section>
+
+    <div class="foot-acts">
+      <a class="ghost-btn" href="#" data-act="返回商城"><i data-lucide="shopping-bag"></i>返回商城</a>
+      <button class="ghost-btn" type="button" data-act="联系客服"><i data-lucide="headphones"></i>联系客服</button>
+    </div>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const $ = (id) => document.getElementById(id)
+    const toastEl = $("toast")
+    let toastTimer = 0
+    function toast(text) {
+      toastEl.textContent = text
+      toastEl.classList.add("show")
+      clearTimeout(toastTimer)
+      toastTimer = setTimeout(() => toastEl.classList.remove("show"), 2200)
+    }
+    function refreshIcons() {
+      if (window.lucide) lucide.createIcons({ attrs: { width: 15, height: 15, "stroke-width": 1.8 } })
+    }
+
+    /* ---------- 订单数据 ---------- */
+    const COMMISSION = {
+      id: "LX260905-0098",
+      total: ["512", ".00"],
+      item: { name: "校园补课番外 · 定制约稿", price: "¥64.00/k" },
+      files: [
+        { name: "校园补课番外-全文.docx", size: "3.2 MB", icon: "file-text" },
+        { name: "校园补课番外-阅读版.epub", size: "1.1 MB", icon: "book-open" },
+      ],
+      payload: [
+        "成稿已交付：校园补课番外（8,000 字），附人物小传与番外时间线。",
+        "包含 DOCX 可编辑版与 EPUB 阅读版；如需微调，请在 7 日内通过约稿对话提出。",
+        "> 定制内容为买断授权，感谢支持。",
+      ],
+      meta: [
+        ["下单时间", "2026/09/05 21:14"],
+        ["买家", "林晚"],
+        ["联系邮箱", "lin***@gmail.com"],
+        ["订单类型", "定制约稿"],
+        ["约定字数", "8,000 字"],
+        ["支付方式", "支付宝 · 官方直连", "paid"],
+        ["定金流水", "2026090522001477881234", "paid", "mono"],
+        ["尾款流水", "2026090715452011335566", "balance_paid", "mono"],
+      ],
+    }
+    const NORMAL = {
+      id: "LX260906-0104",
+      total: ["38", ".00"],
+      item: { name: "《深夜维修工》全文 + 番外", price: "¥38.00" },
+      files: [
+        { name: "深夜维修工-全文.txt", size: "486 KB", icon: "file-text" },
+        { name: "深夜维修工-番外.epub", size: "920 KB", icon: "book-open" },
+      ],
+      payload: [
+        "感谢购买《深夜维修工》！全文 TXT 与番外 EPUB 见下方文件。",
+        "阅读器推荐：静读天下 / Apple Books；EPUB 已内嵌章节导航。",
+        "> 本内容为个人授权，请勿二次传播。",
+      ],
+      meta: [
+        ["下单时间", "2026/09/06 08:17"],
+        ["买家", "林晚"],
+        ["联系邮箱", "lin***@gmail.com"],
+        ["订单类型", "商城商品"],
+        ["支付方式", "易支付 · 支付宝", "paid"],
+        ["交易流水", "2026090608193011223344", "paid", "mono"],
+      ],
+    }
+
+    const METHODS = [
+      { id: "m1", label: "支付宝", sub: "官方直连", icon: "wallet" },
+      { id: "m2", label: "支付宝", sub: "易支付", icon: "qr-code" },
+      { id: "m3", label: "微信支付", sub: "易支付", icon: "scan-line" },
+    ]
+
+    /* ---------- 状态机 ---------- */
+    const STATES = {
+      c_pending: {
+        order: COMMISSION, tone: "warn", title: "待付定金",
+        hint: "订单已创建，请在 <b>24 小时</b>内支付定金 ¥256.00，超时订单将自动取消。",
+        split: [["定金", "¥256.00", "待支付", "wait"], ["尾款", "¥256.00", "交稿后支付", ""]],
+        steps: [
+          { t: "支付定金", s: "now" }, { t: "创作交稿", s: "todo" },
+          { t: "支付尾款", s: "todo" }, { t: "交付完成", s: "todo" },
+        ],
+        pay: { kind: "定金", amount: "¥256.00" },
+        delivery: { mode: "hold", icon: "pen-line", title: "等待支付定金", note: "支付定金后进入交稿流程，成稿将通过本页发放。" },
+        chat: false, paid: false, balancePaid: false,
+      },
+      c_deposit: {
+        order: COMMISSION, tone: "teal", title: "创作进行中",
+        hint: "定金已到账，作者正在创作。交稿后系统会第一时间邮件通知你。",
+        split: [["定金", "¥256.00", "已支付", "ok"], ["尾款", "¥256.00", "交稿后支付", ""]],
+        steps: [
+          { t: "支付定金", s: "done", time: "09/05 21:20" }, { t: "创作交稿", s: "now" },
+          { t: "支付尾款", s: "todo" }, { t: "交付完成", s: "todo" },
+        ],
+        pay: null,
+        delivery: { mode: "hold", icon: "pen-line", title: "等待作者交稿", note: "可通过下方对话跟进进度、补充需求细节。" },
+        chat: true, chatPreview: "最新：大纲已确认，今晚交初稿。", paid: true, balancePaid: false,
+      },
+      c_balance: {
+        order: COMMISSION, tone: "warn", title: "稿件已就绪",
+        hint: "作者已交稿，支付尾款 <b>¥256.00</b> 后即可解锁下载全文文件。",
+        split: [["定金", "¥256.00", "已支付", "ok"], ["尾款", "¥256.00", "待支付", "wait"]],
+        steps: [
+          { t: "支付定金", s: "done", time: "09/05 21:20" }, { t: "创作交稿", s: "done", time: "09/07 14:02" },
+          { t: "支付尾款", s: "now" }, { t: "交付完成", s: "todo" },
+        ],
+        pay: { kind: "尾款", amount: "¥256.00" },
+        delivery: { mode: "locked" },
+        chat: true, chatPreview: "作者：初稿已上传，请查收后支付尾款。", paid: true, balancePaid: false,
+      },
+      c_done: {
+        order: COMMISSION, tone: "teal", title: "交付完成",
+        hint: "感谢惠顾！成稿文件已解锁，可永久保存与下载。",
+        split: [["定金", "¥256.00", "已支付", "ok"], ["尾款", "¥256.00", "已支付", "ok"]],
+        steps: [
+          { t: "支付定金", s: "done", time: "09/05 21:20" }, { t: "创作交稿", s: "done", time: "09/07 14:02" },
+          { t: "支付尾款", s: "done", time: "09/07 15:44" }, { t: "交付完成", s: "done", time: "09/07 15:44" },
+        ],
+        pay: null,
+        delivery: { mode: "open" },
+        chat: true, chatPreview: "作者：感谢约稿，欢迎下次再来。", paid: true, balancePaid: true,
+      },
+      n_pending: {
+        order: NORMAL, tone: "warn", title: "等待支付",
+        hint: "请在 <b>30 分钟</b>内完成支付；支付成功后系统自动发货，无需等待。",
+        split: null,
+        steps: [
+          { t: "提交订单", s: "done", time: "09/06 08:17" }, { t: "完成支付", s: "now" },
+          { t: "自动发货", s: "todo" }, { t: "完成", s: "todo" },
+        ],
+        pay: { kind: "订单金额", amount: "¥38.00" },
+        delivery: { mode: "hold", icon: "zap", title: "支付后自动发货", note: "发放内容与下载文件将在支付成功后立即展示在此处。" },
+        chat: false, paid: false, balancePaid: false,
+      },
+      n_paid: {
+        order: NORMAL, tone: "teal", title: "已完成",
+        hint: "商品已自动发货，可在下方查看发放内容与下载文件。",
+        split: null,
+        steps: [
+          { t: "提交订单", s: "done", time: "09/06 08:17" }, { t: "完成支付", s: "done", time: "09/06 08:19" },
+          { t: "自动发货", s: "done", time: "09/06 08:19" }, { t: "完成", s: "done", time: "09/06 08:19" },
+        ],
+        pay: null,
+        delivery: { mode: "open" },
+        chat: false, paid: true, balancePaid: false,
+      },
+    }
+
+    /* ---------- 渲染 ---------- */
+    function renderHero(st) {
+      const o = st.order
+      const split = st.split
+        ? `<div class="hero-split">${st.split.map(([k, v, tag, cls]) =>
+            `<div class="hs"><span>${k}</span><b>${v}</b>${tag ? `<span class="tag ${cls}">${tag}</span>` : ""}</div>`).join("")}</div>`
+        : ""
+      $("hero").innerHTML = `
+        <div class="hero-l">
+          <div class="hero-id">
+            <span>${o.id}</span>
+            <button type="button" data-copy="${o.id}" title="复制订单号"><i data-lucide="copy" style="width:13px;height:13px"></i></button>
+          </div>
+          <h1><i class="dot ${st.tone}"></i>${st.title}</h1>
+          <p class="hint">${st.hint}</p>
+        </div>
+        <div class="hero-r">
+          <small>订单总额</small>
+          <b class="big">¥${o.total[0]}<small>${o.total[1]}</small></b>
+          ${split}
+        </div>`
+    }
+
+    function renderSteps(st) {
+      $("steps").innerHTML = st.steps.map((s) => `
+        <li class="${s.s}">
+          <i class="s-dot">${s.s === "done" ? '<i data-lucide="check" style="width:9px;height:9px"></i>' : ""}</i>
+          <b>${s.t}</b>
+          ${s.s === "done" ? `<time>${s.time}</time>` : s.s === "now" ? '<span class="cur">当前</span>' : ""}
+        </li>`).join("")
+    }
+
+    function renderPay(st) {
+      const box = $("pay")
+      if (!st.pay) { box.classList.add("hidden"); box.innerHTML = ""; return }
+      box.classList.remove("hidden")
+      box.innerHTML = `
+        <div class="pay-head">
+          <div>
+            <h2>支付${st.pay.kind}</h2>
+            <p class="pay-sub">选择支付方式，跳转收银台完成付款</p>
+          </div>
+          <b class="pay-amt">${st.pay.amount}</b>
+        </div>
+        <div class="methods">
+          ${METHODS.map((m, i) => `
+            <button type="button" class="m-card ${i === 0 ? "on" : ""}" data-m="${m.id}">
+              <span class="m-ico"><i data-lucide="${m.icon}" style="width:16px;height:16px"></i></span>
+              <span><b>${m.label}</b><small>${m.sub}</small></span>
+              <span class="m-check"><i data-lucide="check" style="width:14px;height:14px"></i></span>
+            </button>`).join("")}
+        </div>
+        <button class="pay-btn" type="button" data-act="跳转收银台">支付${st.pay.kind} ${st.pay.amount}<i data-lucide="arrow-right" style="width:16px;height:16px"></i></button>
+        <p class="pay-note"><i data-lucide="shield-check" style="width:13px;height:13px"></i>支付在官方收银台完成，成功后自动返回并更新订单状态</p>`
+    }
+
+    function renderDeliver(st) {
+      const o = st.order
+      const d = st.delivery
+      let body = ""
+      if (d.mode === "open") {
+        body = `
+          <div class="payload">
+            ${o.payload.map((l) => l.startsWith("> ") ? `<div class="pq">${l.slice(2)}</div>` : `<p>${l}</p>`).join("")}
+          </div>
+          <button class="copy-line" type="button" data-copy-payload><i data-lucide="copy" style="width:12px;height:12px"></i>复制原文</button>
+          <div class="files">
+            ${o.files.map((f) => `
+              <div class="f-row">
+                <span class="f-ico"><i data-lucide="${f.icon}" style="width:16px;height:16px"></i></span>
+                <span class="f-meta"><b>${f.name}</b><small>${f.size}</small></span>
+                <button class="f-dl" type="button" data-act="下载 ${f.name}"><i data-lucide="download" style="width:13px;height:13px"></i>下载</button>
+              </div>`).join("")}
+          </div>`
+      } else if (d.mode === "locked") {
+        body = `
+          <div class="lock-banner"><i data-lucide="lock" style="width:14px;height:14px"></i>稿件已上传，支付尾款后解锁下载。</div>
+          <div class="files locked">
+            ${o.files.map((f) => `
+              <div class="f-row">
+                <span class="f-ico"><i data-lucide="${f.icon}" style="width:16px;height:16px"></i></span>
+                <span class="f-meta"><b>${f.name}</b><small>${f.size}</small></span>
+                <span class="f-lock"><i data-lucide="lock" style="width:13px;height:13px"></i>未解锁</span>
+              </div>`).join("")}
+          </div>`
+      } else {
+        body = `
+          <div class="hold">
+            <div class="h-ico"><i data-lucide="${d.icon}" style="width:20px;height:20px"></i></div>
+            <b>${d.title}</b>
+            <p>${d.note}</p>
+          </div>`
+      }
+      const small = d.mode === "open" ? `${o.files.length} 个文件 · 永久有效` : d.mode === "locked" ? "待解锁" : "暂未发放"
+      $("deliver").innerHTML = `
+        <div class="sec-head"><h2>发放内容</h2><small>${small}</small></div>
+        <div class="item-head"><b>${o.item.name}</b><span class="i-price">${o.item.price}</span></div>
+        ${body}`
+    }
+
+    function renderMeta(st) {
+      const o = st.order
+      const rows = [["订单编号", o.id, null, "mono"]]
+        .concat(o.meta)
+        .filter((r) => !r[2] || (r[2] === "paid" && st.paid) || (r[2] === "balance_paid" && st.balancePaid))
+      $("meta").innerHTML = `
+        <div class="sec-head"><h2>订单信息</h2></div>
+        <dl class="kv">
+          ${rows.map((r) => `
+            <div class="row">
+              <dt>${r[0]}</dt>
+              ${r[3] === "mono"
+                ? `<dd class="mono">${r[1]}<button type="button" data-copy="${r[1]}" title="复制"><i data-lucide="copy" style="width:12px;height:12px"></i></button></dd>`
+                : `<dd>${r[1]}</dd>`}
+            </div>`).join("")}
+        </dl>`
+    }
+
+    function render(key) {
+      const st = STATES[key]
+      renderHero(st)
+      renderSteps(st)
+      renderPay(st)
+      renderDeliver(st)
+      renderMeta(st)
+      const chat = $("chat")
+      chat.classList.toggle("hidden", !st.chat)
+      if (st.chat) $("chat-preview").textContent = st.chatPreview || ""
+      refreshIcons()
+    }
+
+    /* ---------- 交互 ---------- */
+    $("state-sel").addEventListener("change", (e) => render(e.target.value))
+
+    document.addEventListener("click", (e) => {
+      const m = e.target.closest("[data-m]")
+      if (m) {
+        document.querySelectorAll("[data-m]").forEach((b) => b.classList.toggle("on", b === m))
+        return
+      }
+      const cp = e.target.closest("[data-copy]")
+      if (cp) {
+        navigator.clipboard?.writeText(cp.dataset.copy).then(
+          () => toast("已复制到剪贴板"),
+          () => toast("复制失败"),
+        )
+        return
+      }
+      if (e.target.closest("[data-copy-payload]")) {
+        const st = STATES[$("state-sel").value]
+        navigator.clipboard?.writeText(st.order.payload.join("\n")).then(
+          () => toast("已复制到剪贴板"),
+          () => toast("复制失败"),
+        )
+        return
+      }
+      const act = e.target.closest("[data-act]")
+      if (act) {
+        e.preventDefault()
+        toast(`Demo：${act.dataset.act}`)
+      }
+    })
+
+    const hashState = location.hash.replace("#state=", "")
+    const initial = STATES[hashState] ? hashState : "c_balance"
+    $("state-sel").value = initial
+    render(initial)
+    refreshIcons()
+  </script>
+</body>
+</html>

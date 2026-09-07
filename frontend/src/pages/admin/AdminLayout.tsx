@@ -114,6 +114,8 @@ function activeGroupId(path: string) {
 
 function pageTitle(path: string) {
   if (TITLES[path]) return TITLES[path]
+  if (path.startsWith('/admin/orders')) return '订单管理'
+  if (path.startsWith('/admin/deliveries')) return '发放记录'
   if (path.startsWith('/admin/payment/') && path !== '/admin/payment/new') return '编辑渠道'
   if (path.includes('/edit')) return '编辑商品'
   return '控制台'
@@ -149,7 +151,8 @@ export function AdminLayout() {
   const { user, loading, logout } = useAuth()
   const { showToast } = useToast()
   const navigate = useNavigate()
-  const { pathname: path } = useLocation()
+  const path = useLocation().pathname
+  const lockPane = path.startsWith('/admin/orders') || path.startsWith('/admin/deliveries')
   const currentGroupId = activeGroupId(path)
 
   const [collapsed, setCollapsed] = useState(readCollapsed)
@@ -436,7 +439,13 @@ export function AdminLayout() {
             ))}
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 md:p-6">
+          <div
+            className={
+              lockPane
+                ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
+                : 'min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 md:p-6'
+            }
+          >
             <Outlet />
           </div>
         </div>

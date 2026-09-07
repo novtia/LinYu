@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends
@@ -8,37 +7,19 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import get_admin_user, get_optional_user
-from ..models import Delivery, Order, Product, User
+from ..models import User
 from ..payment.service import SECRET_MASK
 from ..schemas import (
     DashboardOut,
-    OrderItemOut,
-    OrderOut,
     PublicSettingsOut,
     SettingsOut,
     SiteSettings,
     SysSettings,
 )
 from ..seed import load_settings, save_settings
-from ..services.commission import SALE_COMMISSION, SALE_NORMAL, is_commission_mode
+from ..services.dashboard import build_dashboard
 
 router = APIRouter(prefix="/api", tags=["settings"])
-
-
-def _order_brief(order: Order) -> OrderOut:
-    return OrderOut(
-        id=order.id,
-        username=order.username,
-        email=order.email or "",
-        total=order.total,
-        status=order.status,
-        sale_mode=SALE_COMMISSION if is_commission_mode(getattr(order, "sale_mode", None)) else SALE_NORMAL,
-        created_at=order.created_at,
-        items=[
-            OrderItemOut(product_id=it.product_id, name=it.name, price=it.price)
-            for it in order.items
-        ],
-    )
 
 
 @router.get("/settings/public", response_model=PublicSettingsOut)
@@ -118,19 +99,4 @@ def dashboard(
     _: User = Depends(get_admin_user),
     db: Session = Depends(get_db),
 ):
-    today = datetime.utcnow().date()
-    orders = db.query(Order).all()
-    today_orders = sum(1 for o in orders if o.created_at.date() == today)
-    users = db.query(User).filter(User.role != "admin").count()
-    products_on = db.query(Product).filter(Product.status == "on").count()
-    deliveries = db.query(Delivery).count()
-    recent = (
-        db.query(Order).order_by(Order.created_at.desc()).limit(5).all()
-    )
-    return DashboardOut(
-        today_orders=today_orders,
-        users=users,
-        products_on=products_on,
-        deliveries=deliveries,
-        recent_orders=[_order_brief(o) for o in recent],
-    )
+    return build_dashboard(db)

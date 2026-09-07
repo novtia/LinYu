@@ -44,3 +44,24 @@ export function orderStatusClass(status: string): string {
   if (tone === 'danger') return 'bg-[rgba(180,35,24,.1)] text-danger'
   return 'bg-paper text-ink-mute'
 }
+
+/** 圆点状态色调：定金已付视为进行中（teal） */
+export function orderDotTone(status: string): 'teal' | 'warn' | 'danger' | 'mute' {
+  if (status === 'deposit_paid' || status === 'paid' || status === 'completed') return 'teal'
+  return orderStatusTone(status)
+}
+
+/** 圆点 + 文字组合类名（配合内部 <i> 圆点使用） */
+export function orderDotClass(status: string): string {
+  const tone = orderDotTone(status)
+  if (tone === 'teal') return 'text-teal [&_i]:bg-teal'
+  if (tone === 'warn') return 'text-[#8a6a2f] [&_i]:bg-[#c4a574]'
+  if (tone === 'danger') return 'text-danger [&_i]:bg-danger'
+  return 'text-ink-mute [&_i]:bg-[var(--line-strong)]'
+}
+
+/** 列表里的紧凑状态文案 */
+export function orderCompactLabel(status: string): string {
+  if (status === 'deposit_paid') return '已付定金'
+  return orderStatusLabel(status)
+}

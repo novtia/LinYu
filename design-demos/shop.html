@@ -1,0 +1,753 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>领匣 · 商城首页 Demo</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230f6e5c'/></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+SC:wght@400;500;600;700;800&family=Sora:wght@400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@0.544.0/dist/umd/lucide.min.js"></script>
+  <style>
+    :root {
+      --ink: #14201c;
+      --ink-soft: #3d4f48;
+      --ink-mute: #6b7c74;
+      --paper: #e8f1ee;
+      --fog: #f4f8f6;
+      --line: rgba(20, 32, 28, 0.09);
+      --line-strong: rgba(20, 32, 28, 0.16);
+      --teal: #0f6e5c;
+      --teal-deep: #0a5245;
+      --mint: #7fd4b8;
+      --warn: #8a6a2f;
+      --warn-dot: #c4a574;
+      --danger: #b42318;
+      --font-display: "Syne", "Noto Sans SC", sans-serif;
+      --font-body: "Sora", "Noto Sans SC", sans-serif;
+      --font-mono: "JetBrains Mono", "Noto Sans SC", monospace;
+      --ease: cubic-bezier(.22, .8, .2, 1);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      font-family: var(--font-body);
+      color: var(--ink);
+      background-color: #eef5f2;
+      background-image:
+        radial-gradient(1200px 700px at 85% -10%, rgba(127, 212, 184, 0.35), transparent 55%),
+        radial-gradient(900px 600px at -5% 20%, rgba(196, 165, 116, 0.18), transparent 50%),
+        linear-gradient(180deg, #f7fbf9 0%, var(--fog) 42%, #eef5f2 100%);
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+      -webkit-font-smoothing: antialiased;
+    }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    a { color: inherit; text-decoration: none; }
+    .hidden { display: none !important; }
+    @keyframes riseIn { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+
+    .demo-bar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 80;
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      height: 48px; padding: 0 20px; background: #14201c; color: #eef8f4;
+    }
+    .demo-bar strong { font-family: var(--font-display); font-size: .95rem; letter-spacing: -.02em; }
+    .demo-bar span { color: rgba(238,248,244,.55); font-size: .78rem; }
+    .demo-bar .jump {
+      display: inline-flex; align-items: center; gap: 6px;
+      height: 30px; padding: 0 12px; border: 1px solid rgba(238,248,244,.25); border-radius: 8px;
+      background: transparent; color: rgba(238,248,244,.8); font-size: .78rem; font-weight: 600;
+    }
+    .demo-bar .jump:hover { border-color: var(--mint); color: #fff; }
+
+    .brand-mark {
+      width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
+      background: linear-gradient(135deg, var(--teal) 0%, #1a9a7c 60%, var(--mint) 100%);
+      position: relative; overflow: hidden;
+    }
+    .brand-mark::after {
+      content: ""; position: absolute; inset: 7px 7px 7px 11px;
+      border: 2px solid rgba(255,255,255,.92); border-left: 0; border-radius: 0 4px 4px 0;
+    }
+
+    /* ---------- 前台顶栏 ---------- */
+    .shop-top {
+      position: fixed; top: 48px; left: 0; right: 0; z-index: 70;
+      display: flex; align-items: center; gap: 30px;
+      height: 60px; padding: 0 max(20px, calc((100% - 1120px) / 2));
+      background: rgba(247,251,249,.82); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--line);
+    }
+    .shop-brand {
+      display: flex; align-items: center; gap: 10px;
+      font-family: var(--font-display); font-weight: 800; font-size: 1.08rem; letter-spacing: -.02em;
+    }
+    .shop-brand small { font-family: var(--font-mono); font-size: .62rem; color: var(--ink-mute); letter-spacing: .18em; margin-top: 3px; }
+    .shop-nav { display: flex; gap: 24px; }
+    .shop-nav a {
+      position: relative; height: 60px; display: inline-flex; align-items: center;
+      color: var(--ink-mute); font-size: .86rem; font-weight: 600;
+    }
+    .shop-nav a:hover { color: var(--ink); }
+    .shop-nav a.active { color: var(--ink); font-weight: 700; }
+    .shop-nav a.active::after {
+      content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--teal);
+    }
+    .shop-right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+    .cart-btn {
+      position: relative; width: 36px; height: 36px; border-radius: 10px;
+      border: 1px solid var(--line-strong); background: #fff; color: var(--ink-soft);
+      display: grid; place-items: center; transition: .2s var(--ease);
+    }
+    .cart-btn:hover { border-color: var(--teal); color: var(--teal); }
+    .cart-btn .dot-n {
+      position: absolute; top: -5px; right: -5px; min-width: 16px; height: 16px; padding: 0 4px;
+      border-radius: 99px; background: var(--teal); color: #fff;
+      font-size: .62rem; font-weight: 800; display: grid; place-items: center;
+      border: 2px solid #f7fbf9;
+    }
+    .avatar {
+      width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+      background: var(--ink); color: #fff; font-size: .8rem; font-weight: 700; cursor: pointer;
+    }
+
+    .wrap { width: min(1120px, calc(100% - 40px)); margin-inline: auto; }
+
+    /* ---------- 首屏 Hero ---------- */
+    .hero { padding: 148px 0 60px; }
+    .hero-inner { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); gap: 48px; align-items: center; }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-family: var(--font-mono); font-size: .7rem; letter-spacing: .16em; color: var(--teal);
+      font-weight: 700; margin-bottom: 18px;
+    }
+    .eyebrow::before { content: ""; width: 22px; height: 1.5px; background: var(--teal); }
+    .hero h1 {
+      margin: 0 0 18px; font-family: var(--font-display); font-weight: 800;
+      font-size: clamp(2.5rem, 5.4vw, 3.9rem); letter-spacing: -.05em; line-height: 1.08;
+    }
+    .hero h1 em { font-style: normal; color: var(--teal); }
+    .hero .sub { margin: 0 0 28px; color: var(--ink-mute); font-size: .96rem; line-height: 1.85; max-width: 42ch; }
+    .hero-acts { display: flex; gap: 12px; flex-wrap: wrap; }
+    .teal-btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      height: 48px; padding: 0 24px; border: 0; border-radius: 13px;
+      background: var(--teal); color: #fff; font-weight: 700; font-size: .94rem;
+      transition: .2s var(--ease);
+    }
+    .teal-btn:hover { background: var(--teal-deep); transform: translateY(-1px); }
+    .ghost-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      height: 48px; padding: 0 22px; border: 1px solid var(--line-strong); border-radius: 13px;
+      background: rgba(255,255,255,.6); color: var(--ink); font-weight: 600; font-size: .92rem;
+      transition: .2s var(--ease);
+    }
+    .ghost-btn:hover { border-color: var(--ink); background: #fff; }
+
+    .hero-stats {
+      display: flex; margin-top: 44px; border-top: 1px solid var(--line); padding-top: 20px;
+    }
+    .hero-stats .stat + .stat { margin-left: 28px; padding-left: 28px; border-left: 1px solid var(--line); }
+    .stat b {
+      display: block; font-family: var(--font-display); font-weight: 800;
+      font-size: 1.65rem; letter-spacing: -.04em; line-height: 1;
+    }
+    .stat b small { font-size: .85rem; color: var(--ink-mute); letter-spacing: 0; margin-left: 2px; }
+    .stat span { display: block; margin-top: 7px; color: var(--ink-mute); font-size: .74rem; }
+
+    /* Hero 封面叠放 */
+    .hero-art { position: relative; height: 380px; }
+    .hero-art::before {
+      content: ""; position: absolute; inset: 8% 4%; border-radius: 50%;
+      background: radial-gradient(closest-side, rgba(127,212,184,.4), transparent);
+      filter: blur(8px);
+    }
+    .hc {
+      position: absolute; width: 158px; height: 212px; border-radius: 16px;
+      display: grid; place-items: center; overflow: hidden;
+      box-shadow: 0 30px 50px -30px rgba(20,32,28,.5);
+      transition: transform .4s var(--ease);
+    }
+    .hc::after {
+      content: ""; position: absolute; inset: 0; opacity: .28;
+      background-image:
+        radial-gradient(circle at 20% 30%, #fff 1.5px, transparent 2px),
+        radial-gradient(circle at 70% 60%, #fff 1px, transparent 1.5px);
+      background-size: 28px 28px, 18px 18px;
+    }
+    .hc s {
+      position: relative; z-index: 1; text-decoration: none;
+      font-family: var(--font-display); font-weight: 800; font-size: 2.1rem; color: rgba(255,255,255,.95);
+    }
+    .hc .hc-tag {
+      position: absolute; left: 12px; bottom: 12px; z-index: 2;
+      border-radius: 7px; background: rgba(20,32,28,.72); backdrop-filter: blur(4px);
+      padding: 4px 8px; font-family: var(--font-mono); font-size: .62rem; color: #fff; letter-spacing: .06em;
+    }
+    .hc1 { left: 4%; top: 16%; transform: rotate(-9deg); z-index: 1; }
+    .hc2 { left: 33%; top: 4%; transform: rotate(2deg); z-index: 2; width: 176px; height: 236px; }
+    .hc3 { right: 6%; top: 22%; transform: rotate(10deg); z-index: 1; }
+    .hero-art:hover .hc1 { transform: rotate(-12deg) translateY(-6px); }
+    .hero-art:hover .hc2 { transform: rotate(0deg) translateY(-10px); }
+    .hero-art:hover .hc3 { transform: rotate(13deg) translateY(-6px); }
+
+    .p1 { background: linear-gradient(145deg, #0f6e5c, #1a9a7c 45%, #c4a574); }
+    .p2 { background: linear-gradient(145deg, #14201c, #2a4a40 50%, #7fd4b8); }
+    .p3 { background: linear-gradient(145deg, #8b6b3d, #c4a574 40%, #e8f1ee); }
+    .p4 { background: linear-gradient(145deg, #1d4f46, #0f6e5c, #56b896); }
+    .p5 { background: linear-gradient(145deg, #234038, #4d6b5f 55%, #d3e6df); }
+    .p6 { background: linear-gradient(145deg, #0a5245, #14201c 60%, #7fd4b8); }
+
+    /* ---------- 公告条 ---------- */
+    .notice {
+      display: flex; align-items: center; gap: 12px;
+      border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+      padding: 13px 0; font-size: .84rem; color: var(--ink-soft);
+      transition: background .2s var(--ease); cursor: pointer;
+    }
+    .notice:hover { background: rgba(232,241,238,.5); }
+    .notice i { color: var(--teal); flex-shrink: 0; }
+    .notice .n-label {
+      flex-shrink: 0; font-family: var(--font-mono); font-size: .66rem; font-weight: 700;
+      letter-spacing: .12em; color: var(--teal); border: 1px solid rgba(15,110,92,.35);
+      border-radius: 6px; padding: 3px 7px;
+    }
+    .notice p { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .notice time { margin-left: auto; flex-shrink: 0; font-family: var(--font-mono); font-size: .72rem; color: var(--ink-mute); }
+    .notice > i.arr { color: var(--ink-mute); }
+    .notice:hover > i.arr { color: var(--teal); }
+
+    /* ---------- 作品区 ---------- */
+    .shop { padding: 64px 0 30px; }
+    .shop-head {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+      border-bottom: 1px solid var(--line);
+    }
+    .shop-head h2 {
+      margin: 0; padding-bottom: 14px; font-family: var(--font-display);
+      font-size: clamp(1.5rem, 2.6vw, 1.9rem); letter-spacing: -.035em;
+    }
+    .shop-head h2 small { margin-left: 12px; font-family: var(--font-body); color: var(--ink-mute); font-size: .78rem; font-weight: 500; }
+    .tabs { display: flex; gap: 24px; overflow-x: auto; }
+    .tabs button {
+      position: relative; height: 46px; padding: 0 2px; border: 0; background: none; flex-shrink: 0;
+      color: var(--ink-mute); font-size: .86rem; font-weight: 600;
+      display: inline-flex; align-items: center; gap: 7px;
+    }
+    .tabs button:hover { color: var(--ink); }
+    .tabs button.on { color: var(--ink); }
+    .tabs button.on::after {
+      content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--ink);
+    }
+    .tabs .c { font-family: var(--font-mono); font-size: .7rem; opacity: .55; }
+
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; margin-top: 30px; }
+
+    .card {
+      display: flex; flex-direction: column; min-width: 0; overflow: hidden;
+      background: #fff; border: 1px solid var(--line); border-radius: 20px;
+      transition: transform .25s var(--ease), border-color .25s var(--ease), box-shadow .25s var(--ease);
+      animation: riseIn .55s var(--ease) both;
+    }
+    .card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(15,110,92,.4);
+      box-shadow: 0 22px 44px -32px rgba(20,32,28,.4);
+    }
+    .cover { position: relative; overflow: hidden; aspect-ratio: 16/10; }
+    .cover::after {
+      content: ""; position: absolute; inset: 0; opacity: .26;
+      background-image:
+        radial-gradient(circle at 20% 30%, #fff 1.5px, transparent 2px),
+        radial-gradient(circle at 70% 60%, #fff 1px, transparent 1.5px);
+      background-size: 28px 28px, 18px 18px;
+    }
+    .cover .c-tag {
+      position: absolute; left: 14px; bottom: 14px; z-index: 2;
+      border-radius: 8px; background: rgba(20,32,28,.72); backdrop-filter: blur(4px);
+      padding: 5px 10px; font-family: var(--font-mono); font-size: .66rem; color: #fff; letter-spacing: .08em;
+    }
+    .cover .c-big {
+      position: absolute; right: 16px; bottom: 6px; z-index: 2;
+      font-family: var(--font-display); font-weight: 800; font-size: 3.2rem;
+      color: rgba(255,255,255,.9); letter-spacing: -.04em; line-height: 1;
+    }
+    /* 约稿卡专用封面 */
+    .cover.commission-cover { background: linear-gradient(150deg, #14201c, #1d3a32 55%, #0f6e5c); }
+    .cover.commission-cover .c-ico {
+      position: absolute; inset: 0; display: grid; place-items: center; z-index: 2; color: var(--mint);
+    }
+
+    .card-body { display: flex; flex-direction: column; flex: 1; padding: 18px 20px 18px; }
+    .card-body h3 {
+      margin: 0; font-family: var(--font-display); font-size: 1.12rem; letter-spacing: -.02em;
+    }
+    .card-body h3 a:hover { color: var(--teal); }
+    .card-body .desc {
+      margin: 8px 0 0; flex: 1; color: var(--ink-soft); font-size: .86rem; line-height: 1.7;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .meta-row {
+      display: flex; align-items: center; gap: 8px; margin-top: 14px;
+      font-family: var(--font-mono); font-size: .68rem; color: var(--ink-mute); letter-spacing: .02em;
+    }
+    .meta-row .sep { width: 3px; height: 3px; border-radius: 50%; background: var(--line-strong); }
+    .card-foot {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      margin-top: 12px; padding-top: 14px; border-top: 1px solid var(--line);
+    }
+    .price { font-family: var(--font-display); font-weight: 800; font-size: 1.35rem; letter-spacing: -.035em; }
+    .price small { font-size: .78rem; color: var(--ink-mute); letter-spacing: 0; font-weight: 700; }
+    .acts { display: flex; gap: 8px; }
+    .btn-ghost {
+      display: inline-flex; align-items: center; height: 38px; padding: 0 14px;
+      border: 1px solid var(--line-strong); border-radius: 10px; background: transparent;
+      color: var(--ink-soft); font-size: .82rem; font-weight: 600; transition: .2s var(--ease);
+    }
+    .btn-ghost:hover { border-color: var(--teal); color: var(--teal); }
+    .btn-ink {
+      display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 16px;
+      border: 0; border-radius: 10px; background: var(--ink); color: #fff;
+      font-size: .84rem; font-weight: 700; transition: .2s var(--ease);
+    }
+    .btn-ink:hover { background: var(--teal-deep); }
+    .btn-teal {
+      display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 16px;
+      border: 0; border-radius: 10px; background: var(--teal); color: #fff;
+      font-size: .84rem; font-weight: 700; transition: .2s var(--ease);
+    }
+    .btn-teal:hover { background: var(--teal-deep); }
+
+    /* 主推卡：横版占两列 */
+    .card.feat { grid-column: span 2; flex-direction: row; }
+    .card.feat .cover { width: 46%; flex-shrink: 0; aspect-ratio: auto; }
+    .card.feat .card-body { padding: 24px 26px; }
+    .feat-eyebrow {
+      display: inline-flex; align-items: center; gap: 6px; margin-bottom: 12px;
+      font-family: var(--font-mono); font-size: .66rem; font-weight: 700; letter-spacing: .14em;
+      color: var(--warn);
+    }
+    .card.feat h3 { font-size: 1.55rem; letter-spacing: -.03em; }
+    .card.feat .desc { -webkit-line-clamp: 3; font-size: .9rem; }
+    .feat-badge {
+      position: absolute; top: 14px; left: 14px; z-index: 2;
+      display: inline-flex; align-items: center; gap: 5px;
+      border-radius: 8px; background: rgba(20,32,28,.72); backdrop-filter: blur(4px);
+      padding: 5px 10px; font-family: var(--font-mono); font-size: .66rem; color: var(--mint); letter-spacing: .08em;
+    }
+
+    .empty {
+      margin-top: 30px; padding: 56px 20px; text-align: center;
+      border: 1px dashed var(--line-strong); border-radius: 20px; color: var(--ink-mute); font-size: .88rem;
+    }
+
+    /* ---------- 约稿横幅 ---------- */
+    .commission { padding: 60px 0; }
+    .cm-panel {
+      position: relative; overflow: hidden; border-radius: 28px;
+      background: linear-gradient(140deg, #14201c 0%, #16332b 55%, #0f6e5c 130%);
+      color: #eef8f4; padding: 48px 52px;
+    }
+    .cm-panel::before {
+      content: ""; position: absolute; right: -120px; top: -120px; width: 420px; height: 420px;
+      border-radius: 50%; background: radial-gradient(closest-side, rgba(127,212,184,.22), transparent);
+    }
+    .cm-inner { position: relative; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: 48px; align-items: center; }
+    .cm-eyebrow {
+      margin: 0 0 14px; font-family: var(--font-mono); font-size: .68rem; font-weight: 700;
+      letter-spacing: .18em; color: var(--mint); display: flex; align-items: center; gap: 8px;
+    }
+    .cm-eyebrow::before { content: ""; width: 22px; height: 1.5px; background: var(--mint); }
+    .cm-panel h2 {
+      margin: 0 0 14px; font-family: var(--font-display); font-weight: 800;
+      font-size: clamp(1.8rem, 3.4vw, 2.5rem); letter-spacing: -.04em; line-height: 1.15;
+    }
+    .cm-sub { margin: 0; color: rgba(238,248,244,.62); font-size: .9rem; line-height: 1.85; max-width: 44ch; }
+    .cm-steps { list-style: none; display: flex; gap: 0; margin: 26px 0 0; padding: 0; }
+    .cm-steps li {
+      display: flex; align-items: center; gap: 8px; font-size: .78rem; font-weight: 600;
+      color: rgba(238,248,244,.78);
+    }
+    .cm-steps li i {
+      width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
+      border: 1px solid rgba(127,212,184,.5); color: var(--mint);
+      font-family: var(--font-mono); font-size: .62rem; font-style: normal; font-weight: 700;
+    }
+    .cm-steps li + li::before { content: ""; width: 26px; height: 1px; background: rgba(238,248,244,.25); margin: 0 10px; }
+    .cm-acts { display: flex; gap: 12px; margin-top: 30px; flex-wrap: wrap; }
+    .mint-btn {
+      display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 22px;
+      border: 0; border-radius: 12px; background: var(--mint); color: var(--ink);
+      font-weight: 800; font-size: .9rem; transition: .2s var(--ease);
+    }
+    .mint-btn:hover { background: #9be3cb; transform: translateY(-1px); }
+    .ghost-light {
+      display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 20px;
+      border: 1px solid rgba(238,248,244,.3); border-radius: 12px; background: transparent;
+      color: rgba(238,248,244,.85); font-weight: 600; font-size: .88rem; transition: .2s var(--ease);
+    }
+    .ghost-light:hover { border-color: var(--mint); color: #fff; }
+
+    .quote-card {
+      border: 1px solid rgba(238,248,244,.18); border-radius: 18px;
+      background: rgba(20,32,28,.35); backdrop-filter: blur(6px); padding: 22px 24px;
+    }
+    .q-mono {
+      margin: 0 0 6px; font-family: var(--font-mono); font-size: .66rem; font-weight: 700;
+      letter-spacing: .16em; color: var(--mint);
+    }
+    .q-row {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+      padding: 12px 0; border-bottom: 1px solid rgba(238,248,244,.12); font-size: .84rem;
+    }
+    .q-row:last-of-type { border-bottom: 0; }
+    .q-row span { color: rgba(238,248,244,.75); }
+    .q-row b { font-family: var(--font-mono); font-size: .92rem; font-weight: 700; letter-spacing: -.02em; }
+    .q-foot { margin-top: 12px; padding-top: 12px; border-top: 1px dashed rgba(238,248,244,.2); color: rgba(238,248,244,.5); font-size: .72rem; }
+
+    /* ---------- 保障条 ---------- */
+    .trust { padding: 10px 0 70px; }
+    .trust-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    }
+    .t-item { padding: 26px 28px 24px 0; }
+    .t-item + .t-item { border-left: 1px solid var(--line); padding-left: 28px; }
+    .t-item i {
+      width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center;
+      background: rgba(15,110,92,.1); color: var(--teal); margin-bottom: 14px;
+    }
+    .t-item b { display: block; font-size: .95rem; letter-spacing: -.01em; }
+    .t-item span { display: block; margin-top: 6px; color: var(--ink-mute); font-size: .8rem; line-height: 1.7; }
+
+    /* ---------- 页脚 ---------- */
+    footer { border-top: 1px solid var(--line); padding: 26px 0 30px; }
+    .foot-inner {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+      color: var(--ink-mute); font-size: .8rem;
+    }
+    .foot-inner .f-brand { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--ink-soft); }
+    .foot-inner .f-brand .brand-mark { width: 20px; height: 20px; border-radius: 6px; }
+    .foot-links { display: flex; gap: 20px; }
+    .foot-links a { cursor: pointer; }
+    .foot-links a:hover { color: var(--teal); }
+    .foot-inner .mono { font-family: var(--font-mono); font-size: .72rem; }
+
+    .toast {
+      position: fixed; right: 20px; bottom: 20px; z-index: 100;
+      padding: 10px 14px; background: var(--ink); color: #fff; font-size: .84rem; border-radius: 4px;
+      opacity: 0; transform: translateY(8px); transition: .25s var(--ease); pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: none; }
+
+    @media (max-width: 980px) {
+      .hero-inner { grid-template-columns: 1fr; gap: 20px; }
+      .hero-art { display: none; }
+      .grid { grid-template-columns: repeat(2, 1fr); }
+      .card.feat { grid-column: span 2; }
+      .cm-inner { grid-template-columns: 1fr; gap: 30px; }
+      .cm-panel { padding: 36px 30px; }
+    }
+    @media (max-width: 640px) {
+      .shop-nav { display: none; }
+      .hero { padding-top: 128px; }
+      .hero-stats .stat + .stat { margin-left: 18px; padding-left: 18px; }
+      .grid { grid-template-columns: 1fr; }
+      .card.feat { grid-column: span 1; flex-direction: column; }
+      .card.feat .cover { width: 100%; aspect-ratio: 16/10; }
+      .trust-grid { grid-template-columns: 1fr; }
+      .t-item + .t-item { border-left: 0; border-top: 1px solid var(--line); padding-left: 0; }
+      .cm-steps { flex-wrap: wrap; gap: 10px 0; }
+      .cm-steps li + li::before { width: 14px; margin: 0 8px; }
+      .demo-bar span, .demo-bar .jump { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-bar">
+    <strong>商城首页 Demo</strong>
+    <div style="display:flex;align-items:center;gap:12px">
+      <span>前台 · Hero + 作品书架 + 约稿横幅 + 保障条</span>
+      <a class="jump" href="orders.html">我的订单 Demo <i data-lucide="arrow-up-right"></i></a>
+    </div>
+  </div>
+
+  <header class="shop-top">
+    <a class="shop-brand" href="#" data-act="回到首页"><span class="brand-mark"></span>领匣<small>LINGXIA</small></a>
+    <nav class="shop-nav">
+      <a href="#" class="active">商城</a>
+      <a href="#commission">约稿</a>
+      <a href="orders.html">我的订单</a>
+    </nav>
+    <div class="shop-right">
+      <button class="cart-btn" type="button" data-act="打开购物车"><i data-lucide="shopping-bag"></i><span class="dot-n" id="cart-n">2</span></button>
+      <div class="avatar" data-act="打开个人中心">林</div>
+    </div>
+  </header>
+
+  <main>
+    <!-- 首屏 -->
+    <section class="hero">
+      <div class="wrap hero-inner">
+        <div>
+          <p class="eyebrow">DIGITAL FICTION STORE</p>
+          <h1>好故事，<br />装进<em>匣子</em>带走。</h1>
+          <p class="sub">完结长篇、短篇合集与定制约稿。支付成功即刻发货，发放内容仅你可见，随时在订单中重新下载。</p>
+          <div class="hero-acts">
+            <a class="teal-btn" href="#shop"><i data-lucide="book-open"></i>选购作品</a>
+            <a class="ghost-btn" href="#commission"><i data-lucide="pen-line"></i>定制约稿</a>
+          </div>
+          <div class="hero-stats">
+            <div class="stat"><b>24</b><span>在售作品</span></div>
+            <div class="stat"><b>130<small>+</small></b><span>约稿交付</span></div>
+            <div class="stat"><b>3.2<small>天</small></b><span>平均交稿</span></div>
+          </div>
+        </div>
+        <div class="hero-art" aria-hidden="true">
+          <i class="hc hc1 p2"><s>潮</s><span class="hc-tag">定制约稿</span></i>
+          <i class="hc hc2 p1"><s>深</s><span class="hc-tag">完结 · 长篇</span></i>
+          <i class="hc hc3 p5"><s>雨</s><span class="hc-tag">连载中</span></i>
+        </div>
+      </div>
+    </section>
+
+    <!-- 公告条 -->
+    <div class="wrap">
+      <a class="notice" data-act="查看公告详情">
+        <i data-lucide="megaphone"></i>
+        <span class="n-label">公告</span>
+        <p>本周新上架《玻璃海岸》全文精校版；约稿排期已开放至 9 月下旬，定金锁档。</p>
+        <time>09/07</time>
+        <i class="arr" data-lucide="arrow-up-right"></i>
+      </a>
+    </div>
+
+    <!-- 作品区 -->
+    <section class="shop" id="shop">
+      <div class="wrap">
+        <div class="shop-head">
+          <h2>全部作品<small id="shop-count">8 件在售</small></h2>
+          <div class="tabs" id="tabs">
+            <button type="button" class="on" data-f="all">全部 <span class="c">8</span></button>
+            <button type="button" data-f="long">长篇 <span class="c">3</span></button>
+            <button type="button" data-f="short">短篇 <span class="c">2</span></button>
+            <button type="button" data-f="extra">番外 <span class="c">1</span></button>
+            <button type="button" data-f="bundle">合集 <span class="c">1</span></button>
+            <button type="button" data-f="commission">约稿 <span class="c">1</span></button>
+          </div>
+        </div>
+        <div class="grid" id="grid"></div>
+        <div class="empty hidden" id="empty">该分类暂无作品，看看其他分类吧</div>
+      </div>
+    </section>
+
+    <!-- 约稿横幅 -->
+    <section class="commission" id="commission">
+      <div class="wrap">
+        <div class="cm-panel">
+          <div class="cm-inner">
+            <div>
+              <p class="cm-eyebrow">COMMISSION STUDIO</p>
+              <h2>想看的剧情，<br />我来写。</h2>
+              <p class="cm-sub">长篇定制、番外续写、CP 点梗，按字数计价。定金开工，交稿满意后付尾款，全程一对一对话沟通。</p>
+              <ol class="cm-steps">
+                <li><i>1</i>付定金</li>
+                <li><i>2</i>创作交稿</li>
+                <li><i>3</i>付尾款</li>
+                <li><i>4</i>收稿下载</li>
+              </ol>
+              <div class="cm-acts">
+                <a class="mint-btn" href="#" data-act="发起约稿"><i data-lucide="pen-line"></i>发起约稿</a>
+                <a class="ghost-light" href="#" data-act="了解约稿流程">了解流程</a>
+              </div>
+            </div>
+            <div class="quote-card">
+              <p class="q-mono">报价示例 · QUOTE</p>
+              <div class="q-row"><span>校园番外 · 8,000 字</span><b>¥512.00</b></div>
+              <div class="q-row"><span>修仙短篇 · 15,000 字</span><b>¥960.00</b></div>
+              <div class="q-row"><span>长篇定制 · 30,000 字</span><b>¥1,920.00</b></div>
+              <div class="q-foot">定金 50% 开工 · 平均 3.2 天交付</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 保障条 -->
+    <section class="trust">
+      <div class="wrap">
+        <div class="trust-grid">
+          <div class="t-item">
+            <i><i data-lucide="zap" style="width:17px;height:17px"></i></i>
+            <b>支付即发</b>
+            <span>支付成功立即发货，无需等待人工处理，凌晨下单也能秒收。</span>
+          </div>
+          <div class="t-item">
+            <i><i data-lucide="shield-check" style="width:17px;height:17px"></i></i>
+            <b>隐私保障</b>
+            <span>发放内容仅你本人可见，邮箱查询订单也不会泄露购买明细。</span>
+          </div>
+          <div class="t-item">
+            <i><i data-lucide="archive" style="width:17px;height:17px"></i></i>
+            <b>随时取阅</b>
+            <span>已购内容永久保存在「我的订单」，换设备也能重新下载。</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap foot-inner">
+      <span class="f-brand"><span class="brand-mark"></span>© 2026 领匣 Lingxia</span>
+      <div class="foot-links">
+        <a href="#shop">商品</a>
+        <a href="#commission">约稿</a>
+        <a href="orders.html">我的订单</a>
+        <a href="#top" data-act="回到顶部">回到顶部</a>
+      </div>
+      <span class="mono">xingx.shop</span>
+    </div>
+  </footer>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const $ = (id) => document.getElementById(id)
+    const toastEl = $("toast")
+    let toastTimer = 0
+    function toast(text) {
+      toastEl.textContent = text
+      toastEl.classList.add("show")
+      clearTimeout(toastTimer)
+      toastTimer = setTimeout(() => toastEl.classList.remove("show"), 2200)
+    }
+    function refreshIcons() {
+      if (window.lucide) lucide.createIcons({ attrs: { width: 15, height: 15, "stroke-width": 1.8 } })
+    }
+
+    /* ---------- 商品数据 ---------- */
+    const PRODUCTS = [
+      {
+        id: 1, feat: true, cat: "long", cover: "p1", ch: "深", tag: "完结 · 长篇",
+        name: "《深夜维修工》全文 + 独家番外",
+        desc: "42 万字完结长篇精校版，附 3 篇平台独家番外。凌晨三点的便利店、坏掉的扶梯和不愿下班的城市——本年度口碑之作。",
+        meta: ["TXT · EPUB", "42 万字", "已完结"], price: "¥38", unit: ".00",
+      },
+      {
+        id: 2, cat: "long", cover: "p5", ch: "雨", tag: "连载中",
+        name: "《雨夜租客》",
+        desc: "暴雨夜搬进来的租客从不打伞，房东太太在第七天发现了地下室的钥匙。周更连载，购买含全部更新。",
+        meta: ["EPUB", "周更", "含后续更新"], price: "¥28", unit: ".00",
+      },
+      {
+        id: 3, cat: "bundle", cover: "p6", ch: "都", tag: "合集",
+        name: "「都市人妻」合集包",
+        desc: "三册完结套装：婚姻围城里的一次次溃堤与自救。合集价立省 ¥34。",
+        meta: ["TXT · EPUB", "3 册"], price: "¥128", unit: ".00",
+      },
+      {
+        id: 4, cat: "short", cover: "p3", ch: "午", tag: "短篇",
+        name: "《午夜便利店》",
+        desc: "值夜班的店员发现，凌晨两点后的每一位顾客都不是人。一万字短平快，结尾反转。",
+        meta: ["TXT", "1.2 万字"], price: "¥22", unit: ".00",
+      },
+      {
+        id: 5, cat: "short", cover: "p2", ch: "纸", tag: "短篇合集",
+        name: "《纸船》短篇合集",
+        desc: "六则关于告别的小故事：纸船、站台、未寄出的信。适合睡前读一篇。",
+        meta: ["TXT · EPUB", "6 篇"], price: "¥45", unit: ".00",
+      },
+      {
+        id: 6, cat: "extra", cover: "p4", ch: "补", tag: "番外",
+        name: "《补课日记》番外",
+        desc: "正篇完结后的校园日常补完，含毕业后的糖。需先购正篇，亦可单独阅读。",
+        meta: ["EPUB", "8 千字"], price: "¥18", unit: ".00",
+      },
+      {
+        id: 7, cat: "long", cover: "p4", ch: "玻", tag: "完结 · 长篇",
+        name: "《玻璃海岸》全文精校版",
+        desc: "海滨海市，一场失踪案串起十年的沉默。新上架精校版，修正全部错章。",
+        meta: ["TXT · EPUB", "28 万字"], price: "¥32", unit: ".00",
+      },
+      {
+        id: 8, cat: "commission", commission: true, cover: "", ch: "", tag: "定制约稿",
+        name: "定制约稿 · 你来点梗我来写",
+        desc: "长篇定制、番外续写、CP 点梗，按字数计价。定金 50% 开工，交稿满意后付尾款。",
+        meta: ["按字计价", "全程对话沟通"], price: "¥64", unit: ".00/k",
+      },
+    ]
+
+    function cardHTML(p, i) {
+      const coverInner = p.commission
+        ? `<div class="cover commission-cover">
+             <span class="c-ico"><i data-lucide="pen-line" style="width:34px;height:34px"></i></span>
+             <span class="c-tag">${p.tag}</span>
+           </div>`
+        : `<div class="cover ${p.cover}">
+             ${p.feat ? '<span class="feat-badge"><i data-lucide="star" style="width:11px;height:11px"></i>本周主推</span>' : ""}
+             <span class="c-tag">${p.tag}</span>
+             <span class="c-big">${p.ch}</span>
+           </div>`
+      const acts = p.commission
+        ? `<a class="btn-teal" href="#" data-act="发起约稿"><i data-lucide="pen-line" style="width:13px;height:13px"></i>约稿</a>`
+        : `<a class="btn-ghost" href="#" data-act="查看详情：${p.name}">详情</a>
+           <button class="btn-ink" type="button" data-buy="${p.name}"><i data-lucide="plus" style="width:13px;height:13px"></i>加购</button>`
+      return `
+      <article class="card ${p.feat ? "feat" : ""}" style="animation-delay:${i * 50}ms">
+        ${coverInner}
+        <div class="card-body">
+          ${p.feat ? '<span class="feat-eyebrow">EDITOR&#39;S PICK</span>' : ""}
+          <h3><a href="#" data-act="查看详情：${p.name}">${p.name}</a></h3>
+          <p class="desc">${p.desc}</p>
+          <div class="meta-row">${p.meta.join('<span class="sep"></span>')}</div>
+          <div class="card-foot">
+            <span class="price">${p.price}<small>${p.unit}</small></span>
+            <div class="acts">${acts}</div>
+          </div>
+        </div>
+      </article>`
+    }
+
+    function renderGrid(filter) {
+      const list = PRODUCTS.filter((p) => filter === "all" || p.cat === filter)
+      $("grid").innerHTML = list.map(cardHTML).join("")
+      $("empty").classList.toggle("hidden", list.length > 0)
+      $("shop-count").textContent = `${list.length} 件在售`
+      refreshIcons()
+    }
+
+    /* ---------- 页签过滤 ---------- */
+    $("tabs").addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-f]")
+      if (!btn) return
+      document.querySelectorAll("#tabs [data-f]").forEach((b) => b.classList.toggle("on", b === btn))
+      renderGrid(btn.dataset.f)
+    })
+
+    /* ---------- 加购 ---------- */
+    let cartN = 2
+    document.addEventListener("click", (e) => {
+      const buy = e.target.closest("[data-buy]")
+      if (buy) {
+        cartN += 1
+        $("cart-n").textContent = cartN
+        toast(`已加入购物车：${buy.dataset.buy}`)
+        return
+      }
+      const act = e.target.closest("[data-act]")
+      if (act) {
+        e.preventDefault()
+        toast(`Demo：${act.dataset.act}`)
+      }
+    })
+
+    renderGrid("all")
+    refreshIcons()
+  </script>
+</body>
+</html>
