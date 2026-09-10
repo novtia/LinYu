@@ -243,6 +243,7 @@ export interface CommissionMessage {
   created_at: string
   recalled_at?: string | null
   can_recall?: boolean
+  order_status?: string | null
 }
 
 export interface CommissionThread {
@@ -270,12 +271,35 @@ export interface CommissionMessagesResult {
   messages: CommissionMessage[]
   unread: number
   has_more: boolean
+  order_status?: string | null
 }
 
 export interface CommissionThreadList {
   items: CommissionThread[]
   total: number
 }
+
+export type ChatSocketEvent =
+  | {
+      type: 'message'
+      thread_id: string
+      message_user: CommissionMessage
+      message_admin: CommissionMessage
+      thread: CommissionThread
+    }
+  | {
+      type: 'recall'
+      thread_id: string
+      messages_user: CommissionMessage[]
+      messages_admin: CommissionMessage[]
+      thread: CommissionThread
+    }
+  | {
+      type: 'read'
+      thread_id: string
+      role: 'user' | 'admin'
+      thread: CommissionThread
+    }
 
 export interface DashboardTrendPoint {
   date: string

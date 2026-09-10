@@ -1,5 +1,6 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
+import { ChatSocketProvider } from './context/ChatSocketContext'
 import { CartProvider } from './context/CartContext'
 import { PurchaseResultProvider } from './context/PurchaseResultContext'
 import { ToastProvider } from './context/ToastContext'
@@ -28,10 +29,11 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <CartProvider>
-          <ToastProvider>
-            <PurchaseResultProvider>
-              <Routes>
+        <ChatSocketProvider>
+          <CartProvider>
+            <ToastProvider>
+              <PurchaseResultProvider>
+                <Routes>
                 <Route element={<ShopLayout />}>
                   <Route path="/" element={<ShopPage />} />
                   <Route path="/product/:id" element={<ProductDetailPage />} />
@@ -58,10 +60,11 @@ export default function App() {
                   <Route path="system" element={<SystemPage />} />
                   <Route path="website" element={<WebsitePage />} />
                 </Route>
-              </Routes>
-            </PurchaseResultProvider>
-          </ToastProvider>
-        </CartProvider>
+                </Routes>
+              </PurchaseResultProvider>
+            </ToastProvider>
+          </CartProvider>
+        </ChatSocketProvider>
       </AuthProvider>
     </BrowserRouter>
   )

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
@@ -20,17 +20,20 @@ from ..schemas import (
     CommissionThreadOut,
 )
 from ..services.commission import is_commission_mode, split_price
+from ..services.chat_push import emit_message, emit_read, emit_recalls
 from ..services.commission_chat import (
     add_message,
     assert_commission_product,
     get_or_create_thread,
     message_out,
+    parse_delivery_body,
+    recall_unused_delivery_notices,
     refresh_thread_preview,
     thread_out,
     thread_out_many,
 )
 from ..services.files import image_media_type, is_image_name, resolve_stored_path, save_chat_upload, save_upload
-from ..services.fulfillment import add_commission_file
+from ..services.fulfillment import add_commission_file, delivery_files_for_meta, remove_commission_file_rows
 from ..services.ratelimit import limit_or_raise
 
 router = APIRouter(prefix="/api/commission", tags=["commission"])
@@ -64,6 +67,25 @@ def _mark_read(thread: CommissionThread, role: str) -> None:
         thread.unread_user = 0
 
 
+def _order_status(db: Session, thread: CommissionThread) -> Optional[str]:
+    if not thread.order_id:
+        return None
+    status = db.query(Order.status).filter(Order.id == thread.order_id).scalar()
+    return str(status) if status else None
+
+
+def _load_order_for_delivery(db: Session, order_id: str) -> Order:
+    order = (
+        db.query(Order)
+        .options(selectinload(Order.items), selectinload(Order.deliveries).selectinload(Delivery.files))
+        .filter(Order.id == order_id)
+        .first()
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    return order
+
+
 @router.get("/threads/mine", response_model=CommissionThreadListOut)
 def my_threads(
     user: User = Depends(get_current_user),
@@ -71,7 +93,7 @@ def my_threads(
 ):
     rows = (
         db.query(CommissionThread)
-        .filter(CommissionThread.user_id == user.id, CommissionThread.order_id.isnot(None))
+        .filter(CommissionThread.user_id == user.id)
         .order_by(CommissionThread.updated_at.desc())
         .all()
     )
@@ -177,13 +199,13 @@ def list_messages(
     has_more = False
     if after_id:
         rows = q.filter(CommissionMessage.id > after_id).order_by(CommissionMessage.id.asc()).limit(limit).all()
-        recall_since = now - timedelta(minutes=12)
         extra = (
             q.filter(
                 CommissionMessage.id <= after_id,
                 CommissionMessage.recalled_at.isnot(None),
-                CommissionMessage.recalled_at >= recall_since,
             )
+            .order_by(CommissionMessage.recalled_at.desc())
+            .limit(50)
             .all()
         )
         seen = {m.id for m in rows}
@@ -199,14 +221,19 @@ def list_messages(
         rows = q.order_by(CommissionMessage.id.desc()).limit(limit).all()
         has_more = len(rows) >= limit
         rows.reverse()
+    unread_before = int(thread.unread_admin if role == "admin" else thread.unread_user)
     if mark_read:
         _mark_read(thread, role)
         db.commit()
+        if unread_before:
+            emit_read(db, thread, role)
     unread = int(thread.unread_admin if role == "admin" else thread.unread_user)
+    status = _order_status(db, thread)
     return CommissionMessagesOut(
-        messages=[message_out(m, viewer_role=role, now=now) for m in rows],
+        messages=[message_out(m, viewer_role=role, now=now, order_status=status) for m in rows],
         unread=unread,
         has_more=has_more,
+        order_status=status,
     )
 
 
@@ -230,6 +257,7 @@ def send_message(
     msg = add_message(db, thread, role=role, msg_type=msg_type, body=text)
     db.commit()
     db.refresh(msg)
+    emit_message(db, thread, msg)
     return message_out(msg, viewer_role=role)
 
 
@@ -248,43 +276,48 @@ async def deliver_manuscript(
         raise HTTPException(status_code=403, detail="只有作者可以发货")
     if not thread.order_id:
         raise HTTPException(status_code=400, detail="该对话还没有订单，无法发货")
-    order = (
-        db.query(Order)
-        .options(selectinload(Order.items), selectinload(Order.deliveries).selectinload(Delivery.files))
-        .filter(Order.id == thread.order_id)
-        .first()
-    )
-    if not order:
-        raise HTTPException(status_code=404, detail="订单不存在")
+    order = _load_order_for_delivery(db, thread.order_id)
     if not is_commission_mode(getattr(order, "sale_mode", None)):
         raise HTTPException(status_code=400, detail="该订单不是约稿订单")
     if order.status == "completed":
-        raise HTTPException(status_code=400, detail="订单已完成，不能再发货")
+        raise HTTPException(status_code=400, detail="尾款已收，订单已锁定")
     if order.status not in ("deposit_paid", "awaiting_balance"):
         raise HTTPException(status_code=400, detail="请等待买家支付定金后再发货")
     uploads = [f for f in files if f and f.filename]
     if not uploads:
         raise HTTPException(status_code=400, detail="请选择稿件文件")
-    count = 0
+    file_ids: List[str] = []
+    file_names: List[str] = []
     for item in uploads:
         try:
             stored, original = await save_upload(item, order.id)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
-        add_commission_file(db, order, stored, original)
-        count += 1
+        row = add_commission_file(db, order, stored, original)
+        file_ids.append(row.id)
+        file_names.append(original)
     _, balance = split_price(order.total)
     msg = add_message(
         db,
         thread,
         role="admin",
         msg_type="delivery",
-        body=json.dumps({"order_id": order.id, "file_count": count, "balance_amount": balance}, ensure_ascii=False),
+        body=json.dumps(
+            {
+                "order_id": order.id,
+                "file_count": len(file_ids),
+                "balance_amount": balance,
+                "file_ids": file_ids,
+                "file_names": file_names,
+            },
+            ensure_ascii=False,
+        ),
     )
     db.commit()
     db.refresh(msg)
     db.refresh(order)
-    return message_out(msg, viewer_role=role)
+    emit_message(db, thread, msg)
+    return message_out(msg, viewer_role=role, order_status=order.status)
 
 
 @router.post("/threads/{thread_id}/messages/upload", response_model=CommissionMessageOut)
@@ -315,6 +348,7 @@ async def upload_message(
     )
     db.commit()
     db.refresh(msg)
+    emit_message(db, thread, msg)
     return message_out(msg, viewer_role=role)
 
 
@@ -336,14 +370,39 @@ def recall_message(
         raise HTTPException(status_code=400, detail="系统消息不能撤回")
     if msg.recalled_at:
         raise HTTPException(status_code=400, detail="消息已撤回")
-    if (datetime.utcnow() - (msg.created_at or datetime.utcnow())).total_seconds() > 600:
+    now = datetime.utcnow()
+    order_status = _order_status(db, thread)
+    if msg.type == "delivery":
+        if role != "admin":
+            raise HTTPException(status_code=403, detail="只有作者可以撤回发货")
+        if not thread.order_id:
+            raise HTTPException(status_code=400, detail="该对话没有订单")
+        order = _load_order_for_delivery(db, thread.order_id)
+        if order.status == "completed":
+            raise HTTPException(status_code=400, detail="尾款已收，订单已锁定，不能撤回发货")
+        meta = parse_delivery_body(msg.body)
+        remove_commission_file_rows(db, order, delivery_files_for_meta(order, meta))
+        msg.recalled_at = now
+        extra = recall_unused_delivery_notices(db, order, notify_user=False)
+        refresh_thread_preview(db, thread)
+        thread.updated_at = now
+        thread.unread_user = int(thread.unread_user or 0) + 1
+        db.commit()
+        db.refresh(msg)
+        db.refresh(order)
+        seen = {msg.id}
+        recalled = [msg] + [m for m in extra if m.id not in seen]
+        emit_recalls(db, thread, recalled)
+        return message_out(msg, viewer_role=role, order_status=order.status)
+    if (now - (msg.created_at or now)).total_seconds() > 600:
         raise HTTPException(status_code=400, detail="已超过 10 分钟，不能撤回")
-    msg.recalled_at = datetime.utcnow()
+    msg.recalled_at = now
     refresh_thread_preview(db, thread)
-    thread.updated_at = datetime.utcnow()
+    thread.updated_at = now
     db.commit()
     db.refresh(msg)
-    return message_out(msg, viewer_role=role)
+    emit_recalls(db, thread, [msg])
+    return message_out(msg, viewer_role=role, order_status=order_status)
 
 
 @router.get("/files/{message_id}")

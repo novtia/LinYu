@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 from ..models import Delivery, DeliveryFile, Order, Product, ProductFile
 from ..seed import load_settings
 from .delivery import random_id
+from .files import delete_stored
 
 
 def ensure_commission_delivery(db: Session, order: Order) -> Delivery:
@@ -46,6 +47,64 @@ def add_commission_file(db: Session, order: Order, stored: str, original: str) -
     if order.status == "deposit_paid":
         order.status = "awaiting_balance"
     return row
+
+
+def sync_commission_delivery_state(order: Order) -> None:
+    delivery = order.deliveries[0] if order.deliveries else None
+    remaining = list(delivery.files or []) if delivery else []
+    if delivery:
+        if remaining:
+            delivery.file_path = remaining[0].file_path
+            delivery.file_name = remaining[0].file_name
+        else:
+            delivery.file_path = None
+            delivery.file_name = None
+    if not remaining and order.status == "awaiting_balance":
+        order.status = "deposit_paid"
+
+
+def remove_commission_file_rows(db: Session, order: Order, rows: List[DeliveryFile]) -> int:
+    delivery = order.deliveries[0] if order.deliveries else None
+    if not delivery or not rows:
+        sync_commission_delivery_state(order)
+        return 0
+    seen: set[str] = set()
+    removed = 0
+    for row in rows:
+        if not row or row.id in seen:
+            continue
+        seen.add(row.id)
+        delete_stored(row.file_path)
+        if row in (delivery.files or []):
+            delivery.files.remove(row)
+        db.delete(row)
+        removed += 1
+    sync_commission_delivery_state(order)
+    return removed
+
+
+def delivery_files_for_meta(order: Order, meta: dict) -> List[DeliveryFile]:
+    delivery = order.deliveries[0] if order.deliveries else None
+    if not delivery:
+        return []
+    files = list(delivery.files or [])
+    ids = [str(x) for x in (meta.get("file_ids") or []) if x]
+    if ids:
+        idset = set(ids)
+        return [f for f in files if f.id in idset]
+    try:
+        count = int(meta.get("file_count") or 0)
+    except (TypeError, ValueError):
+        count = 0
+    if count <= 0:
+        return []
+    ordered = sorted(files, key=lambda f: (f.sort_order, f.id))
+    return ordered[:count]
+
+
+def remaining_commission_files(order: Order) -> List[DeliveryFile]:
+    delivery = order.deliveries[0] if order.deliveries else None
+    return list(delivery.files or []) if delivery else []
 
 
 def fulfill_order(

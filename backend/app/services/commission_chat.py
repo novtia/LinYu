@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -9,6 +10,7 @@ from ..models import CommissionMessage, CommissionThread, Order, OrderItem, Prod
 from ..schemas import CommissionMessageOut, CommissionThreadOut
 from ..services.commission import format_words, format_yuan_text, is_commission_mode, split_price
 from ..services.delivery import random_id
+from ..services.fulfillment import remaining_commission_files
 
 RECALL_SECONDS = 600
 PREVIEW_LEN = 48
@@ -165,19 +167,48 @@ def notify_deposit_paid(db: Session, order: Order) -> None:
         )
         .first()
     )
+    msg = None
     if not dup:
-        add_message(db, thread, role="system", msg_type="system", body=text)
+        msg = add_message(db, thread, role="system", msg_type="system", body=text)
     db.commit()
+    if msg:
+        from .chat_push import emit_message
+
+        emit_message(db, thread, msg)
 
 
-def can_recall(msg: CommissionMessage, role: str, now: Optional[datetime] = None) -> bool:
+def parse_delivery_body(body: str) -> dict:
+    try:
+        data = json.loads(body or "")
+        return data if isinstance(data, dict) else {}
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return {}
+
+
+def can_recall(
+    msg: CommissionMessage,
+    role: str,
+    now: Optional[datetime] = None,
+    *,
+    order_status: Optional[str] = None,
+) -> bool:
     now = now or datetime.utcnow()
-    if msg.recalled_at or msg.role == "system" or msg.type in ("system", "delivery") or msg.role != role:
+    if msg.recalled_at or msg.role == "system" or msg.type == "system":
+        return False
+    if msg.type == "delivery":
+        return role == "admin" and order_status != "completed"
+    if msg.role != role:
         return False
     return (now - (msg.created_at or now)).total_seconds() <= RECALL_SECONDS
 
 
-def message_out(msg: CommissionMessage, *, viewer_role: str, now: Optional[datetime] = None) -> CommissionMessageOut:
+def message_out(
+    msg: CommissionMessage,
+    *,
+    viewer_role: str,
+    now: Optional[datetime] = None,
+    order_status: Optional[str] = None,
+) -> CommissionMessageOut:
     now = now or datetime.utcnow()
     recalled = msg.recalled_at is not None
     delivery = msg.type == "delivery"
@@ -191,8 +222,36 @@ def message_out(msg: CommissionMessage, *, viewer_role: str, now: Optional[datet
         file_url=None if recalled or delivery or not msg.file_path else f"/api/commission/files/{msg.id}",
         created_at=msg.created_at,
         recalled_at=msg.recalled_at,
-        can_recall=can_recall(msg, viewer_role, now),
+        can_recall=can_recall(msg, viewer_role, now, order_status=order_status),
+        order_status=order_status,
     )
+
+
+def recall_unused_delivery_notices(db: Session, order: Order, *, notify_user: bool = False) -> list[CommissionMessage]:
+    """稿件被撤光后，把对话里残留的发货卡一并撤回。"""
+    if remaining_commission_files(order):
+        return []
+    thread = db.query(CommissionThread).filter(CommissionThread.order_id == order.id).first()
+    if not thread:
+        return []
+    now = datetime.utcnow()
+    rows = (
+        db.query(CommissionMessage)
+        .filter(
+            CommissionMessage.thread_id == thread.id,
+            CommissionMessage.type == "delivery",
+            CommissionMessage.recalled_at.is_(None),
+        )
+        .all()
+    )
+    for msg in rows:
+        msg.recalled_at = now
+    if rows:
+        refresh_thread_preview(db, thread)
+        thread.updated_at = now
+        if notify_user:
+            thread.unread_user = int(thread.unread_user or 0) + 1
+    return rows
 
 
 def _thread_out_from(

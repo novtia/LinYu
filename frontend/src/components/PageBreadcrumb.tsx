@@ -1,29 +1,24 @@
 import { Link } from 'react-router-dom'
+import { ChevronRight } from 'lucide-react'
 
 export type BreadcrumbItem = {
   label: string
   to?: string
 }
 
-export function PageBreadcrumb({ items }: { items: BreadcrumbItem[] }) {
+export function PageBreadcrumb({ items, className = 'mb-5' }: { items: BreadcrumbItem[]; className?: string }) {
   return (
-    <nav aria-label="面包屑" className="mb-6">
-      <ol className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[0.88rem]">
+    <nav aria-label="面包屑" className={className}>
+      <ol className="flex flex-wrap items-center gap-2 text-[0.8rem] text-ink-mute">
         {items.map((item, i) => {
           const last = i === items.length - 1
           return (
-            <li key={`${item.label}-${i}`} className="flex min-w-0 items-center gap-1.5">
-              {i > 0 && (
-                <span className="text-ink-mute/45 select-none" aria-hidden>
-                  /
-                </span>
-              )}
+            <li key={`${item.label}-${i}`} className="flex min-w-0 items-center gap-2">
+              {i > 0 && <ChevronRight className="h-3 w-3 shrink-0 opacity-50" strokeWidth={1.8} aria-hidden />}
               {last || !item.to ? (
-                <span className={`truncate ${last ? 'font-semibold text-ink' : 'text-ink-mute'}`}>
-                  {item.label}
-                </span>
+                <span className={`truncate ${last ? 'font-semibold text-ink' : ''}`}>{item.label}</span>
               ) : (
-                <Link to={item.to} className="truncate text-ink-mute transition hover:text-teal">
+                <Link to={item.to} className="truncate transition hover:text-teal">
                   {item.label}
                 </Link>
               )}

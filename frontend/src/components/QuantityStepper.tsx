@@ -28,7 +28,7 @@ export function QuantityStepper({
 
   return (
     <div
-      className={`inline-flex items-center overflow-hidden rounded-xl border border-[var(--line-strong)] bg-white ${
+      className={`inline-flex w-fit shrink-0 items-center overflow-hidden rounded-xl border border-[var(--line-strong)] bg-white ${
         disabled ? 'opacity-50' : ''
       }`}
       role="group"

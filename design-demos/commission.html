@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>领匣 · 约稿详情 Demo</title>
+  <title>领匣 · 定制约稿 Demo</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230f6e5c'/></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -63,6 +63,12 @@
       background: transparent; color: rgba(238,248,244,.8); font-size: .78rem; font-weight: 600;
     }
     .demo-bar .jump:hover { border-color: var(--mint); color: #fff; }
+    .seg { display: inline-flex; border: 1px solid rgba(238,248,244,.25); border-radius: 8px; overflow: hidden; }
+    .seg button {
+      height: 30px; padding: 0 12px; border: 0; background: transparent;
+      color: rgba(238,248,244,.6); font-size: .78rem; font-weight: 600;
+    }
+    .seg button.on { background: var(--mint); color: #14201c; }
 
     .brand-mark {
       width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
@@ -119,58 +125,81 @@
     .page { padding: 140px 0 80px; }
 
     /* ---------- 面包屑 ---------- */
-    .crumb { display: flex; align-items: center; gap: 8px; margin-bottom: 22px; font-size: .8rem; color: var(--ink-mute); flex-wrap: wrap; }
+    .crumb { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; font-size: .8rem; color: var(--ink-mute); flex-wrap: wrap; }
     .crumb a { cursor: pointer; transition: .2s; }
     .crumb a:hover { color: var(--teal); }
     .crumb i { opacity: .5; }
     .crumb b { color: var(--ink); font-weight: 600; }
 
-    /* ---------- 报价区 ---------- */
-    .quote-sec {
-      display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 46px;
+    /* ---------- 报价主卡 ---------- */
+    .hero-card {
+      display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
+      background: #fff; border: 1px solid var(--line); border-radius: 24px; overflow: hidden;
       animation: riseIn .5s var(--ease) both;
     }
-    .cm-cover {
-      position: relative; overflow: hidden; border-radius: 20px; aspect-ratio: 3/4;
+    .hero-cover {
+      position: relative; overflow: hidden; min-height: 560px;
       background: linear-gradient(150deg, #14201c, #1d3a32 55%, #0f6e5c);
-      border: 1px solid var(--line);
-      box-shadow: 0 26px 50px -36px rgba(20,32,28,.5);
     }
-    .cm-cover::after {
-      content: ""; position: absolute; inset: 0; opacity: .22;
+    .hero-cover::after {
+      content: ""; position: absolute; inset: 0; opacity: .26;
       background-image:
         radial-gradient(circle at 20% 30%, #fff 1.5px, transparent 2px),
         radial-gradient(circle at 70% 60%, #fff 1px, transparent 1.5px);
       background-size: 28px 28px, 18px 18px;
     }
-    .cm-cover .c-ico {
-      position: absolute; inset: 0; display: grid; place-items: center; z-index: 2;
-      color: var(--mint);
+    .hero-cover::before {
+      content: ""; position: absolute; left: -90px; bottom: -90px; width: 300px; height: 300px;
+      border-radius: 50%; background: radial-gradient(closest-side, rgba(127,212,184,.22), transparent);
     }
-    .cm-cover .c-serial {
-      position: absolute; top: 16px; left: 16px; z-index: 2;
-      font-family: var(--font-mono); font-size: .62rem; letter-spacing: .14em; color: rgba(255,255,255,.7);
+    .hero-cover .c-ico {
+      position: absolute; inset: 0; display: grid; place-items: center; z-index: 2; color: var(--mint);
     }
-    .cm-cover .c-tag {
-      position: absolute; left: 16px; bottom: 16px; z-index: 2;
+    .hero-cover .c-serial {
+      position: absolute; top: 18px; left: 18px; z-index: 2;
+      font-family: var(--font-mono); font-size: .64rem; letter-spacing: .14em; color: rgba(255,255,255,.75);
+    }
+    .hero-cover .c-sched {
+      position: absolute; top: 18px; right: 18px; z-index: 2;
+      display: inline-flex; align-items: center; gap: 6px;
+      border-radius: 99px; border: 1px solid rgba(127,212,184,.45);
+      padding: 5px 11px; font-family: var(--font-mono); font-size: .64rem; color: var(--mint); letter-spacing: .06em;
+    }
+    .hero-cover .c-sched i { width: 6px; height: 6px; border-radius: 50%; background: var(--mint); animation: pulse 1.8s var(--ease) infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+    .hero-cover .c-tag {
+      position: absolute; left: 18px; bottom: 18px; z-index: 2;
       border-radius: 8px; background: rgba(20,32,28,.72); backdrop-filter: blur(4px);
-      padding: 5px 10px; font-family: var(--font-mono); font-size: .66rem; color: var(--mint); letter-spacing: .08em;
+      padding: 6px 11px; font-family: var(--font-mono); font-size: .68rem; color: var(--mint); letter-spacing: .08em;
     }
+    .hero-cover .c-big {
+      position: absolute; right: 22px; bottom: 8px; z-index: 2;
+      font-family: var(--font-display); font-weight: 800; font-size: 5.2rem;
+      color: rgba(255,255,255,.92); letter-spacing: -.04em; line-height: 1;
+    }
+    .hero-cover .c-rate {
+      position: absolute; left: 18px; bottom: 64px; z-index: 2;
+      font-family: var(--font-display); font-weight: 800; font-size: 2.1rem; letter-spacing: -.04em;
+      color: #fff; line-height: 1;
+    }
+    .hero-cover .c-rate small { font-family: var(--font-mono); font-size: .7rem; color: rgba(255,255,255,.6); letter-spacing: .08em; margin-left: 5px; font-weight: 400; }
 
-    .quote { min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+    .buy { padding: 32px 34px 26px; display: flex; flex-direction: column; min-width: 0; }
     .eyebrow {
       display: inline-flex; align-items: center; gap: 8px; margin-bottom: 14px;
       font-family: var(--font-mono); font-size: .68rem; letter-spacing: .16em; color: var(--teal); font-weight: 700;
     }
     .eyebrow::before { content: ""; width: 20px; height: 1.5px; background: var(--teal); }
-    .quote h1 {
+    .buy h1 {
       margin: 0 0 10px; font-family: var(--font-display); font-weight: 800;
-      font-size: clamp(1.8rem, 3.4vw, 2.5rem); letter-spacing: -.045em; line-height: 1.15;
+      font-size: clamp(1.6rem, 2.8vw, 2.15rem); letter-spacing: -.04em; line-height: 1.2;
     }
-    .quote .sub { margin: 0; color: var(--ink-mute); font-size: .9rem; line-height: 1.8; max-width: 46ch; }
-
-    .rate { margin-top: 22px; font-family: var(--font-display); font-weight: 800; font-size: 3rem; letter-spacing: -.05em; line-height: 1; }
-    .rate small { font-size: 1.05rem; color: var(--ink-mute); letter-spacing: 0; font-weight: 700; margin-left: 3px; }
+    .buy .sub { margin: 0; color: var(--ink-mute); font-size: .88rem; line-height: 1.75; }
+    .meta-row {
+      display: flex; align-items: center; flex-wrap: wrap; gap: 9px; margin-top: 15px;
+      font-family: var(--font-mono); font-size: .7rem; color: var(--ink-mute); letter-spacing: .03em;
+    }
+    .meta-row .sep { width: 3px; height: 3px; border-radius: 50%; background: var(--line-strong); }
 
     /* 报价格子：发丝线四分 */
     .q-grid {
@@ -202,7 +231,7 @@
     .presets button.on { color: var(--teal); border-color: var(--teal); background: rgba(15,110,92,.07); }
 
     /* 支付方式 */
-    .f-label { display: block; margin: 20px 0 8px; font-size: .78rem; font-weight: 600; color: var(--ink-soft); letter-spacing: .04em; }
+    .f-label { display: block; margin: 18px 0 8px; font-size: .78rem; font-weight: 600; color: var(--ink-soft); letter-spacing: .04em; }
     .methods { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
     .m-card {
       position: relative; display: flex; align-items: center; gap: 9px; text-align: left;
@@ -223,14 +252,21 @@
     }
     .m-card.on .m-check { opacity: 1; transform: none; }
 
-    .quote-cta { display: flex; align-items: center; gap: 16px; margin-top: 22px; flex-wrap: wrap; }
+    .buy-acts { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; margin-top: 22px; }
+    .btn-line {
+      display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+      height: 50px; border: 1px solid var(--line-strong); border-radius: 13px; background: #fff;
+      color: var(--ink); font-weight: 700; font-size: .92rem; transition: .2s var(--ease);
+    }
+    .btn-line:hover { border-color: var(--ink); }
     .btn-teal {
       display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-      height: 52px; padding: 0 26px; border: 0; border-radius: 13px; background: var(--teal); color: #fff;
-      font-weight: 800; font-size: .98rem; transition: .2s var(--ease);
+      height: 50px; border: 0; border-radius: 13px; background: var(--teal); color: #fff;
+      font-weight: 800; font-size: .96rem; transition: .2s var(--ease);
     }
     .btn-teal:hover { background: var(--teal-deep); }
-    .cta-note { font-family: var(--font-mono); font-size: .74rem; color: var(--ink-mute); }
+    .pay-hint { margin: 10px 0 0; text-align: center; font-size: .74rem; color: var(--ink-mute); }
+    .pay-hint b { font-family: var(--font-mono); color: var(--ink-soft); }
 
     .checks { list-style: none; margin: 22px 0 0; padding: 16px 0 0; border-top: 1px solid var(--line); display: grid; gap: 9px; }
     .checks li { display: flex; align-items: center; gap: 9px; font-size: .8rem; color: var(--ink-soft); }
@@ -242,10 +278,9 @@
     /* ---------- 流程 ---------- */
     .flow4 {
       display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px;
-      margin-top: 52px; padding-top: 26px; border-top: 1px solid var(--line);
-      animation: riseIn .5s var(--ease) .06s both;
+      margin: 52px 0 0; padding: 26px 0 0; border-top: 1px solid var(--line);
+      list-style: none; animation: riseIn .5s var(--ease) .06s both;
     }
-    .flow4 li { list-style: none; }
     .flow4 .n {
       width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
       border: 1.5px solid var(--teal); color: var(--teal);
@@ -254,18 +289,19 @@
     .flow4 b { display: block; font-size: .9rem; letter-spacing: -.01em; }
     .flow4 span { display: block; margin-top: 5px; color: var(--ink-mute); font-size: .76rem; line-height: 1.65; }
 
-    /* ---------- 页签 ---------- */
-    .pane-sec { margin-top: 52px; animation: riseIn .5s var(--ease) .12s both; }
+    /* ---------- 下方：页签 + 侧栏 ---------- */
+    .below { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 48px; margin-top: 56px; }
+    .pane-sec { min-width: 0; animation: riseIn .5s var(--ease) .08s both; }
     .tabs { display: flex; gap: 26px; border-bottom: 1px solid var(--line); }
     .tabs button {
-      position: relative; height: 46px; padding: 0 2px; border: 0; background: none;
+      position: relative; height: 46px; padding: 0 2px; border: 0; background: none; flex-shrink: 0;
       color: var(--ink-mute); font-size: .9rem; font-weight: 600;
       display: inline-flex; align-items: center; gap: 7px;
     }
     .tabs button:hover { color: var(--ink); }
     .tabs button.on { color: var(--ink); }
     .tabs button.on::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--ink); }
-    .tabs .online { width: 7px; height: 7px; border-radius: 50%; background: #1a9a7c; }
+    .tabs .online { width: 7px; height: 7px; border-radius: 50%; background: #1a9a7c; animation: pulse 1.8s var(--ease) infinite; }
 
     /* 约稿说明 */
     .brief-stats {
@@ -274,7 +310,7 @@
     }
     .brief-stats small { display: block; margin-bottom: 6px; color: var(--ink-mute); font-size: .7rem; letter-spacing: .08em; }
     .brief-stats b { font-size: .95rem; font-weight: 700; }
-    .md { padding-top: 14px; color: var(--ink-soft); font-size: .93rem; line-height: 1.9; max-width: 720px; }
+    .md { padding-top: 14px; color: var(--ink-soft); font-size: .93rem; line-height: 1.9; }
     .md h3 {
       margin: 1.6em 0 .6em; font-family: var(--font-display); font-weight: 800;
       font-size: 1.12rem; letter-spacing: -.02em; color: var(--ink);
@@ -294,9 +330,7 @@
 
     /* 对话 mock */
     .talk { padding-top: 26px; }
-    .chat-card {
-      max-width: 720px; border: 1px solid var(--line); border-radius: 20px; background: #fff; overflow: hidden;
-    }
+    .chat-card { border: 1px solid var(--line); border-radius: 20px; background: #fff; overflow: hidden; }
     .chat-head {
       display: flex; align-items: center; gap: 11px; padding: 14px 18px;
       border-bottom: 1px solid var(--line);
@@ -312,14 +346,14 @@
       color: var(--teal); font-size: .74rem; font-weight: 700;
     }
     .chat-head .st-online i { width: 7px; height: 7px; border-radius: 50%; background: #1a9a7c; }
-    .chat-body { padding: 20px 18px; display: grid; gap: 14px; background: var(--fog); }
+    .chat-body { padding: 20px 18px; display: flex; flex-direction: column; gap: 14px; background: var(--fog); max-height: 480px; overflow-y: auto; }
     .msg { display: flex; gap: 9px; align-items: flex-end; max-width: 82%; }
     .msg .m-av {
       width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center;
       font-size: .72rem; font-weight: 800;
     }
     .msg.peer .m-av { background: linear-gradient(135deg, var(--teal), #1a9a7c); color: #fff; }
-    .msg.mine { justify-self: end; flex-direction: row-reverse; }
+    .msg.mine { align-self: flex-end; flex-direction: row-reverse; }
     .msg.mine .m-av { background: var(--ink); color: #fff; }
     .bubble {
       padding: 10px 13px; font-size: .85rem; line-height: 1.65; word-break: break-word;
@@ -338,23 +372,113 @@
     }
     .file-bubble b { display: block; font-size: .8rem; }
     .file-bubble small { display: block; margin-top: 2px; color: var(--ink-mute); font-size: .66rem; font-family: var(--font-mono); }
-    .sys-line { justify-self: center; font-size: .7rem; color: var(--ink-mute); display: flex; align-items: center; gap: 6px; }
-    .chat-input {
-      display: flex; gap: 10px; padding: 13px 14px; border-top: 1px solid var(--line); background: #fff;
+    .sys-line { align-self: center; font-size: .7rem; color: var(--ink-mute); display: flex; align-items: center; gap: 6px; }
+
+    /* 发货卡 mock：与真实尾款解锁卡一致 */
+    .dlv {
+      align-self: center; width: min(320px, 100%); text-align: center;
+      border: 1px solid var(--line); border-radius: 16px; background: #fff; padding: 16px 18px 14px;
     }
+    .dlv .d-ico {
+      width: 36px; height: 36px; margin: 0 auto 9px; border-radius: 11px;
+      background: rgba(15,110,92,.1); color: var(--teal); display: grid; place-items: center;
+    }
+    .dlv b { display: block; font-size: .9rem; }
+    .dlv p { margin: 6px 0 12px; color: var(--ink-mute); font-size: .76rem; line-height: 1.6; }
+    .dlv button {
+      width: 100%; height: 38px; border: 0; border-radius: 10px;
+      background: var(--teal); color: #fff; font-size: .84rem; font-weight: 700; transition: .2s var(--ease);
+    }
+    .dlv button:hover { background: var(--teal-deep); }
+
+    .chat-input {
+      display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--line); background: #fff;
+    }
+    .chat-input .tool {
+      width: 34px; height: 34px; border: 0; border-radius: 9px; background: transparent; flex-shrink: 0;
+      color: var(--ink-mute); display: grid; place-items: center; transition: .15s;
+    }
+    .chat-input .tool:hover { color: var(--teal); background: var(--fog); }
     .chat-input input {
       flex: 1; min-width: 0; height: 40px; border: 1px solid var(--line-strong); border-radius: 11px;
-      padding: 0 14px; outline: none; font-size: .86rem; background: var(--fog);
+      padding: 0 14px; outline: none; font-size: .86rem; background: var(--fog); transition: .2s;
     }
     .chat-input input:focus { border-color: var(--teal); background: #fff; }
-    .chat-input button {
-      height: 40px; padding: 0 18px; border: 0; border-radius: 11px;
+    .chat-input .send {
+      height: 40px; padding: 0 18px; border: 0; border-radius: 11px; flex-shrink: 0;
       background: var(--teal); color: #fff; font-weight: 700; font-size: .84rem;
-      display: inline-flex; align-items: center; gap: 6px;
+      display: inline-flex; align-items: center; gap: 6px; transition: .2s var(--ease);
     }
-    .chat-input button:hover { background: var(--teal-deep); }
+    .chat-input .send:hover { background: var(--teal-deep); }
 
-    footer { border-top: 1px solid var(--line); padding: 26px 0 30px; margin-top: 20px; }
+    /* ---------- 侧栏 ---------- */
+    .rail { animation: riseIn .5s var(--ease) .14s both; }
+    .rail h3 {
+      margin: 0 0 4px; padding-bottom: 12px; border-bottom: 1px solid var(--line);
+      font-size: .78rem; font-weight: 700; letter-spacing: .1em; color: var(--ink-soft);
+      display: flex; align-items: baseline; justify-content: space-between;
+    }
+    .rail h3 small { color: var(--ink-mute); font-weight: 500; letter-spacing: 0; font-size: .7rem; }
+
+    .quote-card {
+      border-radius: 18px; padding: 22px 22px 18px; position: relative; overflow: hidden;
+      background: linear-gradient(140deg, #14201c, #16332b 60%, #0f6e5c 130%);
+      color: #eef8f4;
+    }
+    .quote-card::before {
+      content: ""; position: absolute; right: -60px; top: -60px; width: 200px; height: 200px;
+      border-radius: 50%; background: radial-gradient(closest-side, rgba(127,212,184,.25), transparent);
+    }
+    .quote-card .q-mono { position: relative; margin: 0 0 6px; font-family: var(--font-mono); font-size: .64rem; font-weight: 700; letter-spacing: .16em; color: var(--mint); }
+    .q-row {
+      position: relative; display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+      padding: 11px 0; border-bottom: 1px solid rgba(238,248,244,.12); font-size: .84rem;
+    }
+    .q-row:last-of-type { border-bottom: 0; }
+    .q-row span { color: rgba(238,248,244,.75); }
+    .q-row b { font-family: var(--font-mono); font-size: .92rem; font-weight: 700; letter-spacing: -.02em; }
+    .q-foot { position: relative; margin-top: 12px; padding-top: 12px; border-top: 1px dashed rgba(238,248,244,.2); color: rgba(238,248,244,.5); font-size: .72rem; }
+
+    .rail-sec { margin-top: 30px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 14px; }
+    .tags span {
+      height: 28px; display: inline-flex; align-items: center; padding: 0 12px;
+      border: 1px solid var(--line-strong); border-radius: 99px;
+      color: var(--ink-soft); font-size: .76rem; font-weight: 600; cursor: pointer; transition: .18s var(--ease);
+    }
+    .tags span:hover { color: var(--teal); border-color: var(--teal); background: rgba(15,110,92,.06); }
+
+    .rel { list-style: none; margin: 0; padding: 0; }
+    .rel li {
+      display: flex; align-items: center; gap: 12px; padding: 13px 6px;
+      border-bottom: 1px solid var(--line); cursor: pointer; transition: background .15s;
+    }
+    .rel li:hover { background: rgba(232,241,238,.5); }
+    .rc-cov {
+      width: 44px; height: 58px; border-radius: 8px; flex-shrink: 0; position: relative; overflow: hidden;
+      display: grid; place-items: center;
+    }
+    .rc-cov::after {
+      content: ""; position: absolute; inset: 0; opacity: .28;
+      background-image: radial-gradient(circle at 20% 30%, #fff 1.5px, transparent 2px);
+      background-size: 20px 20px;
+    }
+    .rc-cov s { position: relative; z-index: 1; text-decoration: none; font-family: var(--font-display); font-weight: 800; color: rgba(255,255,255,.95); font-size: .95rem; }
+    .p2 { background: linear-gradient(145deg, #14201c, #2a4a40 50%, #7fd4b8); }
+    .p3 { background: linear-gradient(145deg, #8b6b3d, #c4a574 40%, #e8f1ee); }
+    .p4 { background: linear-gradient(145deg, #1d4f46, #0f6e5c, #56b896); }
+    .rel .r-meta { min-width: 0; }
+    .rel b { display: block; font-size: .86rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rel small { display: block; margin-top: 3px; color: var(--ink-mute); font-size: .7rem; font-family: var(--font-mono); }
+    .rel .r-st {
+      margin-left: auto; flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px;
+      font-size: .7rem; font-weight: 700; color: var(--teal);
+    }
+    .rel .r-st i { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); }
+    .rel .r-st.warn { color: var(--warn); } .rel .r-st.warn i { background: var(--warn-dot); }
+
+    /* ---------- 页脚 ---------- */
+    footer { border-top: 1px solid var(--line); padding: 26px 0 30px; margin-top: 30px; }
     .foot-inner {
       display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
       color: var(--ink-mute); font-size: .8rem;
@@ -374,19 +498,22 @@
     .toast.show { opacity: 1; transform: none; }
 
     @media (max-width: 980px) {
-      .quote-sec { grid-template-columns: 1fr; gap: 26px; }
-      .cm-cover { max-width: 260px; }
+      .hero-card { grid-template-columns: 1fr; }
+      .hero-cover { min-height: 0; aspect-ratio: 16/9; }
+      .below { grid-template-columns: 1fr; gap: 40px; }
       .flow4 { grid-template-columns: repeat(2, 1fr); }
       .brief-stats { grid-template-columns: repeat(2, 1fr); }
     }
     @media (max-width: 640px) {
       .shop-nav { display: none; }
       .page { padding-top: 126px; }
+      .buy { padding: 24px 20px 20px; }
       .q-grid { grid-template-columns: 1fr 1fr; }
       .q-cell + .q-cell { border-left: 0; padding-left: 0; }
       .q-cell:nth-child(even) { border-left: 1px solid var(--line); padding-left: 16px; }
       .q-cell:nth-child(n+3) { border-top: 1px solid var(--line); }
       .methods { grid-template-columns: 1fr; }
+      .buy-acts { grid-template-columns: 1fr; }
       .msg { max-width: 94%; }
       .demo-bar span, .demo-bar .jump { display: none; }
     }
@@ -394,9 +521,13 @@
 </head>
 <body>
   <div class="demo-bar">
-    <strong>约稿详情 Demo</strong>
+    <strong>定制约稿 Demo</strong>
     <div style="display:flex;align-items:center;gap:12px">
-      <span>前台 · 定制约稿 · 实时报价 + 双页签（说明 / 沟通）</span>
+      <span>前台 · 实时报价 + 双页签（说明 / 沟通）</span>
+      <div class="seg" id="pane-seg">
+        <button type="button" class="on" data-pane="brief">约稿说明</button>
+        <button type="button" data-pane="talk">与作者沟通</button>
+      </div>
       <a class="jump" href="product.html">商品详情 Demo <i data-lucide="arrow-up-right"></i></a>
     </div>
   </div>
@@ -422,20 +553,27 @@
         <b>你来点梗我来写</b>
       </nav>
 
-      <!-- 报价区 -->
-      <section class="quote-sec">
-        <div class="cm-cover">
+      <!-- 报价主卡 -->
+      <section class="hero-card">
+        <div class="hero-cover">
           <span class="c-serial">LX-COMMISSION-01</span>
-          <span class="c-ico"><i data-lucide="pen-line" style="width:44px;height:44px"></i></span>
-          <span class="c-tag">定制约稿</span>
+          <span class="c-sched"><i></i>排期开放 · 9 月下旬</span>
+          <span class="c-ico"><i data-lucide="pen-line" style="width:46px;height:46px"></i></span>
+          <span class="c-rate">¥64<small>.00 /k</small></span>
+          <span class="c-tag">定制约稿 · 按字计价</span>
+          <span class="c-big">约</span>
         </div>
 
-        <div class="quote">
+        <div class="buy">
           <p class="eyebrow">COMMISSION STUDIO</p>
           <h1>定制约稿 · 你来点梗我来写</h1>
           <p class="sub">先把人设、尺度和禁触说清楚，确认档期后付定金。大纲通过再按章交稿，全文交付后付尾款解锁。</p>
-
-          <div class="rate">¥64<small>.00 /k</small></div>
+          <div class="meta-row">
+            <span>按字计价</span><span class="sep"></span>
+            <span>一对一沟通</span><span class="sep"></span>
+            <span>按章交稿</span><span class="sep"></span>
+            <span>尾款后解锁</span>
+          </div>
 
           <dl class="q-grid">
             <div class="q-cell">
@@ -488,15 +626,16 @@
             </button>
           </div>
 
-          <div class="quote-cta">
-            <button class="btn-teal" type="button" data-pay-deposit><i data-lucide="pen-line" style="width:15px;height:15px"></i><span id="cta-label">支付定金 ¥640</span></button>
-            <span class="cta-note" id="cta-note">2 万字 · ¥64.00/k</span>
+          <div class="buy-acts">
+            <button class="btn-line" type="button" data-open-talk><i data-lucide="message-square" style="width:15px;height:15px"></i>先沟通看看</button>
+            <button class="btn-teal" type="button" data-pay-deposit><i data-lucide="pen-line" style="width:15px;height:15px"></i><span id="cta-label">支付定金 ¥640.00</span></button>
           </div>
+          <p class="pay-hint">将跳转 <b id="pay-hint-label">支付宝 · 官方直连</b> 完成支付 · <span id="cta-note">2 万字 · ¥64.00/k</span></p>
 
           <ul class="checks">
-            <li><i><i data-lucide="check" style="width:11px;height:11px"></i></i>须登录账号购买，沟通记录与订单绑定</li>
             <li><i><i data-lucide="check" style="width:11px;height:11px"></i></i>先付定金开工，交稿验收后再付尾款</li>
-            <li><i><i data-lucide="check" style="width:11px;height:11px"></i></i>尾款到账后解锁全文下载</li>
+            <li><i><i data-lucide="check" style="width:11px;height:11px"></i></i>大纲阶段不限次调整，每章含一次免费修改</li>
+            <li><i><i data-lucide="check" style="width:11px;height:11px"></i></i>尾款到账解锁 DOCX / EPUB 双格式下载</li>
           </ul>
         </div>
       </section>
@@ -509,91 +648,147 @@
         <li><span class="n">4</span><b>支付尾款</b><span>全文交付满意后付尾款，解锁下载</span></li>
       </ol>
 
-      <!-- 页签 -->
-      <section class="pane-sec">
-        <nav class="tabs" id="tabs">
-          <button type="button" class="on" data-pane="brief">约稿说明</button>
-          <button type="button" data-pane="talk">与作者沟通<span class="online"></span></button>
-        </nav>
+      <!-- 页签 + 侧栏 -->
+      <div class="below">
+        <section class="pane-sec">
+          <nav class="tabs" id="tabs">
+            <button type="button" class="on" data-pane="brief">约稿说明</button>
+            <button type="button" data-pane="talk">与作者沟通<span class="online"></span></button>
+          </nav>
 
-        <div id="pane-brief">
-          <div class="brief-stats">
-            <div><small>计价</small><b>¥64.00 / 千字</b></div>
-            <div><small>起步</small><b>1,000 字</b></div>
-            <div><small>交付</small><b>定金后按章交稿</b></div>
-            <div><small>解锁</small><b>尾款后下载全文</b></div>
-          </div>
-          <div class="md">
-            <h3>题材范围</h3>
-            <p>主攻现言、校园、都市、修仙与悬疑短篇；长篇定制需先沟通大纲与排期。不接违反平台规范的内容，边界请在沟通阶段说明。</p>
-            <h3>约稿流程</h3>
-            <ul>
-              <li><strong>沟通设定</strong>：在「与作者沟通」页签发送人设、 CP 、尺度与禁触点，确认档期与大纲。</li>
-              <li><strong>支付定金</strong>：按字数报价的 50% 支付定金，定金到账后开始动笔。</li>
-              <li><strong>按章交稿</strong>：万字以上默认分 2–3 次交稿，每次可在对话中提出一次免费修改。</li>
-              <li><strong>支付尾款</strong>：全文验收满意后支付尾款，解锁 <code>DOCX</code> 与 <code>EPUB</code> 双格式下载。</li>
-            </ul>
-            <h3>修改与退款</h3>
-            <p>大纲阶段可无限次调整；动笔后每章含一次免费修改。定金支付后 24 小时内可申请全额退款，进入创作后定金不退，可协商转让档期。</p>
-            <blockquote>定制内容为买断授权，署名权归作者所有；商用授权请单独沟通。</blockquote>
-          </div>
-        </div>
-
-        <div id="pane-talk" class="talk hidden">
-          <div class="chat-card">
-            <div class="chat-head">
-              <div class="c-av">匣</div>
-              <div><b>领匣作者</b><small>本商品的沟通，与订单分开</small></div>
-              <span class="st-online"><i></i>在线</span>
+          <div id="pane-brief">
+            <div class="brief-stats">
+              <div><small>计价</small><b>¥64.00 / 千字</b></div>
+              <div><small>起步</small><b>1,000 字</b></div>
+              <div><small>交付</small><b>定金后按章交稿</b></div>
+              <div><small>解锁</small><b>尾款后下载全文</b></div>
             </div>
-            <div class="chat-body">
-              <div class="msg peer">
-                <div class="m-av">匣</div>
-                <div>
-                  <div class="bubble">你好呀～想约什么题材？可以先把人设、尺度和雷点发我。</div>
-                  <span class="m-time">12:30</span>
-                </div>
+            <div class="md">
+              <h3>题材范围</h3>
+              <p>主攻现言、校园、都市、修仙与悬疑短篇；长篇定制需先沟通大纲与排期。不接违反平台规范的内容，边界请在沟通阶段说明。</p>
+              <h3>约稿流程</h3>
+              <ul>
+                <li><strong>沟通设定</strong>：在「与作者沟通」页签发送人设、CP、尺度与禁触点，确认档期与大纲。</li>
+                <li><strong>支付定金</strong>：按字数报价的 50% 支付定金，定金到账后开始动笔。</li>
+                <li><strong>按章交稿</strong>：万字以上默认分 2–3 次交稿，每次可在对话中提出一次免费修改。</li>
+                <li><strong>支付尾款</strong>：全文验收满意后支付尾款，解锁 <code>DOCX</code> 与 <code>EPUB</code> 双格式下载。</li>
+              </ul>
+              <h3>修改与退款</h3>
+              <p>大纲阶段可不限次调整；动笔后每章含一次免费修改。定金支付后 24 小时内可申请全额退款，进入创作后定金不退，可协商转让档期。</p>
+              <blockquote>定制内容为买断授权，署名权归作者所有；商用授权请单独沟通。</blockquote>
+            </div>
+          </div>
+
+          <div id="pane-talk" class="talk hidden">
+            <div class="chat-card">
+              <div class="chat-head">
+                <div class="c-av">匣</div>
+                <div><b>领匣作者</b><small>本商品的沟通，与订单分开</small></div>
+                <span class="st-online"><i></i>在线</span>
               </div>
-              <div class="msg mine">
-                <div class="m-av">林</div>
-                <div>
-                  <div class="bubble">想约一篇校园番外，8 千字左右，甜一点，不要刀。</div>
-                  <span class="m-time">12:32</span>
-                </div>
-              </div>
-              <div class="msg peer">
-                <div class="m-av">匣</div>
-                <div>
-                  <div class="bubble">收到！校园甜番外。我今晚先出大纲发你确认，没问题就可以拍定金啦。</div>
-                  <span class="m-time">12:33</span>
-                </div>
-              </div>
-              <div class="msg peer">
-                <div class="m-av">匣</div>
-                <div>
-                  <div class="file-bubble">
-                    <span class="fb-ico"><i data-lucide="file-text" style="width:16px;height:16px"></i></span>
-                    <span><b>大纲-校园番外.docx</b><small>12 KB</small></span>
+              <div class="chat-body" id="chat-body">
+                <div class="msg peer">
+                  <div class="m-av">匣</div>
+                  <div>
+                    <div class="bubble">你好呀～想约什么题材？可以先把人设、尺度和雷点发我。</div>
+                    <span class="m-time">12:30</span>
                   </div>
-                  <span class="m-time">21:05</span>
+                </div>
+                <div class="msg mine">
+                  <div class="m-av">林</div>
+                  <div>
+                    <div class="bubble">想约一篇校园番外，8 千字左右，甜一点，不要刀。</div>
+                    <span class="m-time">12:32</span>
+                  </div>
+                </div>
+                <div class="msg peer">
+                  <div class="m-av">匣</div>
+                  <div>
+                    <div class="bubble">收到！校园甜番外。我今晚先出大纲发你确认，没问题就可以拍定金咯。</div>
+                    <span class="m-time">12:33</span>
+                  </div>
+                </div>
+                <div class="msg peer">
+                  <div class="m-av">匣</div>
+                  <div>
+                    <div class="file-bubble">
+                      <span class="fb-ico"><i data-lucide="file-text" style="width:16px;height:16px"></i></span>
+                      <span><b>大纲-校园番外.docx</b><small>12 KB</small></span>
+                    </div>
+                    <span class="m-time">21:05</span>
+                  </div>
+                </div>
+                <div class="sys-line"><i data-lucide="pen-line" style="width:11px;height:11px"></i>大纲已发送，等待确认</div>
+                <div class="msg mine">
+                  <div class="m-av">林</div>
+                  <div>
+                    <div class="bubble">大纲 OK，就按这个写！</div>
+                    <span class="m-time">21:20</span>
+                  </div>
+                </div>
+                <div class="sys-line"><i data-lucide="package-check" style="width:11px;height:11px"></i>作者已发货，等待买家支付尾款</div>
+                <div class="dlv">
+                  <span class="d-ico"><i data-lucide="package-check" style="width:17px;height:17px"></i></span>
+                  <b>稿件已就绪</b>
+                  <p>校园番外 · 初稿 8,000 字<br />支付尾款 ¥256.00 后解锁下载</p>
+                  <button type="button" data-act="支付尾款 ¥256.00">支付尾款 ¥256.00</button>
                 </div>
               </div>
-              <div class="sys-line"><i data-lucide="pen-line" style="width:11px;height:11px"></i>大纲已发送，等待确认</div>
-              <div class="msg mine">
-                <div class="m-av">林</div>
-                <div>
-                  <div class="bubble">大纲 OK，就按这个写！</div>
-                  <span class="m-time">21:20</span>
-                </div>
+              <div class="chat-input">
+                <button class="tool" type="button" data-act="选择表情"><i data-lucide="smile" style="width:17px;height:17px"></i></button>
+                <button class="tool" type="button" data-act="发送图片"><i data-lucide="image" style="width:17px;height:17px"></i></button>
+                <button class="tool" type="button" data-act="发送文件"><i data-lucide="paperclip" style="width:17px;height:17px"></i></button>
+                <input placeholder="写人设、尺度、禁触…" id="chat-in" autocomplete="off" />
+                <button class="send" type="button" id="chat-send"><i data-lucide="send" style="width:14px;height:14px"></i>发送</button>
               </div>
-            </div>
-            <div class="chat-input">
-              <input placeholder="输入消息…（Demo 不可发送）" id="chat-in" />
-              <button type="button" data-act="发送消息"><i data-lucide="send" style="width:14px;height:14px"></i>发送</button>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+
+        <aside class="rail">
+          <div class="quote-card">
+            <p class="q-mono">报价示例 · QUOTE</p>
+            <div class="q-row"><span>校园番外 · 8,000 字</span><b>¥512.00</b></div>
+            <div class="q-row"><span>修仙短篇 · 15,000 字</span><b>¥960.00</b></div>
+            <div class="q-row"><span>长篇定制 · 30,000 字</span><b>¥1,920.00</b></div>
+            <div class="q-foot">定金 50% 开工 · 平均 3.2 天交付</div>
+          </div>
+
+          <div class="rail-sec">
+            <h3>题材范围<small>点梗前可参考</small></h3>
+            <div class="tags">
+              <span data-act="题材：现言">现言</span>
+              <span data-act="题材：校园">校园</span>
+              <span data-act="题材：都市">都市</span>
+              <span data-act="题材：修仙">修仙</span>
+              <span data-act="题材：悬疑短篇">悬疑短篇</span>
+              <span data-act="题材：CP 点梗">CP 点梗</span>
+              <span data-act="题材：番外续写">番外续写</span>
+            </div>
+          </div>
+
+          <div class="rail-sec">
+            <h3>最近交付<small>已获买家授权展示</small></h3>
+            <ul class="rel">
+              <li data-act="查看交付案例：《潮湿的信》">
+                <i class="rc-cov p2"><s>潮</s></i>
+                <span class="r-meta"><b>长篇定制《潮湿的信》</b><small>30,000 字 · 分三期交付</small></span>
+                <span class="r-st"><i></i>已交付</span>
+              </li>
+              <li data-act="查看交付案例：校园补课番外">
+                <i class="rc-cov p3"><s>补</s></i>
+                <span class="r-meta"><b>校园补课番外</b><small>8,000 字 · 3 天交付</small></span>
+                <span class="r-st warn"><i></i>待付尾款</span>
+              </li>
+              <li data-act="查看交付案例：修仙短篇">
+                <i class="rc-cov p4"><s>修</s></i>
+                <span class="r-meta"><b>修仙短篇 · 点梗</b><small>15,000 字 · 一次过稿</small></span>
+                <span class="r-st"><i></i>已交付</span>
+              </li>
+            </ul>
+          </div>
+        </aside>
+      </div>
     </div>
   </main>
 
@@ -648,7 +843,7 @@
       $("q-total").textContent = wordsOk ? fmt(total) : "—"
       $("q-deposit").textContent = wordsOk ? fmt(deposit) : "—"
       $("q-balance").textContent = wordsOk ? fmt(balance) : "—"
-      $("cta-label").textContent = wordsOk ? `支付定金 ${fmt(deposit)}` : `至少 ${MIN_WORDS.toLocaleString("zh-CN")} 字`
+      $("cta-label").textContent = wordsOk ? `支付定金 ${fmt(deposit)}` : `至少 ${MIN_WORDS.toLocaleString("zh-CN")} 字起约`
       $("cta-note").textContent = wordsOk ? `${fmtWords(words)} · ¥64.00/k` : `最少 ${MIN_WORDS.toLocaleString("zh-CN")} 字起约`
       $("words").classList.toggle("err", !wordsOk)
       document.querySelectorAll("#presets button").forEach((b) =>
@@ -674,24 +869,72 @@
     })
 
     /* ---------- 支付方式 ---------- */
+    const METHOD_LABEL = { m1: "支付宝 · 官方直连", m2: "支付宝 · 易支付", m3: "微信支付 · 易支付" }
     $("methods").addEventListener("click", (e) => {
       const m = e.target.closest("[data-m]")
       if (!m) return
       document.querySelectorAll("#methods [data-m]").forEach((b) => b.classList.toggle("on", b === m))
+      $("pay-hint-label").textContent = METHOD_LABEL[m.dataset.m]
     })
 
-    /* ---------- 页签 ---------- */
-    $("tabs").addEventListener("click", (e) => {
-      const btn = e.target.closest("[data-pane]")
-      if (!btn) return
-      document.querySelectorAll("#tabs [data-pane]").forEach((b) => b.classList.toggle("on", b === btn))
-      const talk = btn.dataset.pane === "talk"
+    /* ---------- 页签（与 demo-bar seg 联动） ---------- */
+    function setPane(pane) {
+      const talk = pane === "talk"
+      document.querySelectorAll("#tabs [data-pane]").forEach((b) => b.classList.toggle("on", b.dataset.pane === pane))
+      document.querySelectorAll("#pane-seg [data-pane]").forEach((b) => b.classList.toggle("on", b.dataset.pane === pane))
       $("pane-brief").classList.toggle("hidden", talk)
       $("pane-talk").classList.toggle("hidden", !talk)
       refreshIcons()
+    }
+    $("tabs").addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-pane]")
+      if (btn) setPane(btn.dataset.pane)
+    })
+    $("pane-seg").addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-pane]")
+      if (!btn) return
+      setPane(btn.dataset.pane)
+      if (btn.dataset.pane === "talk") $("pane-talk").scrollIntoView({ behavior: "smooth", block: "start" })
+    })
+    document.querySelector("[data-open-talk]").addEventListener("click", () => {
+      setPane("talk")
+      $("pane-talk").scrollIntoView({ behavior: "smooth", block: "start" })
     })
 
-    /* ---------- 交互 ---------- */
+    /* ---------- 对话 mock：可真实发送 ---------- */
+    let replied = false
+    function nowTime() {
+      const d = new Date()
+      return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
+    }
+    function appendMsg(kind, html) {
+      const body = $("chat-body")
+      const el = document.createElement("div")
+      el.className = `msg ${kind}`
+      el.innerHTML = `
+        <div class="m-av">${kind === "mine" ? "林" : "匣"}</div>
+        <div><div class="bubble"></div><span class="m-time">${nowTime()}</span></div>`
+      el.querySelector(".bubble").textContent = html
+      body.appendChild(el)
+      body.scrollTop = body.scrollHeight
+    }
+    function sendChat() {
+      const input = $("chat-in")
+      const text = input.value.trim()
+      if (!text) { toast("Demo：先输入消息"); return }
+      input.value = ""
+      appendMsg("mine", text)
+      if (!replied) {
+        replied = true
+        setTimeout(() => appendMsg("peer", "收到～我整理一下，今晚出大纲发你确认。"), 900)
+      }
+    }
+    $("chat-send").addEventListener("click", sendChat)
+    $("chat-in").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); sendChat() }
+    })
+
+    /* ---------- 其他交互 ---------- */
     document.addEventListener("click", (e) => {
       if (e.target.closest("[data-pay-deposit]")) {
         toast(wordsOk ? "Demo：跳转收银台支付定金" : `至少 ${MIN_WORDS.toLocaleString("zh-CN")} 字起约`)
@@ -703,15 +946,8 @@
         toast(`Demo：${act.dataset.act}`)
       }
     })
-    $("chat-in").addEventListener("keydown", (e) => {
-      if (e.key === "Enter") { e.preventDefault(); toast("Demo：发送消息") }
-    })
 
-    if (location.hash === "#pane=talk") {
-      document.querySelectorAll("#tabs [data-pane]").forEach((b) => b.classList.toggle("on", b.dataset.pane === "talk"))
-      $("pane-brief").classList.add("hidden")
-      $("pane-talk").classList.remove("hidden")
-    }
+    if (location.hash === "#pane=talk") setPane("talk")
     applyQuote()
     refreshIcons()
   </script>

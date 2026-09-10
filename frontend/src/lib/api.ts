@@ -26,10 +26,14 @@ export function setUnauthorizedHandler(handler: (() => void) | null) {
   unauthorizedHandler = handler
 }
 
-function handleUnauthorized(status: number) {
-  if (status !== 401) return
+export function notifyUnauthorized() {
   setToken(null)
   unauthorizedHandler?.()
+}
+
+function handleUnauthorized(status: number) {
+  if (status !== 401) return
+  notifyUnauthorized()
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {

@@ -13,10 +13,10 @@ from .models import User
 security = HTTPBearer(auto_error=False)
 
 
-def _resolve_user(creds: Optional[HTTPAuthorizationCredentials], db: Session) -> Optional[User]:
-    if not creds:
+def user_from_token(token: Optional[str], db: Session) -> Optional[User]:
+    if not token:
         return None
-    payload = decode_access_token(creds.credentials)
+    payload = decode_access_token(token)
     if not payload:
         return None
     user = db.query(User).filter(User.username == payload["sub"]).first()
@@ -26,6 +26,12 @@ def _resolve_user(creds: Optional[HTTPAuthorizationCredentials], db: Session) ->
     if int(payload.get("tv") or 0) != int(user.token_version or 0):
         return None
     return user
+
+
+def _resolve_user(creds: Optional[HTTPAuthorizationCredentials], db: Session) -> Optional[User]:
+    if not creds:
+        return None
+    return user_from_token(creds.credentials, db)
 
 
 def get_current_user(

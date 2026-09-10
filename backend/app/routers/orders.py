@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from ..database import get_db
 from ..deps import get_admin_user, get_current_user, get_optional_user
-from ..models import Delivery, DeliveryFile, Order, OrderItem, OrderPayment, Product, User
+from ..models import CommissionThread, Delivery, Order, OrderItem, OrderPayment, Product, User
 from ..payment.providers import get_provider
 from ..payment.service import get_channel, list_public_methods, parse_config
 from ..schemas import (
@@ -37,10 +37,11 @@ from ..services.commission import (
     is_commission_mode,
     split_price,
 )
-from ..services.commission_chat import ensure_thread_for_order, notify_deposit_paid
+from ..services.chat_push import emit_recalls
+from ..services.commission_chat import ensure_thread_for_order, notify_deposit_paid, recall_unused_delivery_notices
 from ..services.delivery import random_id
-from ..services.files import delete_stored, is_image_name, save_upload
-from ..services.fulfillment import add_commission_file, fulfill_order
+from ..services.files import is_image_name, save_upload
+from ..services.fulfillment import add_commission_file, fulfill_order, remove_commission_file_rows
 from ..services.mail import is_valid_email
 from ..services.ratelimit import rate_limit
 
@@ -730,7 +731,7 @@ async def upload_order_manuscript(
     if not is_commission_mode(order.sale_mode):
         raise HTTPException(status_code=400, detail="仅约稿订单可上传稿件")
     if order.status == "completed":
-        raise HTTPException(status_code=400, detail="订单已完成，不能再改稿件")
+        raise HTTPException(status_code=400, detail="尾款已收，订单已锁定")
     if order.status not in ("deposit_paid", "awaiting_balance"):
         raise HTTPException(status_code=400, detail="请等待买家支付定金后再交稿")
 
@@ -755,27 +756,49 @@ def delete_order_manuscript(
     if not is_commission_mode(order.sale_mode):
         raise HTTPException(status_code=400, detail="仅约稿订单可管理稿件")
     if order.status == "completed":
-        raise HTTPException(status_code=400, detail="订单已完成，不能再改稿件")
+        raise HTTPException(status_code=400, detail="尾款已收，订单已锁定")
     delivery = order.deliveries[0] if order.deliveries else None
     if not delivery:
         raise HTTPException(status_code=404, detail="文件不存在")
     row = next((f for f in delivery.files if f.id == file_id), None)
     if not row:
         raise HTTPException(status_code=404, detail="文件不存在")
-    delete_stored(row.file_path)
-    delivery.files.remove(row)
-    db.delete(row)
-    remaining = list(delivery.files or [])
-    if remaining:
-        delivery.file_path = remaining[0].file_path
-        delivery.file_name = remaining[0].file_name
-    else:
-        delivery.file_path = None
-        delivery.file_name = None
-        if order.status == "awaiting_balance":
-            order.status = "deposit_paid"
+    remove_commission_file_rows(db, order, [row])
+    recalled = recall_unused_delivery_notices(db, order, notify_user=True)
     db.commit()
+    if recalled:
+        thread = db.query(CommissionThread).filter(CommissionThread.order_id == order.id).first()
+        if thread:
+            emit_recalls(db, thread, recalled)
     return MessageOut(message="已删除稿件")
+
+
+@router.post("/{order_id}/recall-delivery", response_model=OrderOut)
+def recall_order_delivery(
+    order_id: str,
+    _: User = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    order = _get_order_or_404(db, order_id)
+    if not is_commission_mode(order.sale_mode):
+        raise HTTPException(status_code=400, detail="仅约稿订单可撤回发货")
+    if order.status == "completed":
+        raise HTTPException(status_code=400, detail="尾款已收，订单已锁定，不能撤回发货")
+    if order.status not in ("deposit_paid", "awaiting_balance"):
+        raise HTTPException(status_code=400, detail="当前订单无法撤回发货")
+    delivery = order.deliveries[0] if order.deliveries else None
+    rows = list(delivery.files or []) if delivery else []
+    if not rows:
+        raise HTTPException(status_code=400, detail="还没有发货")
+    remove_commission_file_rows(db, order, rows)
+    recalled = recall_unused_delivery_notices(db, order, notify_user=True)
+    db.commit()
+    db.refresh(order)
+    if recalled:
+        thread = db.query(CommissionThread).filter(CommissionThread.order_id == order.id).first()
+        if thread:
+            emit_recalls(db, thread, recalled)
+    return _order_out(order, include_payload=True, unlock_download=True)
 
 
 @router.get("", response_model=List[OrderOut])

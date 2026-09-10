@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
-import { FileText, Image as ImageIcon, Paperclip, Smile } from 'lucide-react'
+import { ArrowRight, FileText, Image as ImageIcon, Info, LockOpen, PackageCheck, Paperclip, Send, Smile } from 'lucide-react'
 import { ApiError, api } from '../lib/api'
-import { formatFileSize, formatYuan } from '../lib/commission'
+import { eventMessages, eventThread } from '../lib/chatSocket'
+import { formatFileSize } from '../lib/commission'
+import { useChatSocket } from '../context/ChatSocketContext'
+import { formatMoney } from '../lib/orderDisplay'
 import { useToast } from '../context/ToastContext'
 import { PaymentMethodPicker } from './PaymentMethodPicker'
 import type { CheckoutResult, CommissionMessage, CommissionMessagesResult, PublicPaymentMethod } from '../types'
@@ -27,8 +30,9 @@ type Props = {
   orderId?: string | null
   orderStatus?: string | null
   balanceAmount?: number | null
+  deliveryLabel?: string | null
   onUnread?: (unread: number, threadId: string) => void
-  onOrderChange?: (status: string) => void
+  onOrderChange?: (status: string, meta?: { shipped?: boolean; recalled?: boolean }) => void
 }
 
 function chatPath(path: string, viewer: 'user' | 'admin', extra?: Record<string, string | number>) {
@@ -75,7 +79,12 @@ function isFollow(curr: CommissionMessage, prev?: CommissionMessage) {
 
 function parseDelivery(body: string) {
   try {
-    const data = JSON.parse(body) as { order_id?: string; file_count?: number; balance_amount?: number }
+    const data = JSON.parse(body) as {
+      order_id?: string
+      file_count?: number
+      balance_amount?: number
+      file_names?: string[]
+    }
     return data && typeof data === 'object' ? data : {}
   } catch {
     return {}
@@ -88,27 +97,52 @@ function DeliveryCard({
   latest,
   orderId,
   balanceAmount,
+  fileCount,
+  fileNames,
+  label,
+  canRecall,
+  recalling,
   onUnlocked,
+  onRecall,
 }: {
   viewer: 'user' | 'admin'
   unlocked: boolean
   latest: boolean
   orderId: string
   balanceAmount: number
+  fileCount?: number
+  fileNames?: string[]
+  label?: string | null
+  canRecall?: boolean
+  recalling?: boolean
   onUnlocked: () => void
+  onRecall?: () => void
 }) {
   const { showToast } = useToast()
   const [method, setMethod] = useState<PublicPaymentMethod | null>(null)
   const [paying, setPaying] = useState(false)
+  const orderHref = viewer === 'admin' ? `/admin/orders/${encodeURIComponent(orderId)}` : `/orders/${encodeURIComponent(orderId)}`
+  const filesHint = fileNames?.length ? fileNames.join('、') : fileCount ? `${fileCount} 个文件` : ''
+  const hint = [label, filesHint].filter(Boolean).join(' · ')
+
+  const recallBtn =
+    canRecall && onRecall ? (
+      <button type="button" className="d-recall" disabled={recalling} onClick={onRecall}>
+        {recalling ? '撤回中…' : '撤回发货'}
+      </button>
+    ) : null
 
   if (unlocked) {
     return (
-      <div className="flex justify-center py-1">
-        <Link
-          to={viewer === 'admin' ? `/admin/orders/${encodeURIComponent(orderId)}` : `/orders/${encodeURIComponent(orderId)}`}
-          className="bg-teal px-3 py-1 text-[0.82rem] font-extrabold text-white"
-        >
-          解锁
+      <div className="cm-dlv">
+        <span className="d-ico">
+          <LockOpen className="h-[17px] w-[17px]" strokeWidth={1.8} />
+        </span>
+        <b>稿件已解锁</b>
+        <p>{hint || '可在订单中下载全文'}</p>
+        <Link to={orderHref} className="d-open">
+          查看订单下载
+          <ArrowRight className="h-[13px] w-[13px]" strokeWidth={1.8} />
         </Link>
       </div>
     )
@@ -116,9 +150,13 @@ function DeliveryCard({
 
   if (viewer === 'admin' || !latest) {
     return (
-      <div className="mx-auto w-full max-w-[22rem] border border-[var(--line)] bg-fog px-4 py-3 text-center">
-        <div className="text-[0.88rem] font-bold">稿件已发货</div>
-        <p className="mt-1 text-[0.76rem] text-ink-mute">买家支付尾款后解锁</p>
+      <div className="cm-dlv">
+        <span className="d-ico">
+          <PackageCheck className="h-[17px] w-[17px]" strokeWidth={1.8} />
+        </span>
+        <b>稿件已发货</b>
+        <p>{hint || '买家支付尾款后解锁'}</p>
+        {recallBtn}
       </div>
     )
   }
@@ -149,17 +187,19 @@ function DeliveryCard({
   }
 
   return (
-    <div className="mx-auto w-full max-w-[22rem] border border-[var(--line)] bg-fog px-4 py-3">
-      <div className="text-[0.88rem] font-bold">稿件已就绪</div>
-      <p className="mb-3 mt-1 text-[0.76rem] text-ink-mute">支付尾款 {formatYuan(balanceAmount)} 后解锁</p>
-      <PaymentMethodPicker className="mb-3" value={method?.id || null} onChange={setMethod} />
-      <button
-        type="button"
-        disabled={paying}
-        className="h-10 w-full bg-teal text-[0.88rem] font-bold text-white hover:bg-teal-deep disabled:opacity-60"
-        onClick={pay}
-      >
-        {paying ? '跳转支付中…' : `支付尾款 ${formatYuan(balanceAmount)}`}
+    <div className="cm-dlv">
+      <span className="d-ico">
+        <PackageCheck className="h-[17px] w-[17px]" strokeWidth={1.8} />
+      </span>
+      <b>稿件已就绪</b>
+      <p>
+        {hint ? `${hint}` : '稿件已交付'}
+        <br />
+        支付尾款 {formatMoney(balanceAmount)} 后解锁下载
+      </p>
+      <PaymentMethodPicker className="mb-3 text-left" value={method?.id || null} onChange={setMethod} />
+      <button type="button" disabled={paying} className="d-pay" onClick={pay}>
+        {paying ? '跳转支付中…' : `支付尾款 ${formatMoney(balanceAmount)}`}
       </button>
     </div>
   )
@@ -208,10 +248,12 @@ export function CommissionChat({
   orderId,
   orderStatus,
   balanceAmount,
+  deliveryLabel,
   onUnread,
   onOrderChange,
 }: Props) {
   const { showToast } = useToast()
+  const { connected, subscribe } = useChatSocket()
   const [messages, setMessages] = useState<CommissionMessage[]>([])
   const [hasMore, setHasMore] = useState(false)
   const [text, setText] = useState('')
@@ -219,6 +261,8 @@ export function CommissionChat({
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [sending, setSending] = useState(false)
   const [shipping, setShipping] = useState(false)
+  const [recallingId, setRecallingId] = useState<number | null>(null)
+  const [shipDraft, setShipDraft] = useState<PendingFile[]>([])
   const [dragover, setDragover] = useState(false)
   const [now, setNow] = useState(Date.now())
   const [lightbox, setLightbox] = useState<string | null>(null)
@@ -231,6 +275,8 @@ export function CommissionChat({
   const shipRef = useRef<HTMLInputElement>(null)
   const onOrderChangeRef = useRef(onOrderChange)
   onOrderChangeRef.current = onOrderChange
+  const localStatusRef = useRef(localStatus)
+  localStatusRef.current = localStatus
   const emptyStreak = useRef(0)
   const lastId = useRef(0)
   const readyRef = useRef(false)
@@ -247,6 +293,30 @@ export function CommissionChat({
   useEffect(() => {
     setLocalStatus(orderStatus || '')
   }, [orderStatus, threadId])
+
+  const prevOrderStatus = useRef(orderStatus)
+  useEffect(() => {
+    prevOrderStatus.current = orderStatus
+  }, [threadId])
+  useEffect(() => {
+    if (prevOrderStatus.current === 'awaiting_balance' && orderStatus === 'deposit_paid') {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.type === 'delivery' && !m.recalled_at
+            ? { ...m, recalled_at: new Date().toISOString(), can_recall: false, body: '' }
+            : m,
+        ),
+      )
+    }
+    prevOrderStatus.current = orderStatus
+  }, [orderStatus])
+
+  useEffect(() => {
+    setShipDraft((prev) => {
+      prev.forEach((p) => p.preview && URL.revokeObjectURL(p.preview))
+      return []
+    })
+  }, [threadId])
 
   useEffect(() => {
     const onVis = () => setVisible(document.visibilityState === 'visible')
@@ -286,6 +356,10 @@ export function CommissionChat({
         readyRef.current = true
         onUnreadRef.current?.(res.unread, threadId)
         requestAnimationFrame(() => scrollBottom(true))
+        if (res.order_status) {
+          setLocalStatus(res.order_status)
+          localStatusRef.current = res.order_status
+        }
       })
       .catch(() => {
         if (alive) {
@@ -300,6 +374,85 @@ export function CommissionChat({
 
   useEffect(() => {
     if (!threadId) return
+    const unreadOf = (thread: { unread_admin: number; unread_user: number }) =>
+      viewer === 'admin' ? thread.unread_admin : thread.unread_user
+
+    return subscribe((event) => {
+      if (!('thread_id' in event) || event.thread_id !== threadId) return
+      const incoming = eventMessages(event, viewer)
+      if (incoming.length) {
+        setMessages((prev) => {
+          const next = mergeMessages(prev, incoming)
+          lastId.current = next.at(-1)?.id || lastId.current
+          return next
+        })
+        requestAnimationFrame(() => scrollBottom())
+      }
+      const thread = eventThread(event)
+      if (thread?.order_status && thread.order_status !== localStatusRef.current) {
+        localStatusRef.current = thread.order_status
+        setLocalStatus(thread.order_status)
+        const shipped = incoming.some((m) => m.type === 'delivery' && !m.recalled_at)
+        const recalled = event.type === 'recall' && incoming.some((m) => m.type === 'delivery')
+        onOrderChangeRef.current?.(thread.order_status, { shipped, recalled })
+      }
+      if (thread) {
+        if (focused()) {
+          onUnreadRef.current?.(0, threadId)
+          if (event.type === 'message') {
+            const mine = incoming.some((m) => isMine(m, viewer))
+            if (!mine) {
+              api
+                .get<CommissionMessagesResult>(
+                  chatPath(`/api/commission/threads/${threadId}/messages`, viewer, {
+                    mark_read: 1,
+                    ...(lastId.current ? { after_id: lastId.current } : {}),
+                  }),
+                )
+                .catch(() => {})
+            }
+          }
+        } else {
+          onUnreadRef.current?.(unreadOf(thread), threadId)
+        }
+      }
+    })
+  }, [threadId, viewer, subscribe, scrollBottom])
+
+  useEffect(() => {
+    if (!threadId || !connected || !readyRef.current || !lastId.current) return
+    let alive = true
+    api
+      .get<CommissionMessagesResult>(
+        chatPath(`/api/commission/threads/${threadId}/messages`, viewer, {
+          mark_read: focused() ? 1 : 0,
+          after_id: lastId.current,
+        }),
+      )
+      .then((res) => {
+        if (!alive) return
+        onUnreadRef.current?.(res.unread, threadId)
+        if (res.order_status && res.order_status !== localStatusRef.current) {
+          localStatusRef.current = res.order_status
+          setLocalStatus(res.order_status)
+          onOrderChangeRef.current?.(res.order_status)
+        }
+        if (!res.messages.length) return
+        setMessages((prev) => {
+          const next = mergeMessages(prev, res.messages)
+          lastId.current = next.at(-1)?.id || lastId.current
+          return next
+        })
+        requestAnimationFrame(() => scrollBottom())
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [connected, threadId, viewer, scrollBottom])
+
+  useEffect(() => {
+    if (!threadId || connected) return
     let timer = 0
     let stopped = false
 
@@ -314,6 +467,11 @@ export function CommissionChat({
           )
           if (stopped) return
           onUnreadRef.current?.(res.unread, threadId)
+          if (res.order_status && res.order_status !== localStatusRef.current) {
+            localStatusRef.current = res.order_status
+            setLocalStatus(res.order_status)
+            onOrderChangeRef.current?.(res.order_status)
+          }
           if (res.messages.length) {
             emptyStreak.current = 0
             setMessages((prev) => {
@@ -344,7 +502,7 @@ export function CommissionChat({
       window.clearTimeout(timer)
       document.removeEventListener('visibilitychange', onVis)
     }
-  }, [threadId, viewer, scrollBottom])
+  }, [threadId, viewer, connected, scrollBottom])
 
   useEffect(() => {
     if (!threadId || !active || !visible || !readyRef.current) return
@@ -417,6 +575,42 @@ export function CommissionChat({
     })
   }
 
+  function applyStatus(status?: string | null, meta?: { shipped?: boolean; recalled?: boolean }) {
+    if (!status) return
+    localStatusRef.current = status
+    setLocalStatus(status)
+    onOrderChangeRef.current?.(status, meta)
+  }
+
+  function openShipPreview(files: FileList | File[]) {
+    const next: PendingFile[] = []
+    for (const file of Array.from(files)) {
+      const item: PendingFile = { id: `${file.name}-${file.size}-${Math.random()}`, file }
+      if (file.type.startsWith('image/')) item.preview = URL.createObjectURL(file)
+      next.push(item)
+    }
+    if (!next.length) return
+    setShipDraft((prev) => {
+      prev.forEach((p) => p.preview && URL.revokeObjectURL(p.preview))
+      return next
+    })
+  }
+
+  function closeShipPreview() {
+    setShipDraft((prev) => {
+      prev.forEach((p) => p.preview && URL.revokeObjectURL(p.preview))
+      return []
+    })
+  }
+
+  function dropShipDraft(id: string) {
+    setShipDraft((prev) => {
+      const hit = prev.find((p) => p.id === id)
+      if (hit?.preview) URL.revokeObjectURL(hit.preview)
+      return prev.filter((p) => p.id !== id)
+    })
+  }
+
   async function send() {
     if (!threadId || sending) return
     const body = text.trim()
@@ -473,7 +667,8 @@ export function CommissionChat({
         return next
       })
       setLocalStatus('awaiting_balance')
-      onOrderChangeRef.current?.('awaiting_balance')
+      applyStatus(created.order_status || 'awaiting_balance', { shipped: true })
+      closeShipPreview()
       showToast('已发货，等待买家支付尾款')
       requestAnimationFrame(() => scrollBottom(true))
     } catch (e) {
@@ -483,21 +678,41 @@ export function CommissionChat({
     }
   }
 
-  async function recall(id: number) {
+  async function recall(id: number, isDelivery = false) {
+    if (isDelivery && !window.confirm('撤回这次发货？稿件会从订单中移除，买家侧通知会消失。付尾款前可随时撤回。')) return
+    setRecallingId(id)
     try {
       const updated = await api.post<CommissionMessage>(chatPath(`/api/commission/messages/${id}/recall`, viewer))
-      setMessages((prev) => prev.map((m) => (m.id === id ? updated : m)))
-      showToast('已撤回')
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id === id) return updated
+          if (isDelivery && updated.order_status === 'deposit_paid' && m.type === 'delivery' && !m.recalled_at) {
+            return { ...m, recalled_at: updated.recalled_at || new Date().toISOString(), can_recall: false, body: '' }
+          }
+          return m
+        }),
+      )
+      if (isDelivery) applyStatus(updated.order_status, { recalled: true })
+      showToast(isDelivery ? '已撤回发货' : '已撤回')
     } catch (e) {
       showToast(e instanceof ApiError ? e.message : '撤回失败')
+    } finally {
+      setRecallingId(null)
     }
   }
 
   const daySeen = new Set<string>()
+  const canShip =
+    viewer === 'admin' &&
+    !!orderId &&
+    (localStatus === 'deposit_paid' ||
+      localStatus === 'awaiting_balance' ||
+      orderStatus === 'deposit_paid' ||
+      orderStatus === 'awaiting_balance')
 
   return (
     <section
-      className={`relative flex min-h-0 flex-col border border-[var(--line)] bg-white ${className} ${dragover ? 'after:absolute after:inset-2 after:z-10 after:grid after:place-items-center after:border after:border-dashed after:border-teal after:bg-[rgba(246,249,247,.94)] after:text-[0.9rem] after:font-bold after:text-teal after:content-["松开以加入图片或设定文件"]' : ''}`}
+      className={`cm-chat relative ${className} ${dragover ? 'after:absolute after:inset-2 after:z-10 after:grid after:place-items-center after:rounded-xl after:border after:border-dashed after:border-teal after:bg-[rgba(246,249,247,.94)] after:text-[0.9rem] after:font-bold after:text-teal after:content-["松开以加入图片或设定文件"]' : ''}`}
       onDragEnter={(e) => {
         e.preventDefault()
         setDragover(true)
@@ -517,7 +732,7 @@ export function CommissionChat({
 
       <div
         ref={listRef}
-        className="flex min-h-0 min-w-0 flex-1 flex-col gap-2.5 overflow-x-hidden overflow-y-auto px-0.5 py-3.5"
+        className="cm-chat-body"
         onScroll={(e) => {
           if (e.currentTarget.scrollTop < 40) loadOlder()
         }}
@@ -533,9 +748,12 @@ export function CommissionChat({
             daySeen.add(day)
             if (msg.type === 'system') {
               return (
-                <div key={msg.id}>
-                  {stamp ? <div className="mb-2 self-center text-center text-[0.72rem] text-ink-mute">{stamp}</div> : null}
-                  <div className="self-center bg-fog px-2 py-0.5 text-center text-[0.72rem] text-ink-mute">{msg.body}</div>
+                <div key={msg.id} className="contents">
+                  {stamp ? <div className="self-center text-[0.72rem] text-ink-mute">{stamp}</div> : null}
+                  <div className="cm-sys">
+                    <Info className="h-[11px] w-[11px]" strokeWidth={1.8} />
+                    {msg.body}
+                  </div>
                 </div>
               )
             }
@@ -545,10 +763,10 @@ export function CommissionChat({
               const latestDeliveryId = [...messages].reverse().find((m) => m.type === 'delivery' && !m.recalled_at)?.id
               const unlocked = (localStatus || orderStatus) === 'completed'
               return (
-                <div key={msg.id}>
-                  {stamp ? <div className="mb-2 text-center text-[0.72rem] text-ink-mute">{stamp}</div> : null}
+                <div key={msg.id} className="contents">
+                  {stamp ? <div className="self-center text-[0.72rem] text-ink-mute">{stamp}</div> : null}
                   {msg.recalled_at ? (
-                    <div className="text-center text-[0.8rem] text-ink-mute">已撤回发货</div>
+                    <div className="cm-sys">已撤回发货</div>
                   ) : (
                     <DeliveryCard
                       viewer={viewer}
@@ -556,10 +774,13 @@ export function CommissionChat({
                       latest={msg.id === latestDeliveryId}
                       orderId={cardOrder}
                       balanceAmount={Number(balanceAmount || meta.balance_amount || 0)}
-                      onUnlocked={() => {
-                        setLocalStatus('completed')
-                        onOrderChangeRef.current?.('completed')
-                      }}
+                      fileCount={meta.file_count}
+                      fileNames={meta.file_names}
+                      label={deliveryLabel}
+                      canRecall={viewer === 'admin' && Boolean(msg.can_recall) && !unlocked}
+                      recalling={recallingId === msg.id}
+                      onUnlocked={() => applyStatus('completed')}
+                      onRecall={() => recall(msg.id, true)}
                     />
                   )}
                 </div>
@@ -570,69 +791,42 @@ export function CommissionChat({
             const left = mine && !msg.recalled_at ? recallLeft(msg.created_at, now) : ''
             const showRecall = Boolean(left || (mine && !msg.recalled_at && msg.can_recall))
             return (
-              <div key={msg.id} className="w-full min-w-0">
-                {stamp ? <div className="mb-2 text-center text-[0.72rem] text-ink-mute">{stamp}</div> : null}
-                <div className={`flex w-full min-w-0 ${mine ? 'justify-end' : 'justify-start'} ${follow ? '-mt-1' : ''}`}>
-                  <div className={`flex min-w-0 max-w-[min(26rem,100%)] items-start gap-2 ${mine ? 'flex-row-reverse' : ''}`}>
-                  <div
-                    className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-[0.7rem] font-bold text-white ${mine ? 'bg-teal' : 'bg-ink'} ${follow ? 'invisible' : ''}`}
-                  >
-                    {mine ? mineAvatar : peerAvatar}
-                  </div>
-                  <div className="min-w-0 max-w-[calc(100%-2.25rem)]">
-                    {!follow && (
-                      <span className="mb-0.5 block text-[0.68rem] text-ink-mute">{mine ? '我' : viewer === 'admin' ? '买家' : '作者'}</span>
-                    )}
+              <div key={msg.id} className="contents">
+                {stamp ? <div className="self-center text-[0.72rem] text-ink-mute">{stamp}</div> : null}
+                <div className={`cm-msg ${mine ? 'mine' : 'peer'}`}>
+                  <div className={`m-av ${follow ? 'invisible' : ''}`}>{mine ? mineAvatar : peerAvatar}</div>
+                  <div>
                     {msg.recalled_at ? (
                       <div className="text-[0.8rem] text-ink-mute">{mine ? '你撤回了一条消息' : '对方撤回了一条消息'}</div>
                     ) : msg.type === 'image' && msg.file_url ? (
-                      <button
-                        type="button"
-                        className="block w-full max-w-full border-0 bg-transparent p-0"
-                        onClick={() => setLightbox(msg.file_url || null)}
-                      >
+                      <button type="button" className="block border-0 bg-transparent p-0" onClick={() => setLightbox(msg.file_url || null)}>
                         <AuthImage
                           src={msg.file_url}
                           alt={msg.file_name || '图片'}
-                          className="block h-auto max-h-[min(70vh,32rem)] w-auto max-w-full cursor-zoom-in object-contain"
+                          className="block h-auto max-h-[min(70vh,32rem)] w-auto max-w-full cursor-zoom-in rounded-[4px_14px_14px_14px] object-contain"
                         />
                       </button>
+                    ) : msg.type === 'file' ? (
+                      <button type="button" className="cm-file" onClick={() => msg.file_url && api.download(msg.file_url, msg.file_name || undefined)}>
+                        <span className="fb-ico">
+                          <FileText className="h-4 w-4" strokeWidth={1.8} />
+                        </span>
+                        <span>
+                          <b>{msg.file_name || '文件'}</b>
+                          <small>{formatFileSize(msg.file_size)}</small>
+                        </span>
+                      </button>
                     ) : (
-                      <div
-                        className={`chat-bubble text-[0.88rem] leading-relaxed ${
-                          msg.type === 'file' ? 'p-1.5' : 'px-2.5 py-2'
-                        } ${mine ? 'bg-ink text-white' : 'bg-fog text-ink'}`}
-                      >
-                        {msg.type === 'file' ? (
-                          <button
-                            type="button"
-                            className="flex w-[200px] items-center gap-2 text-left"
-                            onClick={() => msg.file_url && api.download(msg.file_url, msg.file_name || undefined)}
-                          >
-                            <span className={`grid h-[30px] w-[30px] shrink-0 place-items-center ${mine ? 'bg-white/12 text-white' : 'bg-[rgba(15,110,92,.1)] text-teal'}`}>
-                              <FileText className="h-4 w-4" />
-                            </span>
-                            <span className="min-w-0">
-                              <b className="block truncate text-[0.78rem]">{msg.file_name || '文件'}</b>
-                              <small className={mine ? 'text-white/65' : 'text-ink-mute'}>{formatFileSize(msg.file_size)}</small>
-                            </span>
-                          </button>
-                        ) : msg.type === 'emoji' ? (
-                          <span className="text-[1.8rem] leading-none">{msg.body}</span>
-                        ) : (
-                          msg.body
-                        )}
-                      </div>
+                      <div className="cm-bubble chat-bubble">{msg.type === 'emoji' ? <span className="text-[1.8rem] leading-none">{msg.body}</span> : msg.body}</div>
                     )}
-                    <div className={`mt-1 flex items-center gap-2 text-[0.68rem] text-ink-mute ${mine ? 'justify-end' : ''}`}>
+                    <div className="m-time">
                       <span>{fmtTime(msg.created_at)}</span>
                       {showRecall ? (
-                        <button type="button" className={`font-bold ${mine ? 'text-[#8aa39a]' : 'text-teal'}`} onClick={() => recall(msg.id)}>
+                        <button type="button" className="font-bold text-teal" onClick={() => recall(msg.id)}>
                           {left ? `撤回 ${left}` : '撤回'}
                         </button>
                       ) : null}
                     </div>
-                  </div>
                   </div>
                 </div>
               </div>
@@ -641,8 +835,8 @@ export function CommissionChat({
         )}
       </div>
 
-      {emojiOpen && (
-        <div className="absolute bottom-[108px] left-[18px] z-5 grid w-[276px] grid-cols-8 gap-0.5 border border-[var(--line)] bg-white p-2">
+      {emojiOpen ? (
+        <div className="cm-emoji">
           {EMOJIS.map((e) => (
             <button
               key={e}
@@ -658,83 +852,66 @@ export function CommissionChat({
             </button>
           ))}
         </div>
-      )}
+      ) : null}
 
-      <div className="mt-auto border-t border-[var(--line)] pt-2.5">
-        <div className="border border-[var(--line)] bg-fog focus-within:border-ink focus-within:bg-white">
-          {pending.length > 0 && (
-            <div className="flex flex-wrap gap-2 px-2.5 pt-2">
-              {pending.map((p) => (
-                <div key={p.id} className="flex items-center gap-2 border border-[var(--line)] bg-white px-2 py-1 text-[0.76rem]">
-                  {p.preview ? <img src={p.preview} alt="" className="h-7 w-7 object-cover" /> : null}
-                  <span>{p.file.type.startsWith('image/') ? '图片' : p.file.name}</span>
-                  <button type="button" className="font-bold text-danger" onClick={() => dropPending(p.id)}>
-                    移除
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          <textarea
-            ref={areaRef}
-            rows={1}
-            value={text}
-            disabled={!threadId}
-            placeholder={placeholder || (viewer === 'admin' ? '回复设定、大纲或样章…' : '写人设、尺度、禁触，或把设定文件拖进来…')}
-            className="block max-h-[120px] min-h-10 w-full resize-none bg-transparent px-3 pt-2.5 leading-normal outline-none"
-            onChange={(e) => {
-              setText(e.target.value)
-              growArea()
-            }}
-            onPaste={(e) => {
-              const item = [...(e.clipboardData?.items || [])].find((x) => x.type.startsWith('image/'))
-              const file = item?.getAsFile()
-              if (file) {
-                e.preventDefault()
-                addFiles([file])
-              }
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                send()
-              }
-            }}
-          />
-          <div className="flex items-center justify-between gap-2 px-1.5 pb-1.5 pt-1">
-            <div className="flex gap-0.5">
-              <button type="button" className="grid h-[30px] w-[30px] place-items-center text-ink-mute hover:text-teal" title="表情" onClick={() => setEmojiOpen((v) => !v)}>
-                <Smile className="h-4 w-4" />
-              </button>
-              <button type="button" className="grid h-[30px] w-[30px] place-items-center text-ink-mute hover:text-teal" title="图片" onClick={() => imageRef.current?.click()}>
-                <ImageIcon className="h-4 w-4" />
-              </button>
-              <button type="button" className="grid h-[30px] w-[30px] place-items-center text-ink-mute hover:text-teal" title="文件" onClick={() => fileRef.current?.click()}>
-                <Paperclip className="h-4 w-4" />
+      {pending.length > 0 ? (
+        <div className="cm-pending">
+          {pending.map((p) => (
+            <div key={p.id} className="flex items-center gap-2 rounded-lg border border-[var(--line)] bg-fog px-2 py-1 text-[0.76rem]">
+              {p.preview ? <img src={p.preview} alt="" className="h-7 w-7 rounded object-cover" /> : null}
+              <span>{p.file.type.startsWith('image/') ? '图片' : p.file.name}</span>
+              <button type="button" className="font-bold text-danger" onClick={() => dropPending(p.id)}>
+                移除
               </button>
             </div>
-            <div className="flex gap-1.5">
-              {viewer === 'admin' && orderId && (localStatus === 'deposit_paid' || localStatus === 'awaiting_balance' || orderStatus === 'deposit_paid' || orderStatus === 'awaiting_balance') ? (
-                <button
-                  type="button"
-                  disabled={!threadId || shipping}
-                  className="h-[34px] border border-ink px-3 text-[0.88rem] font-bold text-ink hover:bg-ink hover:text-white disabled:opacity-60"
-                  onClick={() => shipRef.current?.click()}
-                >
-                  {shipping ? '发货中…' : '发货'}
-                </button>
-              ) : null}
-              <button
-                type="button"
-                disabled={!threadId || sending}
-                className="h-[34px] bg-teal px-4 text-[0.88rem] font-bold text-white hover:bg-teal-deep disabled:opacity-60"
-                onClick={send}
-              >
-                {sending ? '发送中…' : '发送'}
-              </button>
-            </div>
-          </div>
+          ))}
         </div>
+      ) : null}
+
+      <div className="cm-chat-input">
+        <button type="button" className="tool" title="表情" onClick={() => setEmojiOpen((v) => !v)}>
+          <Smile className="h-[17px] w-[17px]" strokeWidth={1.8} />
+        </button>
+        <button type="button" className="tool" title="图片" onClick={() => imageRef.current?.click()}>
+          <ImageIcon className="h-[17px] w-[17px]" strokeWidth={1.8} />
+        </button>
+        <button type="button" className="tool" title="文件" onClick={() => fileRef.current?.click()}>
+          <Paperclip className="h-[17px] w-[17px]" strokeWidth={1.8} />
+        </button>
+        <textarea
+          ref={areaRef}
+          rows={1}
+          value={text}
+          disabled={!threadId}
+          placeholder={placeholder || (viewer === 'admin' ? '回复设定、大纲或样章…' : '写人设、尺度、禁触，或把设定文件拖进来…')}
+          onChange={(e) => {
+            setText(e.target.value)
+            growArea()
+          }}
+          onPaste={(e) => {
+            const item = [...(e.clipboardData?.items || [])].find((x) => x.type.startsWith('image/'))
+            const file = item?.getAsFile()
+            if (file) {
+              e.preventDefault()
+              addFiles([file])
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              send()
+            }
+          }}
+        />
+        {canShip ? (
+          <button type="button" disabled={!threadId || shipping || shipDraft.length > 0} className="ship" onClick={() => shipRef.current?.click()}>
+            {shipping ? '发货中…' : '发货'}
+          </button>
+        ) : null}
+        <button type="button" disabled={!threadId || sending} className="send" onClick={send}>
+          <Send className="h-3.5 w-3.5" strokeWidth={2} />
+          {sending ? '发送中…' : '发送'}
+        </button>
       </div>
 
       <input
@@ -762,17 +939,96 @@ export function CommissionChat({
         hidden
         multiple
         onChange={(e) => {
-          if (e.target.files) ship(e.target.files)
+          if (e.target.files) openShipPreview(e.target.files)
           e.target.value = ''
         }}
       />
 
-      {lightbox
+      {shipDraft.length
         ? createPortal(
             <div
-              className="fixed inset-0 z-[120] flex items-center justify-center bg-black"
-              onClick={() => setLightbox(null)}
+              className="fixed inset-0 z-[120] flex items-center justify-center bg-[rgba(20,32,28,.45)] p-4 backdrop-blur-[2px]"
+              onClick={shipping ? undefined : closeShipPreview}
             >
+              <div
+                className="w-full max-w-md overflow-hidden rounded-[18px] border border-[var(--line)] bg-white shadow-[0_24px_60px_-28px_rgba(20,32,28,.55)]"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="ship-preview-title"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between border-b border-[var(--line)] px-[18px] py-3.5">
+                  <h3 id="ship-preview-title" className="font-[family-name:var(--font-display)] text-[1.05rem] font-bold">
+                    确认发货
+                  </h3>
+                  <button
+                    type="button"
+                    className="grid h-8 w-8 place-items-center rounded-lg text-ink-mute hover:bg-paper hover:text-ink"
+                    onClick={closeShipPreview}
+                    disabled={shipping}
+                    aria-label="关闭"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="grid gap-3 p-[18px]">
+                  <p className="m-0 text-[0.82rem] leading-relaxed text-ink-mute">
+                    请核对稿件。发送后买家会收到发货通知；付尾款前可随时撤回，尾款到账后订单锁定。
+                    {balanceAmount ? ` 尾款 ${formatMoney(balanceAmount)}。` : ''}
+                  </p>
+                  <ul className="m-0 max-h-[40vh] list-none overflow-auto p-0">
+                    {shipDraft.map((p) => (
+                      <li key={p.id} className="flex items-center gap-2.5 border-b border-[var(--line)] py-2.5 last:border-b-0">
+                        {p.preview ? (
+                          <img src={p.preview} alt="" className="h-10 w-10 shrink-0 rounded object-cover" />
+                        ) : (
+                          <span className="grid h-10 w-10 shrink-0 place-items-center rounded bg-[rgba(15,110,92,.1)] text-teal">
+                            <FileText className="h-4 w-4" strokeWidth={1.8} />
+                          </span>
+                        )}
+                        <span className="min-w-0 flex-1">
+                          <b className="block truncate text-[0.82rem]">{p.file.name}</b>
+                          <small className="font-[family-name:var(--font-mono)] text-[0.68rem] text-ink-mute">{formatFileSize(p.file.size)}</small>
+                        </span>
+                        <button
+                          type="button"
+                          className="shrink-0 border-0 bg-transparent p-0 text-[0.74rem] font-semibold text-danger"
+                          disabled={shipping}
+                          onClick={() => dropShipDraft(p.id)}
+                        >
+                          移除
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="flex justify-end gap-2 pt-1">
+                    <button
+                      type="button"
+                      className="inline-flex h-[38px] items-center rounded-[10px] border border-[var(--line-strong)] px-3.5 text-[0.82rem] font-semibold hover:border-ink"
+                      disabled={shipping}
+                      onClick={closeShipPreview}
+                    >
+                      取消
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex h-[38px] items-center rounded-[10px] bg-teal px-4 text-[0.84rem] font-bold text-white hover:bg-teal-deep disabled:opacity-60"
+                      disabled={shipping || !shipDraft.length}
+                      onClick={() => ship(shipDraft.map((p) => p.file))}
+                    >
+                      {shipping ? '发货中…' : `确认发货（${shipDraft.length}）`}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+
+      {lightbox
+        ? createPortal(
+            <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black" onClick={() => setLightbox(null)}>
               <AuthImage src={lightbox} alt="预览" className="max-h-full max-w-full object-contain" />
             </div>,
             document.body,

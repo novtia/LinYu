@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import os
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -10,13 +10,16 @@ from fastapi.staticfiles import StaticFiles
 from .auth import check_secret_config
 from .database import Base, SessionLocal, engine
 from .migrate import migrate_schema
-from .routers import auth, captcha, categories, commission_chat, deliveries, downloads, orders, pay, payment, payment_channels, products, settings, users
+from .origins import cors_origins
+from .routers import auth, captcha, categories, commission_chat, deliveries, downloads, orders, pay, payment, payment_channels, products, settings, users, ws
 from .seed import seed_if_empty
+from .services.chat_hub import hub
 from .services.files import ASSET_DIR, COVER_DIR, ensure_upload_dir
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    hub.bind_loop(asyncio.get_running_loop())
     check_secret_config()
     ensure_upload_dir()
     Base.metadata.create_all(bind=engine)
@@ -27,23 +30,12 @@ async def lifespan(_: FastAPI):
     finally:
         db.close()
     yield
+    await hub.close_all()
 
 
 app = FastAPI(title="领匣 API", version="1.0.0", lifespan=lifespan)
 
-_cors_origins = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:5174",
-    "http://127.0.0.1:5174",
-    "http://localhost:5175",
-    "http://127.0.0.1:5175",
-    "https://xingx.shop",
-    "https://www.xingx.shop",
-]
-_extra_origin = os.getenv("FRONTEND_URL", "").rstrip("/")
-if _extra_origin and _extra_origin not in _cors_origins:
-    _cors_origins.append(_extra_origin)
+_cors_origins = cors_origins()
 
 app.add_middleware(
     CORSMiddleware,
@@ -77,6 +69,7 @@ app.include_router(categories.router)
 app.include_router(products.router)
 app.include_router(orders.router)
 app.include_router(commission_chat.router)
+app.include_router(ws.router)
 app.include_router(pay.router)
 app.include_router(users.router)
 app.include_router(deliveries.router)

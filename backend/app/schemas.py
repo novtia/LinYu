@@ -428,12 +428,14 @@ class CommissionMessageOut(BaseModel):
     created_at: datetime
     recalled_at: Optional[datetime] = None
     can_recall: bool = False
+    order_status: Optional[str] = None
 
 
 class CommissionMessagesOut(BaseModel):
     messages: List[CommissionMessageOut] = Field(default_factory=list)
     unread: int = 0
     has_more: bool = False
+    order_status: Optional[str] = None
 
 
 class CommissionThreadOut(BaseModel):

@@ -18,6 +18,7 @@ import {
   type LucideProps,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
+import { useChatSocket } from '../../context/ChatSocketContext'
 import { useToast } from '../../context/ToastContext'
 
 type IconComp = ComponentType<LucideProps>
@@ -139,6 +140,15 @@ function breadcrumbCrumbs(path: string) {
   return crumbs
 }
 
+function convBadge(count: number, compact = false) {
+  if (count <= 0) return null
+  const text = count > 99 ? '99+' : String(count)
+  if (compact) {
+    return <span className="admin-nav-dot">{text}</span>
+  }
+  return <span className="admin-nav-badge">{text}</span>
+}
+
 function readCollapsed(): boolean {
   try {
     return localStorage.getItem(SIDEBAR_KEY) === '1'
@@ -149,10 +159,12 @@ function readCollapsed(): boolean {
 
 export function AdminLayout() {
   const { user, loading, logout } = useAuth()
+  const { unreadAdmin } = useChatSocket()
   const { showToast } = useToast()
   const navigate = useNavigate()
   const path = useLocation().pathname
-  const lockPane = path.startsWith('/admin/orders') || path.startsWith('/admin/deliveries')
+  const lockPane =
+    path.startsWith('/admin/orders') || path.startsWith('/admin/deliveries') || path.startsWith('/admin/conversations')
   const currentGroupId = activeGroupId(path)
 
   const [collapsed, setCollapsed] = useState(readCollapsed)
@@ -243,6 +255,7 @@ export function AdminLayout() {
                         }`}
                       >
                         <Icon className="h-[18px] w-[18px]" strokeWidth={1.9} />
+                        {item.to === '/admin/conversations' ? convBadge(unreadAdmin, true) : null}
                         <span className="pointer-events-none absolute left-[calc(100%+10px)] z-50 hidden whitespace-nowrap rounded-lg bg-ink px-2.5 py-1.5 text-[0.78rem] font-medium text-white shadow-lg ring-1 ring-white/10 group-hover:block">
                           {item.label}
                         </span>
@@ -304,6 +317,7 @@ export function AdminLayout() {
                                 >
                                   <Icon className="h-4 w-4 shrink-0" strokeWidth={1.9} />
                                   <span className="truncate">{item.label}</span>
+                                  {item.to === '/admin/conversations' ? convBadge(unreadAdmin) : null}
                                 </NavLink>
                               )
                             })}
@@ -432,6 +446,7 @@ export function AdminLayout() {
                     >
                       <Icon className="h-3.5 w-3.5" strokeWidth={1.9} />
                       {item.short}
+                      {item.to === '/admin/conversations' ? convBadge(unreadAdmin) : null}
                     </NavLink>
                   )
                 })}

@@ -1,13 +1,25 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { ShoppingBag } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
+import { useChatSocket } from '../context/ChatSocketContext'
 import { useToast } from '../context/ToastContext'
 import { CartDropdown } from './CartDropdown'
 
+function subscribeBodyNav(cb: () => void) {
+  const obs = new MutationObserver(cb)
+  obs.observe(document.body, { attributes: true, attributeFilter: ['data-nav'] })
+  return () => obs.disconnect()
+}
+
+function bodyNav() {
+  return document.body.getAttribute('data-nav') || ''
+}
+
 export function Topbar() {
   const { user, openAuth, logout, publicSettings } = useAuth()
+  const { unreadUser } = useChatSocket()
   const { count, open: cartOpen, closeCart, toggleCart } = useCart()
   const { showToast } = useToast()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -16,9 +28,11 @@ export function Topbar() {
   const navigate = useNavigate()
   const { pathname, hash } = useLocation()
   const brand = publicSettings?.name || '领匣'
-  const shopOn = pathname === '/' && hash !== '#commission'
-  const commissionOn = pathname === '/' && hash === '#commission'
+  const pageNav = useSyncExternalStore(subscribeBodyNav, bodyNav, () => '')
+  const commissionsOn = pathname.startsWith('/commissions') || pageNav === 'commissions'
+  const commissionOn = (pathname === '/' && hash === '#commission') || pageNav === 'commission'
   const ordersOn = pathname.startsWith('/orders')
+  const shopOn = !commissionsOn && !commissionOn && !ordersOn && (pathname.startsWith('/product') || pathname === '/')
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -64,8 +78,21 @@ export function Topbar() {
           <Link to="/orders" className={ordersOn ? 'active' : undefined}>
             我的订单
           </Link>
+          <Link to="/commissions" className={commissionsOn ? 'active' : undefined}>
+            我的约稿
+            {unreadUser > 0 ? <span className="nav-unread">{unreadUser > 99 ? '99+' : unreadUser}</span> : null}
+          </Link>
         </nav>
         <div className="shop-right">
+          <Link
+            to="/commissions"
+            className={`relative inline-flex h-9 shrink-0 items-center rounded-[10px] px-2 text-[0.82rem] font-semibold text-ink-soft min-[641px]:hidden ${
+              commissionsOn ? 'text-ink' : ''
+            }`}
+          >
+            约稿
+            {unreadUser > 0 ? <span className="dot-n">{unreadUser > 99 ? '99+' : unreadUser}</span> : null}
+          </Link>
           <Link
             to="/orders"
             className={`inline-flex h-9 shrink-0 items-center rounded-[10px] px-2 text-[0.82rem] font-semibold text-ink-soft min-[641px]:hidden ${
@@ -148,7 +175,10 @@ export function Topbar() {
                     navigate('/commissions')
                   }}
                 >
-                  我的约稿
+                  <span className="flex w-full items-center justify-between gap-3">
+                    我的约稿
+                    {unreadUser > 0 ? <span className="cm-unread">{unreadUser > 99 ? '99+' : unreadUser}</span> : null}
+                  </span>
                 </MenuBtn>
                 {user.role === 'admin' && (
                   <MenuBtn
