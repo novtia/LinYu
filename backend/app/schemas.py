@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class TokenOut(BaseModel):
@@ -386,6 +386,19 @@ class SiteSettings(BaseModel):
     keywords: str = "虚拟商品,自动发货"
     desc: str = "虚拟商品一站售卖。付款成功后自动发货，订单内随时查看。"
     notice: str = "欢迎选购。支付成功后将自动发货，内容可在「我的订单」查看。"
+    domain: str = "xinx.shop"
+
+    @field_validator("domain")
+    @classmethod
+    def normalize_domain(cls, value: str) -> str:
+        host = (value or "").strip()
+        lowered = host.lower()
+        for prefix in ("https://", "http://"):
+            if lowered.startswith(prefix):
+                host = host[len(prefix) :]
+                break
+        host = host.split("/")[0].strip()
+        return host or "xinx.shop"
 
 
 class SettingsOut(BaseModel):
@@ -399,6 +412,7 @@ class PublicSettingsOut(BaseModel):
     allowReg: bool
     maintain: bool
     name: str
+    domain: str = "xinx.shop"
     debugMode: bool = False
     mailEnabled: bool = False
 

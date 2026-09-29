@@ -25,6 +25,12 @@ export function WebsitePage() {
   return (
     <div className="overflow-hidden rounded-[18px] border border-[var(--line)] bg-white">
       <div className="grid gap-4 p-[18px]">
+        <Field
+          label="站点域名"
+          value={site.domain || ''}
+          hint="页脚展示用，只填域名，不要带协议"
+          onChange={(v) => setSite({ ...site, domain: v })}
+        />
         <Field label="SEO 标题" value={site.title} onChange={(v) => setSite({ ...site, title: v })} />
         <Field label="关键词" value={site.keywords} onChange={(v) => setSite({ ...site, keywords: v })} />
         <label className="grid gap-1.5">

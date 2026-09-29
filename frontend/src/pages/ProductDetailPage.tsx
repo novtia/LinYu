@@ -513,7 +513,7 @@ export function ProductDetailPage() {
               回到顶部
             </button>
           </div>
-          <span className="font-[family-name:var(--font-mono)] text-[0.72rem]">xingx.shop</span>
+          <span className="font-[family-name:var(--font-mono)] text-[0.72rem]">{publicSettings?.domain}</span>
         </div>
       </footer>
     </>

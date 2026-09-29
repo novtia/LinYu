@@ -11,8 +11,8 @@ def cors_origins() -> list[str]:
         "http://127.0.0.1:5174",
         "http://localhost:5175",
         "http://127.0.0.1:5175",
-        "https://xingx.shop",
-        "https://www.xingx.shop",
+        "https://xinx.shop",
+        "https://www.xinx.shop",
     ]
     extra = os.getenv("FRONTEND_URL", "").rstrip("/")
     if extra and extra not in origins:

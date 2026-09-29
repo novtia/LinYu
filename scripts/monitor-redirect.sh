@@ -3,7 +3,7 @@
 # 同时探源站,用于区分「CF 层被改」和「源站挂了」。
 # 状态变化时写 /var/log/lingxia-monitor.log 与 syslog；持续异常每小时复报一次。
 
-URL="https://xingx.shop/api/health"
+URL="https://xinx.shop/api/health"
 LOG=/var/log/lingxia-monitor.log
 STATE=/var/lib/lingxia-monitor.state
 mkdir -p "$(dirname "$STATE")"
@@ -11,7 +11,7 @@ mkdir -p "$(dirname "$STATE")"
 EDGE="$(curl -sS -o /dev/null --max-time 15 -w '%{http_code} %{redirect_url}' "$URL" 2>/dev/null)"
 CODE="${EDGE%% *}"
 REDIR="${EDGE#* }"
-ORIGIN="$(curl -sS -k -o /dev/null --max-time 10 --resolve xingx.shop:443:127.0.0.1 -w '%{http_code}' "$URL" 2>/dev/null)"
+ORIGIN="$(curl -sS -k -o /dev/null --max-time 10 --resolve xinx.shop:443:127.0.0.1 -w '%{http_code}' "$URL" 2>/dev/null)"
 NOW="$(date '+%F %T %z')"
 EPOCH="$(date +%s)"
 

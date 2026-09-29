@@ -387,7 +387,7 @@ export function ShopPage() {
               回到顶部
             </a>
           </div>
-          <span className="font-[family-name:var(--font-mono)] text-[0.72rem]">xingx.shop</span>
+          <span className="font-[family-name:var(--font-mono)] text-[0.72rem]">{publicSettings?.domain}</span>
         </div>
       </footer>
     </>

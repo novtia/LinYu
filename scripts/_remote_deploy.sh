@@ -19,5 +19,5 @@ with e.connect() as c:
     print("product_files", pf)
     print("delivery_files", df)
 PY
-curl -sS https://xingx.shop/api/health
+curl -sS https://xinx.shop/api/health
 echo

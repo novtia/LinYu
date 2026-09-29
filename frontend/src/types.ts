@@ -125,6 +125,7 @@ export interface PublicSettings {
   allowReg: boolean
   maintain: boolean
   name: string
+  domain: string
   debugMode?: boolean
   mailEnabled?: boolean
 }
@@ -222,6 +223,7 @@ export interface SiteSettings {
   keywords: string
   desc: string
   notice: string
+  domain: string
 }
 
 export interface Settings {

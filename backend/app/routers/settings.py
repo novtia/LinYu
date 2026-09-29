@@ -35,6 +35,7 @@ def public_settings(
         allowReg=s["sys"].allowReg,
         maintain=s["sys"].maintain,
         name=s["sys"].name,
+        domain=s["site"].domain,
         # 调试模式仅管理员可用，也只对管理员可见
         debugMode=bool(s["sys"].debugMode) and is_admin,
         mailEnabled=bool(s["sys"].mail.enabled),
