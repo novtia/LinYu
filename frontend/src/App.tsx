@@ -24,6 +24,8 @@ import { SystemPage } from './pages/admin/SystemPage'
 import { WebsitePage } from './pages/admin/WebsitePage'
 import { ConversationsPage } from './pages/admin/ConversationsPage'
 import { MyCommissionsPage } from './pages/MyCommissionsPage'
+import { ShelfPage } from './pages/ShelfPage'
+import { ReaderPage } from './pages/ReaderPage'
 
 export default function App() {
   return (
@@ -41,7 +43,9 @@ export default function App() {
                   <Route path="/orders" element={<OrdersListPage />} />
                   <Route path="/orders/:id" element={<OrderDetailPage />} />
                   <Route path="/commissions" element={<MyCommissionsPage />} />
+                  <Route path="/shelf" element={<ShelfPage />} />
                 </Route>
+                <Route path="/read/:id" element={<ReaderPage />} />
                 <Route path="/admin" element={<AdminLayout />}>
                   <Route index element={<DashboardPage />} />
                   <Route path="products" element={<ProductsPage />} />

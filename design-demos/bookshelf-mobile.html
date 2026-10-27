@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>领匣 · 我的书架（手机浏览器）设计稿</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230f6e5c'/></svg>" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+SC:wght@400;500;600;700;800&family=Sora:wght@400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root { --ink: #14201c; --ink-soft: #3d4f48; --ink-mute: #6b7c74; --line: rgba(20,32,28,.09); --line-strong: rgba(20,32,28,.16); --teal: #0f6e5c; --mint: #7fd4b8;
+      --font-display: "Syne", "Noto Sans SC", sans-serif; --font-body: "Sora", "Noto Sans SC", sans-serif; --font-mono: "JetBrains Mono", "Noto Sans SC", monospace; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body { font-family: var(--font-body); color: var(--ink); -webkit-font-smoothing: antialiased; background-color: #eef5f2;
+      background-image: radial-gradient(1200px 700px at 85% -10%, rgba(127,212,184,.35), transparent 55%), radial-gradient(900px 600px at -5% 20%, rgba(196,165,116,.18), transparent 50%), linear-gradient(180deg, #f7fbf9 0%, #f4f8f6 42%, #eef5f2 100%); background-attachment: fixed; }
+    a { color: inherit; text-decoration: none; }
+
+    .demo-bar { position: sticky; top: 0; z-index: 50; display: flex; align-items: center; gap: 12px; height: 48px; padding: 0 20px; background: #14201c; color: #eef8f4; }
+    .demo-bar strong { font-family: var(--font-display); font-size: .95rem; letter-spacing: -.02em; }
+    .demo-bar .sp { flex: 1; }
+    .demo-bar a { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; border: 1px solid rgba(238,248,244,.25); border-radius: 8px; color: rgba(238,248,244,.8); font-size: .78rem; font-weight: 600; }
+    .demo-bar a:hover { border-color: var(--mint); color: #fff; }
+
+    .intro { width: min(1200px, calc(100% - 40px)); margin: 0 auto; padding: 40px 0 6px; }
+    .eyebrow { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 14px; font-family: var(--font-mono); font-size: .7rem; letter-spacing: .16em; font-weight: 700; color: var(--teal); }
+    .eyebrow::before { content: ""; width: 22px; height: 1.5px; background: var(--teal); }
+    .intro h1 { margin: 0 0 10px; font-family: var(--font-display); font-weight: 800; font-size: clamp(1.8rem, 3.6vw, 2.5rem); letter-spacing: -.04em; line-height: 1.15; }
+    .intro p { margin: 0; max-width: 66ch; color: var(--ink-mute); font-size: .9rem; line-height: 1.85; }
+
+    .stage { display: flex; flex-wrap: wrap; justify-content: center; gap: 44px 40px; padding: 36px 20px 20px; }
+    .fig { width: 372px; margin: 0; }
+    .fig figcaption { margin-top: 22px; }
+    .fig .no { font-family: var(--font-mono); font-size: .68rem; font-weight: 700; letter-spacing: .16em; color: var(--teal); }
+    .fig b { display: block; margin-top: 6px; font-family: var(--font-display); font-size: 1.1rem; letter-spacing: -.02em; }
+    .fig ul { margin: 10px 0 0; padding: 0; list-style: none; color: var(--ink-soft); font-size: .8rem; line-height: 1.75; }
+    .fig li { position: relative; padding-left: 14px; }
+    .fig li::before { content: ""; position: absolute; left: 0; top: .72em; width: 5px; height: 1.5px; background: var(--teal); }
+
+    /* ================= 手机 + 浏览器外壳（强调：这是手机浏览器里的网页） ================= */
+    .phone { position: relative; width: 372px; height: 760px; padding: 8px; border-radius: 44px; background: #1b2420; box-shadow: 0 36px 66px -34px rgba(20,32,28,.65), inset 0 0 0 2px #2c3a34; }
+    .phone::before { content: ""; position: absolute; z-index: 20; top: 19px; left: 50%; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: #050808; }
+    .screen { display: flex; flex-direction: column; width: 100%; height: 100%; overflow: hidden; border-radius: 36px; background: #fff; }
+    .sbar { display: flex; justify-content: space-between; align-items: center; height: 34px; padding: 6px 22px 0; background: #f4f8f6; font-size: 12px; font-weight: 600; }
+    .sbar .ic { display: flex; align-items: center; gap: 5px; }
+    .sbar .ic b { font-size: 11px; font-family: var(--font-body); }
+    .sbar .bat { position: relative; width: 20px; height: 10px; border: 1px solid currentColor; border-radius: 3px; }
+    .sbar .bat::after { content: ""; position: absolute; right: -3px; top: 2px; width: 2px; height: 4px; background: currentColor; border-radius: 0 1px 1px 0; }
+    .sbar .bat b { position: absolute; left: 1px; top: 1px; bottom: 1px; width: 70%; background: currentColor; border-radius: 1px; }
+    .abar { display: flex; align-items: center; gap: 8px; height: 46px; padding: 0 10px 6px; background: #f4f8f6; }
+    .url { flex: 1; display: flex; align-items: center; gap: 7px; height: 34px; padding: 0 12px; border-radius: 17px; background: #e6eeeb; color: var(--ink-soft); font-size: 13px; }
+    .url svg { color: var(--ink-mute); }
+    .url span { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tabn { display: grid; place-items: center; width: 24px; height: 24px; border: 1.8px solid var(--ink-soft); border-radius: 6px; font-size: 11px; font-weight: 700; color: var(--ink-soft); }
+    .screen iframe { flex: 1; width: 100%; border: 0; background: #f4f8f6; }
+    .gest { height: 18px; background: #f4f8f6; display: grid; place-items: center; }
+    .gest i { width: 110px; height: 4px; border-radius: 2px; background: rgba(20,32,28,.55); }
+
+    .spec { width: min(1200px, calc(100% - 40px)); margin: 24px auto 70px; padding-top: 32px; border-top: 1px solid var(--line); }
+    .spec h2 { margin: 0 0 20px; font-family: var(--font-display); font-size: 1.4rem; letter-spacing: -.03em; }
+    .spec-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    .card { padding: 20px; border-radius: 18px; background: #fff; border: 1px solid var(--line); }
+    .card b { display: block; font-size: .92rem; }
+    .card span { display: block; margin-top: 8px; color: var(--ink-mute); font-size: .8rem; line-height: 1.8; }
+    @media (max-width: 1000px) { .spec-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 560px) { .demo-bar span { display: none; } }
+  </style>
+</head>
+<body>
+  <script>
+    /* 真手机直接打开时，不套外壳，直接进入响应式页面本身 */
+    if (innerWidth <= 560) location.replace("bookshelf-pc.html")
+  </script>
+  <div class="demo-bar">
+    <strong>我的书架 · 手机浏览器</strong><span class="sp"></span>
+    <a href="bookshelf-pc.html">PC 版</a><a href="reader-mobile.html">阅读器（手机）</a>
+  </div>
+
+  <header class="intro">
+    <p class="eyebrow">MOBILE WEB</p>
+    <h1>同一个网页，手机浏览器里的样子。</h1>
+    <p>书架不是 App：沿用线上前台的顶栏、配色与卡片语言，没有底部标签栏，也没有长按、拖拽这类 App 手势。手机上就是同一个响应式页面（下面三屏都是真实的页面，可滚动、可点击），“更多”以网页常见的底部弹层呈现。</p>
+  </header>
+
+  <section class="stage" id="stage"></section>
+
+  <section class="spec">
+    <h2>手机浏览器适配</h2>
+    <div class="spec-grid">
+      <div class="card"><b>顶栏不变</b><span>和线上一致：品牌 + 约稿 / 订单链接 + 购物车 + 头像。新增“书架”链接，宽屏时是顶栏导航“我的书架”。</span></div>
+      <div class="card"><b>封面双列 · 列表单列</b><span>封面视图手机端 2 列，卡片内的按钮始终可见（不依赖悬停）；列表视图每本书一张横向卡片，进度条与按钮另起一行。</span></div>
+      <div class="card"><b>更多 = 底部弹层</b><span>点“···”从底部升起弹层：订单详情 / 下载原文件 / 联系作者；点遮罩或再点一次关闭。</span></div>
+      <div class="card"><b>不可读的书也占位</b><span>约稿待付尾款显示锁定封面与“支付尾款解锁”，创作中显示进度；PDF 等仅下载，不出现“在线阅读”。</span></div>
+    </div>
+  </section>
+
+  <script>
+    const FIGS = [
+      { no: "01 / SHELF", t: "封面视图", hash: "embed&view=grid", li: ["顶部“继续阅读”卡片：一键回到上次读到的章节", "页签：全部 / 商城文本 / 我的约稿", "按钮常驻在卡片上，不靠悬停"] },
+      { no: "02 / LIST", t: "列表视图 · 我的约稿", hash: "embed&view=list&tab=commission", li: ["切到列表后每本一张横向卡片", "已读进度 / 待付尾款 / 创作中一眼可辨", "约稿用统一的“约稿”徽标标识"] },
+      { no: "03 / ACTIONS", t: "更多操作", hash: "embed&tab=commission&menu=8", li: ["底部弹层：订单详情、下载、联系作者", "待付尾款的约稿“下载原文件”置灰并说明原因", "点遮罩关闭"] },
+    ]
+    document.getElementById("stage").innerHTML = FIGS.map((f) => `
+      <figure class="fig">
+        <div class="phone"><div class="screen">
+          <div class="sbar"><span>22:47</span><span class="ic"><b>5G</b><i class="bat"><b></b></i></span></div>
+          <div class="abar"><div class="url"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span>xinx.shop/shelf</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg></div><span class="tabn">3</span></div>
+          <iframe src="bookshelf-pc.html#${f.hash}" title="${f.t}"></iframe>
+          <div class="gest"><i></i></div>
+        </div></div>
+        <figcaption><span class="no">${f.no}</span><b>${f.t}</b><ul>${f.li.map((x) => `<li>${x}</li>`).join("")}</ul></figcaption>
+      </figure>`).join("")
+  </script>
+</body>
+</html>

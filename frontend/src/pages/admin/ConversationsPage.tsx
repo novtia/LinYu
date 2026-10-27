@@ -6,6 +6,7 @@ import { eventThread, upsertThread } from '../../lib/chatSocket'
 import { formatWords } from '../../lib/commission'
 import { allOrderFiles, AdminOrderDetail } from '../../components/AdminOrderDetail'
 import { orderStatusLabel } from '../../lib/orderStatus'
+import { fmtBeijingClock } from '../../lib/time'
 import { useChatSocket } from '../../context/ChatSocketContext'
 import { useToast } from '../../context/ToastContext'
 import { CommissionChat } from '../../components/CommissionChat'
@@ -14,9 +15,7 @@ import type { CommissionThread, CommissionThreadList, Order } from '../../types'
 type Filter = 'all' | 'unread' | 'deposit'
 
 function fmtTime(iso?: string | null) {
-  if (!iso) return ''
-  const d = new Date(iso)
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  return fmtBeijingClock(iso)
 }
 
 function shouldOpenDetail(order: Order) {

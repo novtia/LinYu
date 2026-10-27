@@ -5,24 +5,15 @@ import { ApiError, api } from '../lib/api'
 import { eventThread, upsertThread } from '../lib/chatSocket'
 import { formatWords, isCommissionProduct } from '../lib/commission'
 import { orderCompactLabel, orderDotTone } from '../lib/orderStatus'
+import { fmtBeijingThread } from '../lib/time'
 import { useAuth } from '../context/AuthContext'
 import { useChatSocket } from '../context/ChatSocketContext'
 import { useToast } from '../context/ToastContext'
 import { CommissionChat } from '../components/CommissionChat'
 import type { CommissionThread, CommissionThreadList, Product } from '../types'
 
-function pad(n: number) {
-  return String(n).padStart(2, '0')
-}
-
 function fmtThreadTime(iso?: string | null) {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  const now = new Date()
-  if (d.toDateString() === now.toDateString()) return `${pad(d.getHours())}:${pad(d.getMinutes())}`
-  if (d.getFullYear() === now.getFullYear()) return `${pad(d.getMonth() + 1)}/${pad(d.getDate())}`
-  return `${String(d.getFullYear()).slice(2)}/${pad(d.getMonth() + 1)}/${pad(d.getDate())}`
+  return fmtBeijingThread(iso)
 }
 
 function statusMeta(t: CommissionThread): { label: string; tone: 'teal' | 'warn' | 'mute' } {

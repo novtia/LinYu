@@ -7,8 +7,11 @@ from sqlalchemy.orm import Session, joinedload
 
 from ..models import Delivery, DeliveryFile, Order, Product, ProductFile
 from ..seed import load_settings
+from .commission import is_commission_mode
 from .delivery import random_id
 from .files import delete_stored
+
+EMPTY_DELIVERY_NOTE = "暂无发货内容，请联系客服"
 
 
 def ensure_commission_delivery(db: Session, order: Order) -> Delivery:
@@ -154,7 +157,7 @@ def fulfill_order(
             first_path = paid_files[0].file_path if paid_files else (getattr(product, "file_path", None) if product else None)
             first_name = paid_files[0].file_name if paid_files else (getattr(product, "file_name", None) if product else None)
             if not payload and not first_path:
-                payload = "暂无发货内容，请联系客服"
+                payload = EMPTY_DELIVERY_NOTE
 
             delivery = Delivery(
                 id="d_" + random_id(),
@@ -207,3 +210,101 @@ def fulfill_order(
         pass
 
     return deliveries
+
+
+def _product_sources(product: Product) -> tuple[list[tuple[str, str]], str]:
+    paid_files = sorted(list(product.files or []), key=lambda f: (f.sort_order, f.created_at or datetime.min))
+    sources = [(f.file_path, f.file_name or "已购文件") for f in paid_files if f.file_path]
+    legacy = getattr(product, "file_path", None)
+    if not sources and legacy:
+        sources = [(legacy, getattr(product, "file_name", None) or "已购文件")]
+    content = (product.delivery_content or "").strip()
+    return sources, content
+
+
+def replenish_order(db: Session, order: Order) -> int:
+    """把商品当前的文件和发货内容补到已支付、但当时没货的订单上。"""
+    if is_commission_mode(getattr(order, "sale_mode", None)):
+        raise ValueError("约稿订单请在对话里交稿")
+    if order.status not in ("paid", "completed"):
+        raise ValueError("订单还未支付，不能补货")
+
+    saw_goods = False
+    attached = 0
+    for it in order.items:
+        product = (
+            db.query(Product)
+            .options(joinedload(Product.files))
+            .filter(Product.id == it.product_id)
+            .first()
+        )
+        if not product:
+            continue
+        sources, content = _product_sources(product)
+        if not sources and not content:
+            continue
+        saw_goods = True
+        delivery = next((d for d in order.deliveries if d.product_id == it.product_id), None)
+        if not delivery:
+            delivery = Delivery(
+                id="d_" + random_id(),
+                order_id=order.id,
+                product_id=it.product_id,
+                product_name=it.name,
+                payload=content,
+                created_at=datetime.utcnow(),
+            )
+            db.add(delivery)
+            order.deliveries.append(delivery)
+            db.flush()
+            attached += 1
+        known = {f.file_path for f in (delivery.files or []) if f.file_path}
+        if delivery.file_path:
+            known.add(delivery.file_path)
+        sort_order = max((f.sort_order for f in (delivery.files or [])), default=-1) + 1
+        added_paths: list[tuple[str, str]] = []
+        for path, name in sources:
+            if path in known:
+                continue
+            db.add(
+                DeliveryFile(
+                    id="df_" + random_id(length=8),
+                    delivery_id=delivery.id,
+                    file_path=path,
+                    file_name=name,
+                    sort_order=sort_order,
+                )
+            )
+            known.add(path)
+            added_paths.append((path, name))
+            sort_order += 1
+            attached += 1
+        if added_paths and not delivery.file_path:
+            delivery.file_path, delivery.file_name = added_paths[0]
+        current = (delivery.payload or "").strip()
+        if content and current in ("", EMPTY_DELIVERY_NOTE):
+            delivery.payload = content
+            attached += 1
+        elif added_paths and current == EMPTY_DELIVERY_NOTE:
+            delivery.payload = ""
+            attached += 1
+
+    if not saw_goods:
+        raise ValueError("商品还没有可发放的文件，请先上传后再补货")
+    if attached == 0:
+        raise ValueError("这份订单已经有当前商品的文件，无需补货")
+
+    order.status = "completed"
+    db.commit()
+    db.expire_all()
+
+    try:
+        from .mail import notify_order_emails
+
+        fresh = db.query(Order).filter(Order.id == order.id).first()
+        if fresh:
+            notify_order_emails(db, fresh)
+    except Exception:
+        pass
+
+    return attached

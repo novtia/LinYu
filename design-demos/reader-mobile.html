@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>领匣 · 小说阅读器（手机）设计稿 · 参考起点</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%238b6914'/></svg>" />
+  <style>
+    :root { --red: #ed424b; --gold: #8b6914; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; min-height: 100%; }
+    body { font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif; color: #333; background: #e9e9e9; -webkit-font-smoothing: antialiased; }
+    button, input { font: inherit; color: inherit; }
+    button { cursor: pointer; border: 0; background: none; padding: 0; }
+    a { color: inherit; text-decoration: none; }
+    .hidden { display: none !important; }
+
+    /* ================= 展示台（非产品 UI） ================= */
+    .demo-bar { position: sticky; top: 0; z-index: 300; display: flex; align-items: center; gap: 12px; height: 46px; padding: 0 20px; background: #262626; color: #ddd; font-size: 13px; }
+    .demo-bar strong { color: #fff; font-weight: 600; }
+    .demo-bar .sp { flex: 1; }
+    .demo-bar a { padding: 5px 12px; border-radius: 99px; }
+    .demo-bar a:hover { background: rgba(255,255,255,.12); color: #fff; }
+    .demo-bar a.cur { background: var(--red); color: #fff; }
+    .intro { width: min(1240px, calc(100% - 40px)); margin: 0 auto; padding: 36px 0 4px; }
+    .intro h1 { margin: 0 0 8px; font-size: 26px; }
+    .intro p { margin: 0; color: #777; font-size: 14px; line-height: 1.85; max-width: 74ch; }
+    .map { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .map span { padding: 4px 10px; border-radius: 4px; background: #fff; font-size: 12px; color: #666; }
+    .map span i { font-style: normal; color: #aaa; margin: 0 4px; }
+    .stage { display: flex; flex-wrap: wrap; justify-content: center; gap: 40px 34px; padding: 34px 20px 10px; }
+    .fig { width: 380px; margin: 0; }
+    .fig figcaption { margin-top: 20px; font-size: 13px; color: #666; line-height: 1.8; }
+    .fig figcaption .no { color: var(--red); font-weight: 700; font-size: 12px; letter-spacing: .1em; }
+    .fig figcaption b { display: block; margin: 2px 0 6px; font-size: 16px; color: #222; }
+    .fig figcaption ul { margin: 0; padding-left: 16px; }
+    .spec { width: min(1240px, calc(100% - 40px)); margin: 20px auto 70px; padding-top: 28px; border-top: 1px solid #d6d6d6; }
+    .spec h2 { margin: 0 0 18px; font-size: 18px; }
+    .spec-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+    .spec-card { background: #fff; border-radius: 8px; padding: 18px; }
+    .spec-card b { display: block; font-size: 14px; margin-bottom: 6px; }
+    .spec-card span { display: block; font-size: 13px; color: #777; line-height: 1.8; }
+    .tap-map { display: grid; grid-template-columns: 3fr 4fr 3fr; height: 50px; margin-top: 12px; border-radius: 4px; overflow: hidden; border: 1px dashed #c9b27a; font-size: 12px; font-weight: 700; color: var(--gold); }
+    .tap-map div { display: grid; place-items: center; text-align: center; line-height: 1.3; }
+    .tap-map div + div { border-left: 1px dashed #c9b27a; }
+    .tap-map div:nth-child(2) { background: rgba(139,105,20,.1); }
+    .th-row { display: flex; gap: 8px; margin-top: 12px; }
+    .th-row i { width: 26px; height: 26px; border-radius: 50%; border: 1px solid rgba(0,0,0,.15); }
+
+    /* ================= 手机外框 ================= */
+    .phone { position: relative; width: 380px; height: 790px; padding: 9px; border-radius: 44px; background: #1c1c1e; box-shadow: 0 30px 60px -30px rgba(0,0,0,.6), inset 0 0 0 2px #333; }
+    .phone::before { content: ""; position: absolute; z-index: 200; top: 20px; left: 50%; width: 11px; height: 11px; margin-left: -5px; border-radius: 50%; background: #050505; box-shadow: inset 0 0 0 2px #1b1b24; }
+    .screen { position: relative; width: 100%; height: 100%; overflow: hidden; border-radius: 36px; isolation: isolate; background: var(--paper); color: var(--fg); transition: background .3s; font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif; }
+
+    /* ================= 起点 App 配色：背景 6 色 ================= */
+    .phone {
+      --paper: #ecdfbd; --fg: #2b2418; --mute: #a59468; --chrome: #e5d3a3; --cfg: #8b6914; --accent: #8b6914;
+      --pill: rgba(139,105,20,.12); --line: rgba(139,105,20,.18); --track: #8b6914; --tex: .5;
+    }
+    .phone[data-theme="white"] { --paper: #ffffff; --fg: #333; --mute: #aaa; --chrome: #f7f7f7; --cfg: #555; --accent: #ed424b; --pill: rgba(0,0,0,.05); --line: rgba(0,0,0,.08); --track: #ccc; --tex: 0; }
+    .phone[data-theme="night"] { --paper: #1b1b1d; --fg: #8a8a8a; --mute: #5a5a5c; --chrome: #28282a; --cfg: #a58f5b; --accent: #c9a45c; --pill: rgba(255,255,255,.06); --line: rgba(255,255,255,.09); --track: #6d5e3c; --tex: 0; }
+    .phone[data-theme="sand"]  { --paper: #ebdcd0; --fg: #382c25; --mute: #ac9686; --chrome: #e3d1c3; --cfg: #84614a; --accent: #84614a; --pill: rgba(132,97,74,.12); --line: rgba(132,97,74,.18); --track: #84614a; --tex: .25; }
+    .phone[data-theme="green"] { --paper: #dcead0; --fg: #26351f; --mute: #8aa27c; --chrome: #cfe0c0; --cfg: #55753f; --accent: #55753f; --pill: rgba(85,117,63,.12); --line: rgba(85,117,63,.2); --track: #55753f; --tex: .15; }
+    .phone[data-theme="pink"]  { --paper: #fbe3de; --fg: #4a2b29; --mute: #c49a96; --chrome: #f4d3cd; --cfg: #b0544e; --accent: #b0544e; --pill: rgba(176,84,78,.1); --line: rgba(176,84,78,.18); --track: #b0544e; --tex: .1; }
+    .screen::before { /* 羊皮纸纹理 */
+      content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: var(--tex);
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.55' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .55  0 0 0 0 .42  0 0 0 0 .2  0 0 0 .22 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    }
+
+    /* 正文 */
+    .m-scroll { position: absolute; inset: 0; z-index: 1; overflow-y: auto; overflow-anchor: none; padding: 44px 22px 60px; scrollbar-width: none; font-family: var(--rf); }
+    .m-scroll::-webkit-scrollbar { display: none; }
+    .m-ch { margin: 4px 0 22px; font-size: calc(var(--fs) * 1.3); line-height: 1.4; font-weight: 700; letter-spacing: .02em; }
+    .m-sec + .m-sec { margin-top: 40px; } /* 滚动模式：章节首尾相接，仅留一小段间距 */
+    /* 分页模式：CSS 多列横向分页，章节标题自动另起一页 */
+    .screen.paged .m-scroll { overflow: hidden; padding: 0; }
+    .screen.paged .m-flow { position: absolute; left: 22px; top: 46px; column-gap: 44px; column-fill: auto; transition: transform .28s cubic-bezier(.22,.8,.2,1); will-change: transform; }
+    .screen.paged .m-flow > * + * { break-before: column; margin-top: 0; }
+    /* 空状态：只在整本小说没有后续章节时出现 */
+    .m-endstate { min-height: 340px; margin-top: 40px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; font-family: "PingFang SC", "Microsoft YaHei", sans-serif; color: var(--mute); }
+    .screen.paged .m-endstate { height: 100%; margin-top: 0; }
+    .m-endstate svg { color: var(--accent); opacity: .55; margin-bottom: 14px; }
+    .m-endstate b { font-size: 16px; color: var(--cfg); font-weight: 600; }
+    .m-endstate p { margin: 8px 0 18px; font-size: 13px; line-height: 1.8; }
+    .m-endstate button { height: 36px; padding: 0 22px; border-radius: 18px; border: 1px solid var(--line); font-size: 13px; color: var(--cfg); }
+    .m-prose { font-size: var(--fs); line-height: var(--lh); letter-spacing: .02em; }
+    .m-prose p { margin: 0 0 .78em; text-align: justify; text-indent: 2em; word-break: break-all; }
+    .m-prose ::selection { background: rgba(139,105,20,.25); }
+    /* 沉浸态顶部小字：章节名 + 时间 + 电量（起点 App 同款） */
+    .hdr { position: absolute; z-index: 20; top: 0; left: 0; right: 0; height: 38px; padding: 14px 22px 0; display: flex; align-items: flex-start; justify-content: space-between; font-size: 11.5px; color: var(--mute); background: linear-gradient(var(--paper) 62%, transparent); transition: opacity .2s; pointer-events: none; }
+    .hdr .l { max-width: 62%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hdr .r { display: flex; align-items: center; gap: 6px; }
+    .bat { position: relative; display: inline-block; width: 20px; height: 10px; border: 1px solid currentColor; border-radius: 3px; opacity: .85; }
+    .bat::after { content: ""; position: absolute; right: -3px; top: 2px; width: 2px; height: 4px; border-radius: 0 1px 1px 0; background: currentColor; }
+    .bat b { position: absolute; left: 1px; top: 1px; bottom: 1px; width: 40%; border-radius: 1px; background: currentColor; }
+    .screen.menu .hdr { opacity: 0; }
+
+    /* 顶栏（呼出菜单） */
+    .m-top { position: absolute; z-index: 50; top: 0; left: 0; right: 0; height: 82px; padding-top: 30px; display: flex; align-items: center; padding-left: 10px; padding-right: 14px; background: var(--chrome); color: var(--cfg); box-shadow: 0 6px 18px -10px rgba(0,0,0,.35); transform: translateY(-105%); transition: transform .3s cubic-bezier(.22,.8,.2,1), background .3s; }
+    .screen.menu .m-top { transform: none; }
+    .sys { position: absolute; top: 0; left: 0; right: 0; height: 30px; padding: 9px 20px 0; display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: var(--cfg); }
+    .sys .ic { display: flex; align-items: center; gap: 5px; }
+    .sig { display: inline-flex; align-items: flex-end; gap: 1.5px; height: 10px; } .sig i { width: 2.5px; background: currentColor; border-radius: 1px; } .sig i:nth-child(1){height:4px}.sig i:nth-child(2){height:6px}.sig i:nth-child(3){height:8px}.sig i:nth-child(4){height:10px}
+    .tb-btn { display: inline-flex; align-items: center; gap: 4px; height: 44px; padding: 0 8px; font-size: 14px; color: var(--cfg); position: relative; }
+    .tb-btn.back { padding: 0 6px; }
+    .tb-btn.on svg { fill: currentColor; }
+    .tb-btn .badge { position: absolute; top: 4px; left: 21px; min-width: 15px; height: 15px; padding: 0 4px; border-radius: 8px; background: var(--red); color: #fff; font-size: 10px; line-height: 15px; text-align: center; font-weight: 600; }
+    .m-top .sp { flex: 1; }
+
+    /* 底栏（呼出菜单） */
+    .m-bottom { position: absolute; z-index: 50; left: 0; right: 0; bottom: 0; padding: 16px 16px 8px; background: var(--chrome); color: var(--cfg); box-shadow: 0 -6px 18px -10px rgba(0,0,0,.35); transform: translateY(105%); transition: transform .3s cubic-bezier(.22,.8,.2,1), background .3s; }
+    .screen.menu .m-bottom { transform: none; }
+    .rd { position: absolute; top: 7px; right: 14px; width: 6px; height: 6px; border-radius: 50%; background: var(--red); }
+    .slide { display: flex; align-items: center; gap: 12px; margin: 14px 0 6px; }
+    .slide button { flex-shrink: 0; font-size: 14px; color: var(--cfg); height: 32px; }
+    .slide button:disabled { opacity: .35; }
+    .tabs { display: grid; grid-template-columns: repeat(4, 1fr); padding-top: 4px; }
+    .tab { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 8px 0 6px; font-size: 11.5px; color: var(--cfg); }
+    .tab.on { color: var(--accent); }
+    .tab small { position: absolute; top: 2px; left: calc(50% + 6px); font-size: 9px; line-height: 1; color: var(--mute); }
+    input[type=range] { -webkit-appearance: none; appearance: none; flex: 1; min-width: 0; height: 28px; margin: 0; background: transparent; outline: none; }
+    input[type=range]::-webkit-slider-runnable-track { height: 2px; border-radius: 1px; background: var(--track); }
+    input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; margin-top: -11px; border-radius: 50%; background: #fff; box-shadow: 0 1px 6px rgba(0,0,0,.35); border: 0; }
+    input[type=range]::-moz-range-track { height: 2px; background: var(--track); }
+    input[type=range]::-moz-range-thumb { width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 6px rgba(0,0,0,.35); border: 0; }
+    input[type=range]:disabled { opacity: .4; }
+
+    /* 设置面板（起点：亮度 / 字号 / 背景 / 四个快捷项） */
+    .m-mask { position: absolute; z-index: 60; inset: 0; background: rgba(0,0,0,.4); opacity: 0; pointer-events: none; transition: opacity .3s; }
+    .screen.drawer .m-mask { opacity: 1; pointer-events: auto; }
+    .screen.sheet .m-mask { opacity: 1; pointer-events: auto; background: transparent; }
+    .m-sheet { position: absolute; z-index: 70; left: 0; right: 0; bottom: 0; padding: 12px 20px 8px; background: var(--chrome); color: var(--cfg); transform: translateY(105%); transition: transform .3s cubic-bezier(.22,.8,.2,1), background .3s; box-shadow: 0 -6px 18px -10px rgba(0,0,0,.35); }
+    .screen.sheet .m-sheet { transform: none; }
+    .sh { display: flex; align-items: center; gap: 12px; min-height: 58px; }
+    .sh > label { position: relative; flex-shrink: 0; width: 32px; font-size: 12.5px; color: var(--cfg); }
+    .sh .ico { flex-shrink: 0; color: var(--cfg); }
+    .sys-chk { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; font-size: 12.5px; color: var(--cfg); }
+    .sys-chk i { width: 16px; height: 16px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--pill); opacity: .35; }
+    .sys-chk.on i { opacity: 1; }
+    .fsr { flex: 1; display: flex; align-items: center; gap: 10px; }
+    .cap { height: 38px; min-width: 66px; padding: 0 12px; border-radius: 19px; border: 1px solid var(--line); background: transparent; font-size: 16px; color: var(--cfg); display: inline-flex; align-items: center; justify-content: center; gap: 2px; }
+    .cap:active { background: var(--pill); }
+    .fsr .n { width: 24px; text-align: center; font-size: 15px; }
+    .cap.font { margin-left: auto; min-width: 0; padding: 0 10px; font-size: 12.5px; white-space: nowrap; flex-shrink: 0; background: var(--pill); border-color: transparent; }
+    .cap { min-width: 66px; }
+    .bgs { flex: 1; display: flex; justify-content: space-between; align-items: center; }
+    .bg { width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(0,0,0,.12); transition: .15s; }
+    .bg.on { border: 2px solid var(--accent); box-shadow: 0 0 0 2px var(--chrome) inset; }
+    .quick { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--line); }
+    .quick .tab { padding-top: 10px; }
+    .quick .tab .rd { top: 4px; right: calc(50% - 20px); }
+    .more { display: none; padding: 4px 0 8px; border-top: 1px solid var(--line); margin-top: 6px; }
+    .screen.more-open .more { display: block; }
+    .seg { flex: 1; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; }
+    .seg button { height: 34px; border-radius: 17px; border: 1px solid var(--line); font-size: 13px; color: var(--cfg); }
+    .seg button.on { background: var(--accent); border-color: var(--accent); color: var(--paper); }
+    .phone[data-theme="night"] .seg button.on { color: #1b1b1d; }
+
+    /* 目录抽屉 */
+    .m-drawer { position: absolute; z-index: 80; top: 0; bottom: 0; left: 0; width: 86%; display: flex; flex-direction: column; background: var(--paper); color: var(--fg); transform: translateX(-103%); transition: transform .32s cubic-bezier(.22,.8,.2,1); box-shadow: 18px 0 40px -18px rgba(0,0,0,.5); }
+    .screen.drawer .m-drawer { transform: none; }
+    .m-drawer > * { position: relative; z-index: 1; }
+    .dr-head { display: flex; gap: 12px; align-items: center; padding: 40px 18px 14px; }
+    .cov { width: 46px; height: 62px; flex-shrink: 0; border-radius: 3px; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 20px; background: linear-gradient(150deg, #3d3b52, #7c4f4a); box-shadow: 0 2px 6px rgba(0,0,0,.3); }
+    .dr-head b { display: block; font-size: 16px; }
+    .dr-head small { display: block; margin-top: 6px; font-size: 12px; color: var(--mute); }
+    .dr-tabs { display: flex; align-items: center; padding: 0 18px; border-bottom: 1px solid var(--line); }
+    .dr-tabs button { position: relative; height: 42px; margin-right: 26px; font-size: 15px; color: var(--mute); }
+    .dr-tabs button.on { color: var(--fg); font-weight: 600; }
+    .dr-tabs button.on::after { content: ""; position: absolute; left: 50%; bottom: -1px; width: 18px; height: 3px; margin-left: -9px; border-radius: 2px; background: var(--accent); }
+    .dr-tabs .sort { margin: 0 0 0 auto; display: inline-flex; align-items: center; gap: 3px; font-size: 12.5px; color: var(--cfg); }
+    .dr-list { flex: 1; overflow-y: auto; margin: 0; padding: 0 0 20px; list-style: none; scrollbar-width: none; }
+    .dr-list::-webkit-scrollbar { display: none; }
+    .dr-item { display: flex; align-items: center; gap: 8px; width: 100%; height: 50px; padding: 0 18px; border-bottom: 1px solid var(--line); text-align: left; font-size: 14.5px; color: var(--fg); }
+    .dr-item .t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dr-item.read { color: var(--mute); }
+    .dr-item.cur { color: var(--accent); font-weight: 600; }
+    .dr-item.cur::after { content: "在读"; font-size: 10px; font-weight: 400; line-height: 15px; padding: 0 4px; border: 1px solid var(--accent); border-radius: 3px; }
+    .dr-bm { display: block; width: 100%; padding: 14px 18px; text-align: left; border-bottom: 1px solid var(--line); }
+    .dr-bm b { display: block; font-size: 14px; }
+    .dr-bm p { margin: 6px 0 4px; font-size: 12.5px; line-height: 1.7; color: var(--mute); }
+    .dr-bm small { font-size: 11px; color: var(--mute); }
+    .dr-empty { padding: 70px 20px; text-align: center; font-size: 13px; color: var(--mute); list-style: none; }
+
+    .tint { position: absolute; z-index: 30; inset: 0; background: rgba(255,150,0,.13); mix-blend-mode: multiply; pointer-events: none; opacity: 0; transition: opacity .3s; }
+    .screen.eye .tint { opacity: 1; }
+    .dim { position: absolute; z-index: 150; inset: 0; background: #000; pointer-events: none; opacity: var(--dim, 0); }
+    .toast { position: absolute; z-index: 120; left: 50%; bottom: 170px; max-width: 80%; transform: translate(-50%, 8px); padding: 9px 16px; border-radius: 6px; background: rgba(0,0,0,.78); color: #fff; font-size: 13px; opacity: 0; transition: .25s; pointer-events: none; text-align: center; }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    /* ================= 真手机打开：全屏单页 ================= */
+    @media (max-width: 560px) {
+      .demo-bar .sp, .demo-bar strong { display: none; }
+      .intro, .spec, .fig figcaption, .fig:not(:first-child) { display: none; }
+      .stage { display: block; padding: 0; }
+      .fig { width: 100%; }
+      .phone { width: 100%; height: calc(100dvh - 46px); padding: 0; border-radius: 0; box-shadow: none; background: none; }
+      .phone::before { display: none; }
+      .screen { border-radius: 0; }
+      .sys { display: none; }
+      .m-top { height: 52px; padding-top: 0; }
+      .m-bottom { padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
+      .hdr { padding-top: 10px; }
+      .toast { bottom: 190px; }
+    }
+    @media (max-width: 1000px) { .spec-grid { grid-template-columns: repeat(2, 1fr); } }
+  </style>
+</head>
+<body>
+  <div class="demo-bar">
+    <strong>小说阅读器 · 手机版设计稿</strong><span class="sp"></span>
+    <a href="reader-pc.html">PC 版</a><a class="cur">手机版</a>
+  </div>
+
+  <header class="intro">
+    <h1>手机版阅读器 · 参考起点 App</h1>
+    <p>羊皮纸底色 + 金棕色控件，沿用起点“点中间呼出菜单、顶栏 / 底栏 / 设置面板 / 目录抽屉”的完整布局。4 屏均可真实操作：点屏幕中间呼出菜单，点底栏“设置”调字号和背景，点“目录”打开抽屉；任一屏改设置，其余屏同步。</p>
+    <div class="map">
+      <span>订阅<i>→</i>下载原文件</span><span>月票<i>→</i>书签</span><span>（新增）顶栏搜索</span>
+      <span>书友圈<i>→</i>书签</span><span>横屏模式<i>→</i>翻页方式</span>
+    </div>
+  </header>
+
+  <section class="stage">
+    <figure class="fig"><div class="phone" id="ph1"></div>
+      <figcaption><span class="no">01 / READING</span><b>沉浸阅读</b><ul><li>整屏正文，顶部仅一行 章节名 + 时间 + 电量</li><li>章节之间无“上一章 / 下一章”按钮：滚动时下一章直接接上，分页时翻页即进入下一章</li><li>只有读完全书最后一章，才出现“已读完最新章节”空状态</li></ul></figcaption></figure>
+    <figure class="fig"><div class="phone" id="ph2"></div>
+      <figcaption><span class="no">02 / MENU</span><b>呼出菜单</b><ul><li>顶栏：返回 · 搜索 · 下载 · 书签 · 更多</li><li>底栏：上下章滑条 → 目录 / 书签 / 夜间 / 设置</li></ul></figcaption></figure>
+    <figure class="fig"><div class="phone" id="ph3"></div>
+      <figcaption><span class="no">03 / SETTINGS</span><b>阅读设置</b><ul><li>亮度（可随系统）、字号 A− / A+、字体、6 种背景</li><li>护眼 / 自动阅读 / 翻页方式 / 更多设置，正文实时预览</li></ul></figcaption></figure>
+    <figure class="fig"><div class="phone" id="ph4"></div>
+      <figcaption><span class="no">04 / CONTENTS</span><b>目录与书签</b><ul><li>左侧抽屉 86% 宽，当前章高亮并自动定位</li><li>已读章节置灰，支持倒序</li></ul></figcaption></figure>
+  </section>
+
+  <section class="spec">
+    <h2>交互规范</h2>
+    <div class="spec-grid">
+      <div class="spec-card"><b>两种阅读方式</b><span>滚动：下一章直接接在上一章后面，无任何分隔按钮，点屏幕呼出菜单。分页：横向翻页，翻过本章最后一页即是下一章首页；3 : 4 : 3 分区点按，或左右滑动。</span>
+        <div class="tap-map"><div>上一屏</div><div>菜单</div><div>下一屏</div></div></div>
+      <div class="spec-card"><b>6 种背景</b><span>白 / 夜间黑 / 米粉 / 豆绿 / 粉 / 羊皮纸（默认）。夜间按钮与背景黑色联动。</span>
+        <div class="th-row"><i style="background:#fff"></i><i style="background:#1b1b1d"></i><i style="background:#ebdcd0"></i><i style="background:#dcead0"></i><i style="background:#fbe3de"></i><i style="background:#ecdfbd"></i></div></div>
+      <div class="spec-card"><b>进度云同步</b><span>切章 / 退出时上报章节与章内百分比，PC 与手机打开同一本书自动续读。</span></div>
+      <div class="spec-card"><b>文件与权限</b><span>TXT 按“第X章”规则分章，EPUB 读内置目录；仅登录且订单归属本人可在线阅读，游客仅可下载。</span></div>
+    </div>
+  </section>
+
+  <script>
+    /* ================= 示例内容（原创，仅供设计演示） ================= */
+    const BOOK = { name: "深夜维修工", fmt: "TXT" }
+    const TOC = [
+      "序章 最后一班扶梯", "第一章 凌晨三点的扶梯", "第二章 值班表上没有的名字", "第三章 十六号柜",
+      "第四章 冷库的回声", "第五章 不肯下班的人", "第六章 夜班交接", "第七章 停电十七分钟",
+      "第八章 监控里的第二个影子", "第九章 保安室的茶", "第十章 地下三层", "第十一章 旧图纸",
+      "第十二章 一枚生锈的铭牌", "第十三章 他们为什么留下", "第十四章 凌晨四点的广播", "第十五章 失物招领处",
+      "第十六章 最后一次巡检", "第十七章 天亮之前", "第十八章 开门营业",
+      "番外一 便利店灯亮着", "番外二 值班日志", "番外三 沈既白的雨伞",
+    ]
+    const BODY = [
+      [
+        "夜里十一点四十，商场的最后一批顾客被保安客气地请了出去。卷帘门一扇接一扇落下，像有人在城市边缘缓缓合上了眼睛。",
+        "沈既白把工具箱放在三楼扶梯口，蹲下身，用手电照进裙板的缝隙。履带上的齿牙磨得发亮，只有靠近楼梯口的第七级，沾着一小片说不清颜色的潮痕。",
+        "他在这家商场做了六年维修工，早就习惯了深夜里那种被放大的安静——空调的低鸣、远处冷库压缩机的震颤，还有自己鞋底和地砖摩擦的声音。",
+        "可今晚多了一样东西。扶梯没有通电，却在他背后，轻轻地、一级一级地，往上走了一格。",
+      ],
+      [
+        "手电的光圈在裙板上晃了晃，沈既白屏住呼吸，慢慢直起腰。",
+        "扶梯静止着，像一条被冻住的银色河。他伸手按了按急停按钮，红色的键帽完好地弹在原位——断电、锁闭、挂牌，三道工序都是他亲手做的，不会错。",
+        "“大概是履带回弹。”他对自己说。声音在空荡的中庭里转了一圈，没有人回答。",
+        "他重新蹲下，把螺丝刀探进第七级台阶的缝隙。金属碰着金属，声音很轻，却在夜里被放得很大。就在这时，对讲机沙沙响了两声，里面传来保安老周含混的嗓音：“小沈，你还在三楼？”",
+        "“在，快收工了。”",
+        "“哦。”老周顿了顿，“监控里……你旁边是不是还站着一位？”",
+        "沈既白没有回头。他盯着手电照亮的那一小块地面，那里只有他自己的影子，一个，安安静静地趴在地上。",
+        "凌晨三点整，整座商场的灯同时暗了一格。",
+      ],
+      [
+        "第二天傍晚，沈既白在更衣室里翻开值班表。",
+        "纸页被翻得起了毛边，最上面一行印着“夜班维修·沈既白”。往下数，保洁、保安、冷库巡检……三十一个名字，他都认得。",
+        "只有最底下那一行，用铅笔轻轻写着一个他不认得的名字：陈守。",
+        "没有工号，没有班次，字迹却很新，像是谁昨天夜里刚刚补上去的。",
+        "“你问陈师傅啊？”隔壁柜的老赵嚼着包子，含糊地说，“早年管扶梯的，退休好些年了。怎么，他又回来排班了？”",
+        "老赵笑得像开了个玩笑。沈既白也跟着笑了笑，笑意没能爬上眼角。",
+        "他把值班表翻到背面，铅笔的压痕透过纸张，隐约现出另一行小字——“十六号柜，别开”。",
+      ],
+      [
+        "更衣室一共二十四个铁皮柜，编号从一排到二十四。十六号在最里侧，门上落着一层薄灰，锁孔却很干净。",
+        "沈既白在柜子前站了很久。",
+        "走廊尽头的灯管闪了两下，嗡的一声，又稳住了。他把手掌贴在冰凉的柜门上，听见里面有极轻的节拍——不是心跳，更像是扶梯履带一格一格往上爬的声音。",
+        "他想起老周在对讲机里没问完的那句话。",
+        "“你旁边是不是还站着一位？”",
+        "钥匙在他口袋里。那是入职第一天行政交给他的一串旧钥匙，其中有一把，齿纹和别的都不一样。",
+        "他把它拿了出来。",
+      ],
+    ]
+    const bodyOf = (i) => BODY[i % BODY.length] // 设计稿：超出 4 章的用示例正文循环填充
+
+    /* ================= 图标 ================= */
+    const ICON = {
+      chevL: '<path d="m15 18-6-6 6-6"/>',
+      download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+      bookmark: '<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>',
+      more: '<circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/><circle cx="5" cy="12" r="1.3"/>',
+      search: '<circle cx="11" cy="11" r="7.5"/><path d="m21 21-4.3-4.3"/>',
+      pen: '<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>',
+      flag: '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>',
+      list: '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
+      moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+      sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
+      sunDim: '<circle cx="12" cy="12" r="3"/><path d="M12 4v1M12 19v1M5.6 5.6l.7.7M17.7 17.7l.7.7M4 12h1M19 12h1M5.6 18.4l.7-.7M17.7 6.3l.7-.7"/>',
+      hex: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><circle cx="12" cy="12" r="3"/>',
+      eyeOff: '<path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/>',
+      eye: '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+      auto: '<rect x="4" y="3" width="16" height="7" rx="2"/><rect x="4" y="14" width="16" height="7" rx="2"/><path d="m12 11.5 0 1"/>',
+      page: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18M3 9h6"/>',
+      dots: '<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>',
+      head: '<path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/>',
+      chevR: '<path d="m9 18 6-6-6-6"/>',
+      sort: '<path d="m3 16 4 4 4-4M7 20V4M21 8l-4-4-4 4M17 4v16"/>',
+    }
+    const ic = (n, s = 22, w = 1.7) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${ICON[n]}</svg>`
+    const hydrate = (root) => root.querySelectorAll("[data-ic]").forEach((el) => { el.outerHTML = ic(el.dataset.ic, +(el.dataset.s || 22)) })
+
+    /* ================= 共享设置（4 屏联动） ================= */
+    const THEMES = [["white", "#ffffff"], ["night", "#1b1b1d"], ["sand", "#ebdcd0"], ["green", "#dcead0"], ["pink", "#fbe3de"], ["parch", "#ecdfbd"]]
+    const FONTS = {
+      sys: '"PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif',
+      song: 'SimSun, "Songti SC", "Noto Serif SC", serif',
+      kai: 'KaiTi, STKaiti, "Noto Serif SC", serif',
+    }
+    const FONT_NAME = { sys: "系统字体", song: "宋体", kai: "楷体" }
+    let S = { theme: "parch", prev: "parch", fs: 18, font: "sys", lh: 1.62, mode: "scroll", bright: 100, sysb: false, eye: false }
+    try { Object.assign(S, JSON.parse(localStorage.getItem("lx-reader-m2") || "{}")) } catch (e) {}
+    const save = () => { try { localStorage.setItem("lx-reader-m2", JSON.stringify(S)) } catch (e) {} }
+    const bookmarks = new Map([[0, { pct: 62, text: "他在这家商场做了六年维修工，早就习惯了深夜里那种被放大的安静……" }]])
+    const READ = new Set([0])
+    const PHONES = []
+
+    const TPL = `
+      <div class="screen">
+        <div class="m-scroll"><div class="m-flow"></div></div>
+        <div class="hdr"><span class="l"></span><span class="r">22:47 <i class="bat"><b></b></i></span></div>
+        <div class="tint"></div>
+
+        <div class="m-top">
+          <div class="sys"><span>22:47</span><span class="ic"><span class="sig"><i></i><i></i><i></i><i></i></span><b style="font-weight:600">5G</b><i class="bat"><b></b></i></span></div>
+          <button class="tb-btn back" data-a="back" type="button"><i data-ic="chevL" data-s="28"></i></button>
+          <span class="sp"></span>
+          <button class="tb-btn" data-a="search" type="button"><i data-ic="search" data-s="24"></i>搜索</button>
+          <button class="tb-btn" data-a="dl" type="button"><i data-ic="download" data-s="24"></i>下载</button>
+          <button class="tb-btn" data-a="bm" type="button"><i data-ic="bookmark" data-s="24"></i>书签<b class="badge"></b></button>
+          <button class="tb-btn" data-a="more" type="button"><i data-ic="dots" data-s="24"></i></button>
+        </div>
+
+        <div class="m-bottom">
+          <div class="slide">
+            <button data-a="prev" type="button">上一章</button>
+            <input class="seek" type="range" min="1" max="${TOC.length}" value="2" />
+            <button data-a="next" type="button">下一章</button>
+          </div>
+          <div class="tabs">
+            <button class="tab" data-a="toc" type="button"><i data-ic="list" data-s="25"></i>目录</button>
+            <button class="tab" data-a="bmlist" type="button"><i data-ic="bookmark" data-s="25"></i>书签<small class="bmn"></small></button>
+            <button class="tab" data-a="night" type="button"><i data-ic="moon" data-s="25"></i><span>夜间</span></button>
+            <button class="tab" data-a="set" type="button"><i data-ic="hex" data-s="25"></i>设置</button>
+          </div>
+        </div>
+
+        <div class="m-mask" data-a="mask"></div>
+
+        <div class="m-sheet">
+          <div class="sh"><label>亮度</label><i class="ico" data-ic="sunDim" data-s="22"></i><input class="in-b" type="range" min="10" max="100" /><i class="ico" data-ic="sun" data-s="22"></i>
+            <button class="sys-chk" data-a="sysb" type="button"><i></i>随系统</button></div>
+          <div class="sh"><label>字号<b class="rd" style="position:absolute;top:-6px;right:-2px;width:6px;height:6px;border-radius:50%;background:var(--red)"></b></label>
+            <div class="fsr"><button class="cap" data-a="fs-" type="button">A<small style="font-size:11px">−</small></button><span class="n fs-n"></span><button class="cap" data-a="fs+" type="button">A<small style="font-size:11px">+</small></button>
+            <button class="cap font" data-a="font" type="button"><span class="fn"></span><i data-ic="chevR" data-s="14"></i></button></div></div>
+          <div class="sh"><label>背景</label><div class="bgs"></div></div>
+          <div class="more">
+            <div class="sh" style="min-height:48px"><label>行距</label><div class="seg" data-k="lh"><button data-v="1.4" type="button">紧凑</button><button data-v="1.62" type="button">标准</button><button data-v="1.95" type="button">宽松</button></div></div>
+          </div>
+          <div class="quick">
+            <button class="tab" data-a="eye" type="button"><i data-ic="eyeOff" data-s="25"></i>护眼模式</button>
+            <button class="tab" data-a="auto" type="button"><i data-ic="auto" data-s="25"></i>自动阅读<b class="rd"></b></button>
+            <button class="tab" data-a="paging" type="button"><i data-ic="page" data-s="25"></i><span class="pg">滚动阅读</span></button>
+            <button class="tab" data-a="moreset" type="button"><i data-ic="dots" data-s="25"></i>更多设置<b class="rd"></b></button>
+          </div>
+        </div>
+
+        <aside class="m-drawer">
+          <div class="dr-head"><span class="cov">深</span><div><b>《${BOOK.name}》</b><small class="dr-sub"></small></div></div>
+          <div class="dr-tabs"><button class="on" data-a="tab-toc" type="button">目录</button><button data-a="tab-bm" type="button">书签</button>
+            <button class="sort" data-a="sort" type="button"><i data-ic="sort" data-s="14"></i><span>倒序</span></button></div>
+          <ul class="dr-list"></ul>
+        </aside>
+
+        <div class="dim"></div>
+        <div class="toast"></div>
+      </div>`
+
+    function mount(host, init = {}) {
+      host.innerHTML = TPL; hydrate(host)
+      const $ = (s) => host.querySelector(s), $$ = (s) => [...host.querySelectorAll(s)]
+      const screen = $(".screen"), scroll = $(".m-scroll"), flow = $(".m-flow")
+      const LAST = TOC.length - 1, GAP = 44
+      const st = { cur: -1, a: 0, b: 0, page: 0, tab: "toc", desc: false, toastT: 0, timer: 0, tick: 0, auto: false, key: "", ready: false, swiped: false }
+      const paged = () => S.mode === "page"
+
+      /* ---- 章节流：滚动模式首尾相接；分页模式翻页即进入下一章 ---- */
+      const secHTML = (i) => `<section class="m-sec" data-i="${i}"><h2 class="m-ch">${TOC[i]}</h2><div class="m-prose">${bodyOf(i).map((x) => `<p>${x}</p>`).join("")}</div></section>`
+      const endHTML = `<section class="m-endstate" data-end="1">${ic("book", 44, 1.3)}<b>已读完最新章节</b><p>作者暂未更新后续章节<br />更新后会在这里继续阅读</p><button data-a="toc" type="button">查看目录</button></section>`
+      const secs = () => [...flow.querySelectorAll(".m-sec")]
+      const W = () => scroll.clientWidth
+      const pageCount = () => Math.max(1, Math.round((flow.scrollWidth + GAP) / W()))
+      const secStart = (el) => Math.round((el.getBoundingClientRect().left - flow.getBoundingClientRect().left) / W())
+      const secEnd = (el) => (el.nextElementSibling ? secStart(el.nextElementSibling) : pageCount())
+
+      function build(a, b) {
+        st.a = a; st.b = b
+        flow.innerHTML = Array.from({ length: b - a + 1 }, (_, k) => secHTML(a + k)).join("") + (b === LAST ? endHTML : "")
+      }
+      function layout() {
+        if (!paged()) { flow.style.cssText = ""; return }
+        flow.style.width = scroll.clientWidth - GAP + "px"
+        flow.style.height = scroll.clientHeight - 46 - 34 + "px"
+        flow.style.columnWidth = scroll.clientWidth - GAP + "px"
+      }
+      function appendNext() {
+        if (st.b >= LAST) return
+        st.b++
+        flow.querySelector("[data-end]")?.remove()
+        flow.insertAdjacentHTML("beforeend", secHTML(st.b) + (st.b === LAST ? endHTML : ""))
+      }
+      function prependPrev() {
+        if (st.a <= 0) return 0
+        st.a--; flow.insertAdjacentHTML("afterbegin", secHTML(st.a))
+        return 1
+      }
+      function setCur(i) {
+        if (i === st.cur) return
+        st.cur = i; READ.add(i)
+        $(".hdr .l").textContent = TOC[i]
+        $(".seek").value = i + 1
+        $$(".slide button[data-a=prev]").forEach((b) => (b.disabled = i === 0))
+        $$(".slide button[data-a=next]").forEach((b) => (b.disabled = i === LAST))
+        if (st.ready) refresh()
+      }
+
+      /* 跳转到某章（目录 / 滑条 / 书签 / 设置变更重排）。pct = 章内百分比 */
+      function jump(i, pct = 0) {
+        i = Math.max(0, Math.min(LAST, i))
+        if (!W()) return
+        build(Math.max(0, i - 1), Math.min(LAST, i + 1)); layout()
+        const sec = secs().find((s) => +s.dataset.i === i)
+        if (paged()) {
+          const s0 = secStart(sec), n = Math.max(1, secEnd(sec) - s0)
+          go(s0 + Math.round((pct / 100) * (n - 1)), false)
+        } else {
+          scroll.scrollTop = sec.offsetTop - 40 + Math.round((pct / 100) * sec.offsetHeight)
+        }
+        st.cur = -1; setCur(i)
+      }
+
+      /* 分页 */
+      function go(p, anim = true) {
+        st.page = Math.max(0, Math.min(pageCount() - 1, p))
+        flow.style.transition = anim ? "" : "none"
+        flow.style.transform = `translateX(${-st.page * W()}px)`
+        if (!anim) { void flow.offsetWidth; flow.style.transition = "" }
+        const ss = secs(); let cur = +ss[0].dataset.i
+        ss.forEach((s) => { if (secStart(s) <= st.page) cur = +s.dataset.i })
+        setCur(cur)
+        if (st.b < LAST && st.page >= pageCount() - 2) appendNext() // 提前接上下一章
+      }
+      function flip(dir) {
+        if (dir > 0) {
+          if (st.page < pageCount() - 1) go(st.page + 1)
+          else toast("已经是最后一页")
+        } else if (st.page > 0) go(st.page - 1)
+        else {
+          const p0 = pageCount()
+          if (prependPrev()) { const added = pageCount() - p0; go(added, false); go(added - 1) } // 上一章接到最前面，再翻回它的最后一页
+          else toast("已经是第一页")
+        }
+      }
+
+      /* 滚动：快到底部时接下一章，快到顶部时接上一章 */
+      function onScroll() {
+        if (paged() || !st.ready) return
+        const t = scroll.scrollTop
+        if (st.b < LAST && scroll.scrollHeight - t - scroll.clientHeight < 600) appendNext()
+        if (st.a > 0 && t < 300) { const h0 = scroll.scrollHeight; prependPrev(); scroll.scrollTop = t + (scroll.scrollHeight - h0) }
+        let cur = st.a; secs().forEach((s) => { if (s.offsetTop - 40 <= scroll.scrollTop + 100) cur = +s.dataset.i })
+        setCur(cur)
+      }
+      scroll.addEventListener("scroll", onScroll)
+
+      function currentPct() {
+        const sec = secs().find((s) => +s.dataset.i === st.cur); if (!sec) return 0
+        if (paged()) { const s0 = secStart(sec), n = secEnd(sec) - s0; return n > 1 ? Math.max(0, Math.min(100, Math.round(((st.page - s0) / (n - 1)) * 100))) : 0 }
+        return Math.max(0, Math.min(100, Math.round(((scroll.scrollTop - (sec.offsetTop - 40)) / sec.offsetHeight) * 100)))
+      }
+      /* ---- 目录 ---- */
+      function renderDrawer() {
+        const list = $(".dr-list")
+        $(".dr-sub").textContent = `${BOOK.fmt} · 共 ${TOC.length} 章 · 读至第 ${st.cur + 1} 章`
+        $$(".dr-tabs button[data-a^=tab]").forEach((b) => b.classList.toggle("on", b.dataset.a === "tab-" + st.tab))
+        $(".dr-tabs .sort").classList.toggle("hidden", st.tab !== "toc")
+        $(".dr-tabs .sort span").textContent = st.desc ? "正序" : "倒序"
+        if (st.tab === "toc") {
+          const idx = TOC.map((_, i) => i); if (st.desc) idx.reverse()
+          list.innerHTML = idx.map((i) => `<li><button class="dr-item ${i === st.cur ? "cur" : READ.has(i) ? "read" : ""}" data-ch="${i}" type="button"><span class="t">${TOC[i]}</span></button></li>`).join("")
+          const c = list.querySelector(".cur"); if (c) requestAnimationFrame(() => (list.scrollTop = Math.max(0, c.offsetTop - 140)))
+        } else {
+          list.innerHTML = bookmarks.size
+            ? [...bookmarks].map(([ch, b]) => `<li><button class="dr-bm" data-bm="${ch}" type="button"><b>${TOC[ch]}</b><p>${b.text}</p><small>本章 ${b.pct}%</small></button></li>`).join("")
+            : `<li class="dr-empty">还没有书签<br />呼出菜单点“书签”即可添加</li>`
+        }
+      }
+      function refresh() {
+        const has = bookmarks.has(st.cur)
+        $(".tb-btn[data-a=bm]").classList.toggle("on", has)
+        const bd = $(".tb-btn .badge"); bd.textContent = bookmarks.size; bd.classList.toggle("hidden", !bookmarks.size)
+        const bn = $(".bmn"); bn.textContent = bookmarks.size || ""
+        renderDrawer()
+      }
+
+      /* ---- 状态切换 ---- */
+      const flag = (o) => { for (const k in o) screen.classList.toggle(k, o[k]) ; syncTabs() }
+      function syncTabs() {
+        $(".m-bottom .tab[data-a=toc]").classList.toggle("on", screen.classList.contains("drawer"))
+        $(".m-bottom .tab[data-a=set]").classList.toggle("on", screen.classList.contains("sheet"))
+      }
+      function toast(m) { const el = $(".toast"); el.textContent = m; el.classList.add("show"); clearTimeout(st.toastT); st.toastT = setTimeout(() => el.classList.remove("show"), 1700) }
+      function toggleBm() {
+        if (bookmarks.has(st.cur)) { bookmarks.delete(st.cur); toast("已取消书签") }
+        else { const b = bodyOf(st.cur); bookmarks.set(st.cur, { pct: currentPct(), text: b[Math.min(1, b.length - 1)].slice(0, 36) + "……" }); toast("已添加书签") }
+        PHONES.forEach((p) => p.refresh())
+      }
+      function setAuto(on) {
+        st.auto = on; clearInterval(st.timer)
+        if (on) st.timer = setInterval(() => { if (!paged()) scroll.scrollTop += 1; else if (++st.tick % 180 === 0) flip(1) }, 28)
+        $(".quick .tab[data-a=auto]").classList.toggle("on", on)
+      }
+
+      /* ---- 点按：滚动模式任意位置呼出菜单；分页模式 3:4:3 分区（左翻前页 / 中菜单 / 右翻后页），也支持左右滑动 ---- */
+      let sx = 0, sy = 0
+      scroll.addEventListener("pointerdown", (e) => { sx = e.clientX; sy = e.clientY; st.swiped = false })
+      scroll.addEventListener("pointerup", (e) => {
+        if (!paged()) return
+        const dx = e.clientX - sx, dy = e.clientY - sy
+        if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.5) { st.swiped = true; flip(dx < 0 ? 1 : -1) }
+      })
+      scroll.addEventListener("click", (e) => {
+        if (st.swiped) { st.swiped = false; return }
+        if (e.target.closest("button")) return
+        if (screen.classList.contains("menu")) return flag({ menu: false })
+        const r = scroll.getBoundingClientRect(), x = (e.clientX - r.left) / r.width
+        if (paged() && x < 0.3) flip(-1)
+        else if (paged() && x > 0.7) flip(1)
+        else flag({ menu: true })
+      })
+
+      host.addEventListener("click", (e) => {
+        const ch = e.target.closest("[data-ch]"); if (ch) { jump(+ch.dataset.ch); flag({ drawer: false, menu: false }); return }
+        const bm = e.target.closest("[data-bm]"); if (bm) { jump(+bm.dataset.bm, bookmarks.get(+bm.dataset.bm).pct); flag({ drawer: false, menu: false }); return }
+        const th = e.target.closest("[data-th]"); if (th) { S.theme = th.dataset.th; commit(); return }
+        const sg = e.target.closest(".seg [data-v]"); if (sg) { S[sg.parentElement.dataset.k] = +sg.dataset.v; commit(); return }
+        const a = e.target.closest("[data-a]")?.dataset.a; if (!a) return
+        switch (a) {
+          case "prev": jump(st.cur - 1); break
+          case "next": jump(st.cur + 1); break
+          case "toc": st.tab = "toc"; renderDrawer(); flag({ drawer: true, menu: false, sheet: false }); break
+          case "bmlist": st.tab = "bm"; renderDrawer(); flag({ drawer: true, menu: false, sheet: false }); break
+          case "tab-toc": st.tab = "toc"; renderDrawer(); break
+          case "tab-bm": st.tab = "bm"; renderDrawer(); break
+          case "sort": st.desc = !st.desc; renderDrawer(); break
+          case "set": flag({ sheet: true, menu: false, drawer: false }); break
+          case "mask": flag({ drawer: false, sheet: false, "more-open": false }); break
+          case "night": if (S.theme === "night") S.theme = S.prev || "parch"; else { S.prev = S.theme; S.theme = "night" } commit(); break
+          case "bm": toggleBm(); break
+          case "back": toast("Demo：返回订单详情"); break
+          case "dl": toast("Demo：下载原文件《深夜维修工.txt》"); break
+          case "more": toast("Demo：更多（分享 / 反馈 / 书籍信息）"); break
+          case "search": toast("Demo：全文搜索（搜索结果按章节列出，点击跳转）"); break
+          case "fs-": S.fs = Math.max(14, S.fs - 1); commit(); break
+          case "fs+": S.fs = Math.min(30, S.fs + 1); commit(); break
+          case "font": S.font = { sys: "song", song: "kai", kai: "sys" }[S.font]; commit(); break
+          case "sysb": S.sysb = !S.sysb; commit(); break
+          case "eye": S.eye = !S.eye; commit(); break
+          case "auto": setAuto(!st.auto); toast(st.auto ? "自动阅读已开启" : "自动阅读已关闭"); break
+          case "paging": S.mode = paged() ? "scroll" : "page"; commit(); toast(paged() ? "阅读方式：左右翻页" : "阅读方式：上下滚动"); break
+          case "moreset": flag({ "more-open": !screen.classList.contains("more-open") }); break
+        }
+      })
+      $(".seek").addEventListener("input", (e) => toast(`第 ${e.target.value} 章 · ${TOC[e.target.value - 1]}`))
+      $(".seek").addEventListener("change", (e) => jump(+e.target.value - 1))
+      $(".in-b").addEventListener("input", (e) => { S.bright = +e.target.value; S.sysb = false; commit() })
+      $(".bgs").innerHTML = THEMES.map(([k, c]) => `<button class="bg" type="button" data-th="${k}" style="background:${c}"></button>`).join("")
+
+      /* ---- 应用共享设置 ---- */
+      function applyLocal() {
+        host.dataset.theme = S.theme === "parch" ? "" : S.theme
+        host.style.setProperty("--fs", S.fs + "px")
+        host.style.setProperty("--lh", S.lh)
+        host.style.setProperty("--rf", FONTS[S.font])
+        host.style.setProperty("--dim", S.sysb ? 0 : ((100 - S.bright) * 0.006).toFixed(3))
+        $(".in-b").value = S.bright; $(".in-b").disabled = S.sysb
+        $(".sys-chk").classList.toggle("on", S.sysb)
+        $(".fs-n").textContent = S.fs; $(".fn").textContent = FONT_NAME[S.font]
+        $$(".bg").forEach((b) => b.classList.toggle("on", b.dataset.th === S.theme))
+        $$(".seg button").forEach((b) => b.classList.toggle("on", +b.dataset.v === S.lh))
+        screen.classList.toggle("eye", S.eye)
+        $(".quick .tab[data-a=eye]").classList.toggle("on", S.eye)
+        $(".quick .pg").textContent = paged() ? "左右翻页" : "滚动阅读"
+        const night = S.theme === "night"
+        $(".m-bottom .tab[data-a=night]").innerHTML = `${ic(night ? "sun" : "moon", 25)}<span>${night ? "日间" : "夜间"}</span>`
+        /* 影响排版的设置变化 → 以当前章节与进度重新排版 */
+        const key = [S.mode, S.fs, S.lh, S.font].join("|")
+        screen.classList.toggle("paged", paged())
+        if (st.ready && key !== st.key) { const p = currentPct(); st.key = key; jump(st.cur, p) }
+        st.key = key
+      }
+      function commit() { save(); PHONES.forEach((p) => p.applyLocal()) }
+
+      PHONES.push({ applyLocal, refresh, reflow: () => st.ready && W() && jump(st.cur, currentPct()) })
+      applyLocal(); jump(init.ch ?? 1, init.pct || 0); st.ready = true; refresh()
+      if (init.tab) { st.tab = init.tab; renderDrawer() }
+      flag({ menu: !!init.menu, sheet: !!init.sheet, drawer: !!init.drawer })
+    }
+
+    window.addEventListener("resize", () => PHONES.forEach((p) => p.reflow()))
+    mount(document.getElementById("ph1"), { pct: 0 })
+    mount(document.getElementById("ph2"), { pct: 0, menu: true })
+    mount(document.getElementById("ph3"), { pct: 0, sheet: true })
+    mount(document.getElementById("ph4"), { pct: 0, drawer: true })
+  </script>
+</body>
+</html>

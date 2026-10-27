@@ -1,22 +1,15 @@
 import { type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { Copy, FileText, Image as ImageIcon, Lock, Mail, MessageSquare, Upload } from 'lucide-react'
+import { Copy, FileText, Image as ImageIcon, Lock, Mail, MessageSquare, PackagePlus, Upload } from 'lucide-react'
 import { formatWords } from '../lib/commission'
 import { channelLabel, isCommissionOrder, isDoneStatus, itemFiles, orderTitle } from '../lib/orderDisplay'
 import { orderCompactLabel, orderDotClass } from '../lib/orderStatus'
+import { fmtBeijingFull, fmtBeijingRecent } from '../lib/time'
 import { MarkdownContent } from './MarkdownContent'
 import type { Order, OrderItem, OrderPayment, ProductFileItem } from '../types'
 
 const FLOW = ['付定金', '沟通设定', '按章交稿', '付尾款'] as const
 const PAY_KIND: Record<string, string> = { deposit: '定金', balance: '尾款', full: '全款' }
-
-function pad(n: number) {
-  return String(n).padStart(2, '0')
-}
-
-function fmtClock(d: Date) {
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
 
 export function yuan(n: number) {
   const v = Math.round(Number(n) * 100) / 100
@@ -27,22 +20,11 @@ export function yuan(n: number) {
 }
 
 export function fmtListTime(iso?: string | null) {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return '—'
-  const now = new Date()
-  const yesterday = new Date(now)
-  yesterday.setDate(now.getDate() - 1)
-  if (d.toDateString() === now.toDateString()) return fmtClock(d)
-  if (d.toDateString() === yesterday.toDateString()) return `昨天 ${fmtClock(d)}`
-  return `${d.getMonth() + 1}/${d.getDate()} ${fmtClock(d)}`
+  return fmtBeijingRecent(iso)
 }
 
 function fmtFullTime(iso?: string | null) {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return '—'
-  return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${fmtClock(d)}`
+  return fmtBeijingFull(iso)
 }
 
 export function allOrderFiles(o: Order): ProductFileItem[] {
@@ -60,24 +42,28 @@ type Props = {
   order: Order
   uploading?: boolean
   recalling?: boolean
+  replenishing?: boolean
   hideChatLink?: boolean
   onCopy: (text: string, ok?: string) => void
   onUploadClick: () => void
   onDownload: (url: string, name: string) => void
   onDelete: (fileId: string) => void
   onRecallDelivery?: () => void
+  onReplenish?: () => void
 }
 
 export function AdminOrderDetail({
   order,
   uploading,
   recalling,
+  replenishing,
   hideChatLink,
   onCopy,
   onUploadClick,
   onDownload,
   onDelete,
   onRecallDelivery,
+  onReplenish,
 }: Props) {
   const commission = isCommissionOrder(order)
   const files = allOrderFiles(order)
@@ -93,6 +79,9 @@ export function AdminOrderDetail({
     ['deposit_paid', 'awaiting_balance', 'completed'].includes(order.status)
   const balancePaid = payments.some((p) => p.kind === 'balance' && p.status === 'paid') || order.status === 'completed'
   const chatHref = `/admin/conversations?order=${encodeURIComponent(order.id)}`
+  const missingFileItem = order.items.find((it) => itemFiles(it).length === 0)
+  const canReplenish =
+    !commission && (order.status === 'paid' || order.status === 'completed') && !!missingFileItem && !!onReplenish
 
   return (
     <div>
@@ -251,6 +240,15 @@ export function AdminOrderDetail({
         ) : (
           <PayloadFallback items={order.items} commission={commission} />
         )}
+        {canReplenish && files.length === 0 && missingFileItem ? (
+          <p className="mt-3 mb-0 text-[0.8rem] text-ink-mute">
+            买家还没有可下载的文件。请先到
+            <Link to={`/admin/products/${missingFileItem.product_id}/edit`} className="font-semibold text-teal hover:underline">
+              商品
+            </Link>
+            里上传，再点补货。
+          </p>
+        ) : null}
         {canEdit ? (
           <button
             type="button"
@@ -286,6 +284,17 @@ export function AdminOrderDetail({
       </Section>
 
       <div className="mt-7 flex flex-wrap gap-2">
+        {canReplenish ? (
+          <button
+            type="button"
+            disabled={replenishing}
+            onClick={() => onReplenish?.()}
+            className="inline-flex h-[38px] items-center gap-1.5 rounded-[10px] bg-teal px-4 text-[0.84rem] font-bold text-white hover:bg-teal-deep disabled:opacity-60"
+          >
+            <PackagePlus className="h-3.5 w-3.5" strokeWidth={1.9} />
+            {replenishing ? '补货中…' : '补货'}
+          </button>
+        ) : null}
         {commission && !hideChatLink ? (
           <Link
             to={chatHref}

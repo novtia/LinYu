@@ -41,7 +41,7 @@ from ..services.chat_push import emit_recalls
 from ..services.commission_chat import ensure_thread_for_order, notify_deposit_paid, recall_unused_delivery_notices
 from ..services.delivery import random_id
 from ..services.files import is_image_name, save_upload
-from ..services.fulfillment import add_commission_file, fulfill_order, remove_commission_file_rows
+from ..services.fulfillment import add_commission_file, fulfill_order, remove_commission_file_rows, replenish_order
 from ..services.mail import is_valid_email
 from ..services.ratelimit import rate_limit
 
@@ -798,6 +798,21 @@ def recall_order_delivery(
         thread = db.query(CommissionThread).filter(CommissionThread.order_id == order.id).first()
         if thread:
             emit_recalls(db, thread, recalled)
+    return _order_out(order, include_payload=True, unlock_download=True)
+
+
+@router.post("/{order_id}/replenish", response_model=OrderOut)
+def replenish_order_delivery(
+    order_id: str,
+    _: User = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    order = _get_order_or_404(db, order_id)
+    try:
+        replenish_order(db, order)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    order = _get_order_or_404(db, order_id)
     return _order_out(order, include_payload=True, unlock_download=True)
 
 

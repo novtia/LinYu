@@ -5,6 +5,7 @@ import { ApiError, api } from '../../lib/api'
 import { useToast } from '../../context/ToastContext'
 import { formatWords } from '../../lib/commission'
 import { fmtFullTime, isCommissionOrder, isDoneStatus, orderTitle } from '../../lib/orderDisplay'
+import { beijingDateKey } from '../../lib/time'
 import { orderCompactLabel, orderDotClass } from '../../lib/orderStatus'
 import { AdminOrderDetail, fmtListTime, yuan } from '../../components/AdminOrderDetail'
 import type { Order } from '../../types'
@@ -66,7 +67,7 @@ function exportCsv(rows: Order[]) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `orders-${new Date().toISOString().slice(0, 10)}.csv`
+  a.download = `orders-${beijingDateKey()}.csv`
   document.body.appendChild(a)
   a.click()
   a.remove()
@@ -85,6 +86,7 @@ export function OrdersPage() {
   const [busy, setBusy] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [recalling, setRecalling] = useState(false)
+  const [replenishing, setReplenishing] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const filtered = useMemo(() => {
@@ -195,6 +197,22 @@ export function OrdersPage() {
       showToast('已删除稿件')
     } catch (e) {
       showToast(e instanceof ApiError ? e.message : '删除失败')
+    }
+  }
+
+  async function handleReplenish() {
+    if (!id) return
+    if (!window.confirm('将把商品里当前已上传的文件补发到这个订单，买家刷新后即可下载。确定补货？')) return
+    setReplenishing(true)
+    try {
+      const o = await api.post<Order>(`/api/orders/${encodeURIComponent(id)}/replenish`)
+      setDetail(o)
+      setOrders((prev) => prev.map((x) => (x.id === o.id ? o : x)))
+      showToast('已补货，买家现在可以下载')
+    } catch (e) {
+      showToast(e instanceof ApiError ? e.message : '补货失败')
+    } finally {
+      setReplenishing(false)
     }
   }
 
@@ -339,6 +357,7 @@ export function OrdersPage() {
               order={active}
               uploading={uploading}
               recalling={recalling}
+              replenishing={replenishing}
               onCopy={copyText}
               onUploadClick={() => fileRef.current?.click()}
               onDownload={async (url, name) => {
@@ -350,6 +369,7 @@ export function OrdersPage() {
               }}
               onDelete={handleDelete}
               onRecallDelivery={handleRecallDelivery}
+              onReplenish={handleReplenish}
             />
           ) : (
             <div className="px-2 py-16 text-center text-[0.86rem] text-ink-mute">选择左侧订单查看详情</div>

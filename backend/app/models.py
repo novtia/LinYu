@@ -174,6 +174,34 @@ class DeliveryFile(Base):
     delivery: Mapped["Delivery"] = relationship(back_populates="files")
 
 
+class ReadingProgress(Base):
+    """在线阅读进度，按「用户 + 已购文件」存一条，PC 与手机共用。"""
+
+    __tablename__ = "reading_progress"
+    __table_args__ = (UniqueConstraint("user_id", "file_id", name="uq_reading_progress_user_file"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.id"), index=True)
+    file_id: Mapped[str] = mapped_column(String(64), index=True)  # DeliveryFile.id
+    ch: Mapped[int] = mapped_column(Integer, default=0)  # 章节序号（从 0 起）
+    pct: Mapped[int] = mapped_column(Integer, default=0)  # 章内进度 0-100
+    overall: Mapped[int] = mapped_column(Integer, default=0)  # 全书进度 0-100
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ReadingBookmark(Base):
+    __tablename__ = "reading_bookmarks"
+    __table_args__ = (UniqueConstraint("user_id", "file_id", "ch", name="uq_reading_bookmark_user_file_ch"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(64), ForeignKey("users.id"), index=True)
+    file_id: Mapped[str] = mapped_column(String(64), index=True)
+    ch: Mapped[int] = mapped_column(Integer, default=0)
+    pct: Mapped[int] = mapped_column(Integer, default=0)
+    text: Mapped[str] = mapped_column(String(255), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class Settings(Base):
     __tablename__ = "settings"
 

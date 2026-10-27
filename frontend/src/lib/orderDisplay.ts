@@ -1,5 +1,6 @@
 import { formatWords } from './commission'
 import { orderCompactLabel, orderDotTone } from './orderStatus'
+import { fmtBeijingFull, fmtBeijingShort } from './time'
 import type { Order, OrderItem, OrderPayment, ProductFileItem } from '../types'
 
 const COVER_TONES = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'] as const
@@ -18,28 +19,19 @@ export const ORDER_LIST_FILTERS: { id: OrderListFilter; label: string }[] = [
 const PROVIDER: Record<string, string> = { alipay: '支付宝', ezpay: '易支付', free: '免费', manual: '人工' }
 const METHOD: Record<string, string> = { alipay: '支付宝', wxpay: '微信', qqpay: 'QQ', free: '免费', manual: '人工' }
 
-function pad(n: number) {
-  return String(n).padStart(2, '0')
-}
-
 export function fmtListTime(iso: string) {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return '—'
-  return `${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  const text = fmtBeijingShort(iso)
+  return text === '—' ? '—' : text
 }
 
 export function fmtFullTime(iso?: string | null) {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return '—'
-  return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  return fmtBeijingFull(iso)
 }
 
 export function fmtStepTime(iso?: string | null) {
   if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  return `${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  const text = fmtBeijingShort(iso)
+  return text === '—' ? '' : text
 }
 
 export function formatMoney(n: number) {

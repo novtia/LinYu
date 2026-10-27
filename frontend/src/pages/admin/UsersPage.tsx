@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ApiError, api } from '../../lib/api'
+import { fmtBeijingMonthDayClock } from '../../lib/time'
 import { useToast } from '../../context/ToastContext'
 import type { User } from '../../types'
 import { IconBtn, PanelTable, Tag } from './ProductsPage'
@@ -10,8 +11,7 @@ interface ResetPasswordRes {
 }
 
 function fmtTime(iso: string) {
-  const d = new Date(iso)
-  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  return fmtBeijingMonthDayClock(iso)
 }
 
 export function UsersPage() {

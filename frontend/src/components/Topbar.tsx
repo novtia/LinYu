@@ -32,6 +32,7 @@ export function Topbar() {
   const commissionsOn = pathname.startsWith('/commissions') || pageNav === 'commissions'
   const commissionOn = (pathname === '/' && hash === '#commission') || pageNav === 'commission'
   const ordersOn = pathname.startsWith('/orders')
+  const shelfOn = pathname.startsWith('/shelf')
   const shopOn = !commissionsOn && !commissionOn && !ordersOn && (pathname.startsWith('/product') || pathname === '/')
 
   useEffect(() => {
@@ -75,6 +76,9 @@ export function Topbar() {
           <Link to={{ pathname: '/', hash: 'commission' }} className={commissionOn ? 'active' : undefined}>
             约稿
           </Link>
+          <Link to="/shelf" className={shelfOn ? 'active' : undefined}>
+            我的书架
+          </Link>
           <Link to="/orders" className={ordersOn ? 'active' : undefined}>
             我的订单
           </Link>
@@ -85,8 +89,16 @@ export function Topbar() {
         </nav>
         <div className="shop-right">
           <Link
+            to="/shelf"
+            className={`inline-flex h-9 shrink-0 items-center rounded-[10px] px-1.5 text-[0.8rem] font-semibold text-ink-soft min-[641px]:hidden ${
+              shelfOn ? 'text-ink' : ''
+            }`}
+          >
+            书架
+          </Link>
+          <Link
             to="/commissions"
-            className={`relative inline-flex h-9 shrink-0 items-center rounded-[10px] px-2 text-[0.82rem] font-semibold text-ink-soft min-[641px]:hidden ${
+            className={`relative inline-flex h-9 shrink-0 items-center rounded-[10px] px-1.5 text-[0.8rem] font-semibold text-ink-soft min-[641px]:hidden ${
               commissionsOn ? 'text-ink' : ''
             }`}
           >
@@ -95,7 +107,7 @@ export function Topbar() {
           </Link>
           <Link
             to="/orders"
-            className={`inline-flex h-9 shrink-0 items-center rounded-[10px] px-2 text-[0.82rem] font-semibold text-ink-soft min-[641px]:hidden ${
+            className={`inline-flex h-9 shrink-0 items-center rounded-[10px] px-1.5 text-[0.8rem] font-semibold text-ink-soft min-[641px]:hidden ${
               ordersOn ? 'text-ink' : ''
             }`}
           >
@@ -160,6 +172,14 @@ export function Topbar() {
                   }}
                 >
                   账号信息
+                </MenuBtn>
+                <MenuBtn
+                  onClick={() => {
+                    setMenuOpen(false)
+                    navigate('/shelf')
+                  }}
+                >
+                  我的书架
                 </MenuBtn>
                 <MenuBtn
                   onClick={() => {

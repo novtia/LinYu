@@ -16,43 +16,24 @@ import { ApiError, api } from '../../lib/api'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
 import { orderStatusLabel, orderStatusTone } from '../../lib/orderStatus'
+import { beijingHour, fmtBeijingConv, fmtBeijingRecent } from '../../lib/time'
 import type { Dashboard, DashboardConv, Order } from '../../types'
 
 type Range = 7 | 14 | 30
 
 function greet(name: string) {
-  const h = new Date().getHours()
+  const h = beijingHour()
   const hi = h < 5 ? '夜深了' : h < 11 ? '早上好' : h < 14 ? '中午好' : h < 18 ? '下午好' : '晚上好'
   return `${hi}，${name}`
 }
 
-function pad(n: number) {
-  return String(n).padStart(2, '0')
-}
-
-function fmtClock(d: Date) {
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-
 function fmtOrderTime(iso: string) {
-  const d = new Date(iso)
-  const now = new Date()
-  const yesterday = new Date(now)
-  yesterday.setDate(now.getDate() - 1)
-  if (d.toDateString() === now.toDateString()) return fmtClock(d)
-  if (d.toDateString() === yesterday.toDateString()) return `昨天 ${fmtClock(d)}`
-  return `${d.getMonth() + 1}/${d.getDate()} ${fmtClock(d)}`
+  const text = fmtBeijingRecent(iso)
+  return text === '—' ? '' : text
 }
 
 function fmtConvTime(iso?: string | null) {
-  if (!iso) return ''
-  const d = new Date(iso)
-  const now = new Date()
-  const yesterday = new Date(now)
-  yesterday.setDate(now.getDate() - 1)
-  if (d.toDateString() === now.toDateString()) return fmtClock(d)
-  if (d.toDateString() === yesterday.toDateString()) return '昨天'
-  return `${pad(d.getMonth() + 1)}/${pad(d.getDate())}`
+  return fmtBeijingConv(iso)
 }
 
 function fmtBarLabel(date: string) {

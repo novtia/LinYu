@@ -20,6 +20,7 @@
   "dependencies": {
     "@tanstack/react-virtual": "^3.14.10",
     "lucide-react": "^1.28.0",
+    "qrcode-generator": "^2.0.4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-easy-crop": "^6.2.3",

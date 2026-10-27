@@ -7,6 +7,7 @@ import { eventMessages, eventThread } from '../lib/chatSocket'
 import { formatFileSize } from '../lib/commission'
 import { useChatSocket } from '../context/ChatSocketContext'
 import { formatMoney } from '../lib/orderDisplay'
+import { fmtBeijingClock, fmtBeijingDate, parseServerTime } from '../lib/time'
 import { useToast } from '../context/ToastContext'
 import { PaymentMethodPicker } from './PaymentMethodPicker'
 import type { CheckoutResult, CommissionMessage, CommissionMessagesResult, PublicPaymentMethod } from '../types'
@@ -49,17 +50,15 @@ function isMine(msg: CommissionMessage, viewer: 'user' | 'admin') {
 }
 
 function parseUtc(iso: string) {
-  if (!iso) return new Date(NaN)
-  return /[zZ]|[+-]\d{2}:?\d{2}$/.test(iso) ? new Date(iso) : new Date(`${iso}Z`)
+  return parseServerTime(iso) ?? new Date(NaN)
 }
 
 function fmtTime(iso: string) {
-  const d = parseUtc(iso)
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  return fmtBeijingClock(iso)
 }
 
 function fmtDay(iso: string) {
-  return parseUtc(iso).toLocaleDateString('zh-CN')
+  return fmtBeijingDate(iso)
 }
 
 function recallLeft(iso: string, now: number) {

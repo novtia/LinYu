@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { BookOpen, Download, FileText, Image as ImageIcon, Lock } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import type { ProductFileItem } from '../types'
 
@@ -7,6 +8,11 @@ function fileKindIcon(name: string) {
   if (isImageName(name)) return ImageIcon
   if (/\.(epub|mobi|azw3?)$/i.test(name)) return BookOpen
   return FileText
+}
+
+/** 买家侧的 txt / epub 可以在线阅读（管理员端带删除按钮，不显示） */
+function canRead(f: ProductFileItem, onDelete?: unknown) {
+  return !onDelete && !!f.id && !!f.download_url && /\.(txt|epub)$/i.test(f.file_name)
 }
 
 export function isImageName(name: string) {
@@ -107,14 +113,25 @@ export function DeliveryFileList({
                   未解锁
                 </span>
               ) : (
-                <button
-                  type="button"
-                  className="inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-[9px] border border-[var(--line-strong)] px-3 text-[0.78rem] font-bold text-ink transition hover:border-teal hover:text-teal"
-                  onClick={() => onDownload(f.download_url!, f.file_name)}
-                >
-                  <Download className="h-3.5 w-3.5" strokeWidth={1.8} />
-                  下载
-                </button>
+                <span className="flex shrink-0 items-center gap-2">
+                  {canRead(f, onDelete) ? (
+                    <Link
+                      to={`/read/${f.id}`}
+                      className="inline-flex h-[34px] items-center gap-1.5 rounded-[9px] bg-teal px-3 text-[0.78rem] font-bold text-white transition hover:opacity-90"
+                    >
+                      <BookOpen className="h-3.5 w-3.5" strokeWidth={1.8} />
+                      阅读
+                    </Link>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="inline-flex h-[34px] items-center gap-1.5 rounded-[9px] border border-[var(--line-strong)] px-3 text-[0.78rem] font-bold text-ink transition hover:border-teal hover:text-teal"
+                    onClick={() => onDownload(f.download_url!, f.file_name)}
+                  >
+                    <Download className="h-3.5 w-3.5" strokeWidth={1.8} />
+                    下载
+                  </button>
+                </span>
               )}
             </li>
           )
@@ -142,13 +159,20 @@ export function DeliveryFileList({
           <div className="min-w-0 flex-1">
             <div className="truncate text-[0.86rem] font-semibold">{f.file_name}</div>
             {f.download_url ? (
-              <button
-                type="button"
-                className="text-[0.8rem] font-semibold text-teal hover:underline"
-                onClick={() => onDownload(f.download_url!, f.file_name)}
-              >
-                下载
-              </button>
+              <div className="flex items-center gap-3">
+                {canRead(f, onDelete) ? (
+                  <Link to={`/read/${f.id}`} className="text-[0.8rem] font-semibold text-teal hover:underline">
+                    在线阅读
+                  </Link>
+                ) : null}
+                <button
+                  type="button"
+                  className="text-[0.8rem] font-semibold text-teal hover:underline"
+                  onClick={() => onDownload(f.download_url!, f.file_name)}
+                >
+                  下载
+                </button>
+              </div>
             ) : (
               <div className="text-[0.78rem] text-ink-mute">已锁定</div>
             )}

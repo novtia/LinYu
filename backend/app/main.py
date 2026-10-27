@@ -11,7 +11,7 @@ from .auth import check_secret_config
 from .database import Base, SessionLocal, engine
 from .migrate import migrate_schema
 from .origins import cors_origins
-from .routers import auth, captcha, categories, commission_chat, deliveries, downloads, orders, pay, payment, payment_channels, products, settings, users, ws
+from .routers import auth, captcha, categories, commission_chat, deliveries, downloads, orders, pay, payment, payment_channels, products, reader, settings, users, ws
 from .seed import seed_if_empty
 from .services.chat_hub import hub
 from .services.files import ASSET_DIR, COVER_DIR, ensure_upload_dir
@@ -74,6 +74,7 @@ app.include_router(pay.router)
 app.include_router(users.router)
 app.include_router(deliveries.router)
 app.include_router(downloads.router)
+app.include_router(reader.router)
 app.include_router(settings.router)
 app.include_router(payment_channels.router)
 app.include_router(payment.router)

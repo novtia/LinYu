@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { ApiError, api } from '../../lib/api'
 import { useToast } from '../../context/ToastContext'
+import { beijingDateKey, fmtBeijingFull, fmtBeijingRecent, isBeijingToday, isBeijingYesterday } from '../../lib/time'
 import type { Delivery, ProductFileItem } from '../../types'
 
 type Filter = 'all' | 'text' | 'file' | 'commission'
@@ -24,31 +25,12 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: 'commission', label: '约稿稿件' },
 ]
 
-function pad(n: number) {
-  return String(n).padStart(2, '0')
-}
-
-function fmtClock(d: Date) {
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-
 function fmtListTime(iso?: string | null) {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return '—'
-  const now = new Date()
-  const yesterday = new Date(now)
-  yesterday.setDate(now.getDate() - 1)
-  if (d.toDateString() === now.toDateString()) return fmtClock(d)
-  if (d.toDateString() === yesterday.toDateString()) return `昨天 ${fmtClock(d)}`
-  return `${d.getMonth() + 1}/${d.getDate()} ${fmtClock(d)}`
+  return fmtBeijingRecent(iso)
 }
 
 function fmtFullTime(iso?: string | null) {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return '—'
-  return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${fmtClock(d)}`
+  return fmtBeijingFull(iso)
 }
 
 function deliveryFiles(d: Delivery): ProductFileItem[] {
@@ -110,9 +92,7 @@ function parseFilter(raw: string | null): Filter {
 }
 
 function isToday(iso: string) {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return false
-  return d.toDateString() === new Date().toDateString()
+  return isBeijingToday(iso)
 }
 
 function csvEscape(v: string) {
@@ -140,7 +120,7 @@ function exportCsv(rows: Delivery[]) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `deliveries-${new Date().toISOString().slice(0, 10)}.csv`
+  a.download = `deliveries-${beijingDateKey()}.csv`
   document.body.appendChild(a)
   a.click()
   a.remove()
@@ -167,12 +147,7 @@ export function DeliveriesPage() {
     const text = rows.filter((d) => hasText(d) && !hasFiles(d)).length
     const file = rows.filter(hasFiles).length
     const buyers = new Set(rows.map((d) => d.email || d.username || d.order_id)).size
-    const yesterday = rows.filter((d) => {
-      const dt = new Date(d.created_at)
-      const y = new Date()
-      y.setDate(y.getDate() - 1)
-      return dt.toDateString() === y.toDateString()
-    }).length
+    const yesterday = rows.filter((d) => isBeijingYesterday(d.created_at)).length
     return { today, text, file, buyers, yesterday }
   }, [rows])
 
