@@ -5,10 +5,12 @@ from typing import Dict, List, Optional
 from .alipay_page import AlipayPageProvider
 from .base import BasePaymentProvider
 from .ezpay import EzpayProvider
+from .usdt import UsdtProvider
 
 _REGISTRY: List[BasePaymentProvider] = [
     AlipayPageProvider(),
     EzpayProvider(),
+    UsdtProvider(),
 ]
 
 _BY_ID: Dict[str, BasePaymentProvider] = {p.id: p for p in _REGISTRY}

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, ChevronRight, Inbox, Mail, PenLine } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Inbox, Mail, PenLine, Trash2 } from 'lucide-react'
 import { ApiError, api } from '../lib/api'
-import { getGuestEmail, setGuestEmail } from '../lib/guestEmail'
+import { getGuestEmail, orderPath, setGuestEmail } from '../lib/guestEmail'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { orderCompactLabel } from '../lib/orderStatus'
@@ -32,6 +32,7 @@ export function OrdersListPage() {
   const [email, setEmail] = useState(getGuestEmail())
   const [searched, setSearched] = useState(() => !!getGuestEmail())
   const [filter, setFilter] = useState<OrderListFilter>('all')
+  const [deletingId, setDeletingId] = useState('')
   const isGuest = !loading && !user
 
   useEffect(() => {
@@ -85,6 +86,20 @@ export function OrdersListPage() {
       showToast(err instanceof ApiError ? err.message : '查询失败')
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function deleteOrder(orderId: string) {
+    if (!window.confirm(`确定删除订单「${orderId}」？删除后无法恢复。`)) return
+    setDeletingId(orderId)
+    try {
+      await api.delete(user ? `/api/orders/${encodeURIComponent(orderId)}` : orderPath(orderId))
+      setOrders((prev) => prev.filter((o) => o.id !== orderId))
+      showToast('订单已删除')
+    } catch (err) {
+      showToast(err instanceof ApiError ? err.message : '删除订单失败')
+    } finally {
+      setDeletingId('')
     }
   }
 
@@ -241,7 +256,14 @@ export function OrdersListPage() {
             ) : (
               <div className="mt-[26px] grid gap-[18px]">
                 {visible.map((o, i) => (
-                  <OrderTicket key={o.id} order={o} delay={i * 45} />
+                  <OrderTicket
+                    key={o.id}
+                    order={o}
+                    delay={i * 45}
+                    canDelete={user?.role === 'admin' || o.status === 'pending' || o.status === 'failed' || o.status === 'cancelled'}
+                    deleting={deletingId === o.id}
+                    onDelete={() => void deleteOrder(o.id)}
+                  />
                 ))}
               </div>
             )}
@@ -252,7 +274,19 @@ export function OrdersListPage() {
   )
 }
 
-function OrderTicket({ order, delay }: { order: Order; delay: number }) {
+function OrderTicket({
+  order,
+  delay,
+  canDelete,
+  deleting,
+  onDelete,
+}: {
+  order: Order
+  delay: number
+  canDelete: boolean
+  deleting: boolean
+  onDelete: () => void
+}) {
   const dead = isDeadStatus(order.status)
   const commission = isCommissionOrder(order)
   const covers = orderCovers(order)
@@ -310,6 +344,22 @@ function OrderTicket({ order, delay }: { order: Order; delay: number }) {
           ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          {canDelete ? (
+            <button
+              type="button"
+              disabled={deleting}
+              title="删除订单"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                onDelete()
+              }}
+              className="inline-flex h-7 items-center gap-1 rounded-lg border border-[rgba(180,35,24,.3)] px-2 text-[0.72rem] font-semibold text-danger transition hover:border-danger hover:bg-[rgba(180,35,24,.06)] disabled:opacity-50"
+            >
+              <Trash2 className="h-3 w-3" strokeWidth={1.9} />
+              {deleting ? '删除中' : '删除'}
+            </button>
+          ) : null}
           <b className="font-[family-name:var(--font-display)] text-[1.28rem] font-extrabold tracking-[-0.035em]">{formatMoney(order.total)}</b>
           <ChevronRight className="h-[17px] w-[17px] text-ink-mute transition group-hover:translate-x-[3px] group-hover:text-teal" strokeWidth={1.8} />
         </div>

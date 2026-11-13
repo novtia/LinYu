@@ -156,6 +156,56 @@ export interface AlipayPageConfig {
   }
 }
 
+export interface UsdtChainItemConfig {
+  enabled: boolean
+  address: string
+  rpc_url: string
+}
+
+export interface UsdtConfig {
+  rate_mode: 'auto' | 'fixed'
+  fixed_rate: number
+  rate_markup_pct: number
+  expire_minutes: number
+  trongrid_api_key: string
+  chains: Record<string, UsdtChainItemConfig>
+  methods: {
+    usdt: boolean
+  }
+}
+
+export interface UsdtChainSpec {
+  id: string
+  name: string
+  full_name: string
+  kind?: 'tron' | 'evm' | string
+  contract?: string
+  decimals?: number
+  badge: string
+  hint: string
+}
+
+export interface UsdtSession {
+  payment_id: string
+  order_id: string
+  title: string
+  status: 'pending' | 'paid' | 'expired'
+  amount_cny: number
+  amount_usdt: string
+  exchange_rate: number
+  chain: string
+  chain_name: string
+  chain_full_name: string
+  address: string
+  contract: string
+  expires_at: string
+  remaining_seconds: number
+  tx_hash?: string | null
+  explorer_url?: string | null
+  redirect_url: string
+  available_chains: UsdtChainSpec[]
+}
+
 export interface PaymentChannel {
   id: string
   name: string
@@ -164,7 +214,8 @@ export interface PaymentChannel {
   config: Record<string, unknown> & {
     pid?: string
     app_id?: string
-    methods?: Partial<EzpayConfig['methods']> & Partial<AlipayPageConfig['methods']>
+    chains?: Record<string, UsdtChainItemConfig>
+    methods?: Partial<EzpayConfig['methods']> & Partial<AlipayPageConfig['methods']> & Partial<UsdtConfig['methods']>
   }
   created_at: string
   updated_at: string
@@ -357,4 +408,39 @@ export interface Dashboard {
   todos: DashboardTodo[]
   conversations: DashboardConv[]
   system: DashboardSystem
+}
+
+export interface LedgerRow {
+  order_id: string
+  at: string
+  kind: 'full' | 'deposit' | 'balance' | string
+  ok: boolean
+  channel: string
+  amount: number
+  buyer: string
+  item: string
+  sale_mode: string
+  product_id?: number | null
+  user_id?: string | null
+  payment_channel_id?: string | null
+}
+
+export interface AnalyticsStock {
+  writing: number
+  writing_late: number
+  balance_count: number
+  balance_money: number
+  balance_late: number
+  pending_pay: number
+  users: number
+  paying_users: number
+  repeat_users: number
+  products_on: number
+  products_off: number
+  commission_on: number
+}
+
+export interface Analytics {
+  rows: LedgerRow[]
+  stock: AnalyticsStock
 }

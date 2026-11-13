@@ -594,6 +594,44 @@ def _migrate_product_chat_loose(conn) -> None:
     )
 
 
+def _migrate_usdt_invoices(conn) -> None:
+    """自托管 USDT 虚拟尾数收款锁定单表。"""
+    conn.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS usdt_invoices (
+                id VARCHAR(64) NOT NULL PRIMARY KEY,
+                payment_id VARCHAR(64) NOT NULL,
+                order_id VARCHAR(64) NOT NULL,
+                channel_id VARCHAR(64) NOT NULL,
+                chain VARCHAR(24) NOT NULL,
+                address VARCHAR(128) NOT NULL,
+                address_key VARCHAR(128) NOT NULL,
+                amount_cny FLOAT NOT NULL,
+                exchange_rate FLOAT NOT NULL,
+                amount_usdt VARCHAR(32) NOT NULL,
+                amount_units VARCHAR(64) NOT NULL,
+                status VARCHAR(16) DEFAULT 'pending',
+                tx_hash VARCHAR(128) UNIQUE,
+                created_at DATETIME NOT NULL,
+                expires_at DATETIME NOT NULL,
+                paid_at DATETIME,
+                FOREIGN KEY(order_id) REFERENCES orders (id)
+            )
+            """
+        )
+    )
+    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_usdt_invoices_payment_id ON usdt_invoices (payment_id)"))
+    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_usdt_invoices_order_id ON usdt_invoices (order_id)"))
+    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_usdt_invoices_expires_at ON usdt_invoices (expires_at)"))
+    conn.execute(
+        text(
+            "CREATE INDEX IF NOT EXISTS ix_usdt_invoices_chain_addr_status "
+            "ON usdt_invoices (chain, address_key, status)"
+        )
+    )
+
+
 def migrate_schema(engine: Engine) -> None:
     """Add new columns / rebuild legacy tables for SQLite."""
     alterations = {
@@ -634,3 +672,4 @@ def migrate_schema(engine: Engine) -> None:
         _migrate_commission_chat(conn)
         _migrate_commission_thread_order(conn)
         _migrate_product_chat_loose(conn)
+        _migrate_usdt_invoices(conn)

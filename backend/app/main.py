@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -15,6 +16,32 @@ from .routers import auth, captcha, categories, commission_chat, deliveries, dow
 from .seed import seed_if_empty
 from .services.chat_hub import hub
 from .services.files import ASSET_DIR, COVER_DIR, ensure_upload_dir
+from .services.order_expiry import purge_expired_unpaid_orders
+from .services.usdt_payment import poll_pending_usdt_invoices
+
+logger = logging.getLogger("lingxia")
+
+
+async def _purge_expired_orders_loop() -> None:
+    while True:
+        await asyncio.sleep(300)
+        db = SessionLocal()
+        try:
+            purge_expired_unpaid_orders(db)
+        except Exception:
+            logger.exception("清除过期未支付订单失败")
+            db.rollback()
+        finally:
+            db.close()
+
+
+async def _usdt_monitor_loop() -> None:
+    while True:
+        await asyncio.sleep(8)
+        try:
+            await asyncio.to_thread(poll_pending_usdt_invoices)
+        except Exception:
+            logger.exception("USDT 链上入账轮询异常")
 
 
 @asynccontextmanager
@@ -27,9 +54,17 @@ async def lifespan(_: FastAPI):
     db = SessionLocal()
     try:
         seed_if_empty(db)
+        purge_expired_unpaid_orders(db)
+    except Exception:
+        logger.exception("启动时清除过期未支付订单失败")
+        db.rollback()
     finally:
         db.close()
+    purge_task = asyncio.create_task(_purge_expired_orders_loop())
+    usdt_task = asyncio.create_task(_usdt_monitor_loop())
     yield
+    usdt_task.cancel()
+    purge_task.cancel()
     await hub.close_all()
 
 

@@ -1,0 +1,1564 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>领匣 · 营收</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230f6e5c'/></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+SC:wght@400;500;600;700&family=Sora:wght@500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@0.544.0/dist/umd/lucide.min.js"></script>
+  <link rel="stylesheet" href="admin.css" />
+  <style>
+    .desk-inner { width: min(1280px, 100%); }
+
+    /* 1. 刊头总账区（Masthead + 2x2 复式十字格） */
+    .folio-head {
+      display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(300px, 1fr);
+      gap: 28px; padding-bottom: 26px; border-bottom: 2px solid var(--ink);
+    }
+    .folio-head > * { min-width: 0; }
+    .folio-kicker {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      font-family: var(--font-mono); font-size: .72rem; font-weight: 700;
+      letter-spacing: .08em; color: var(--ink-mute); text-transform: uppercase;
+    }
+    .folio-kicker .pill {
+      padding: 2px 8px; border-radius: 99px; background: var(--ink); color: #eef8f4;
+      font-size: .66rem; letter-spacing: .06em;
+    }
+    .folio-title-row { display: flex; align-items: baseline; gap: 16px; margin-top: 10px; flex-wrap: wrap; }
+    .folio-title-row h1 {
+      margin: 0; font-family: var(--font-display); font-size: 1.5rem;
+      letter-spacing: -.03em; color: var(--ink-soft); font-weight: 700;
+    }
+    .hero-money {
+      margin: 10px 0 0; font-family: var(--font-body); font-weight: 800;
+      font-size: clamp(2.4rem, 4vw, 3.4rem); letter-spacing: -.045em; line-height: 1;
+      font-variant-numeric: tabular-nums; color: var(--ink);
+    }
+    .hero-money .frac { font-size: .52em; color: var(--ink-mute); font-weight: 700; letter-spacing: -.02em; }
+    .hero-sub {
+      margin: 12px 0 0; color: var(--ink-soft); font-size: .84rem; line-height: 1.6; max-width: 38rem;
+    }
+    .hero-sub b { color: var(--teal); font-weight: 700; font-family: var(--font-mono); }
+    .folio-controls {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      flex-wrap: wrap; margin-top: 18px;
+    }
+    .range-pills {
+      display: inline-flex; padding: 3px; border-radius: 10px;
+      background: rgba(20, 32, 28, .055); border: 1px solid var(--line);
+    }
+    .range-pills button {
+      height: 28px; padding: 0 11px; border: 0; border-radius: 7px;
+      background: transparent; color: var(--ink-mute); font-size: .76rem; font-weight: 700;
+      transition: .18s var(--ease);
+    }
+    .range-pills button:hover { color: var(--ink); }
+    .range-pills button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgba(20,32,28,.08); }
+
+    .jumps { display: inline-flex; gap: 4px; align-items: center; }
+    .jumps a {
+      height: 30px; padding: 0 10px; border-radius: 8px; display: inline-flex; align-items: center;
+      color: var(--ink-mute); font-size: .76rem; font-weight: 700;
+    }
+    .jumps a:hover { color: var(--ink); background: rgba(20,32,28,.04); }
+    .jumps a.on { color: var(--teal); background: rgba(15,110,92,.1); }
+
+    /* 右侧 2x2 复式记账十字格 */
+    .cross-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      background: #fff; border: 1px solid var(--line-strong);
+      box-shadow: 4px 4px 0 rgba(20, 32, 28, .06);
+    }
+    .cross-cell {
+      padding: 15px 18px; display: flex; flex-direction: column; justify-content: space-between;
+      min-width: 0; position: relative;
+    }
+    .cross-cell:nth-child(2) { border-left: 1px solid var(--line); }
+    .cross-cell:nth-child(3) { border-top: 1px solid var(--line); }
+    .cross-cell:nth-child(4) { border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+    .cross-cell .clbl {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      font-size: .72rem; font-weight: 700; color: var(--ink-mute); letter-spacing: .04em;
+    }
+    .cross-cell .clbl i { width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0; }
+    .cross-cell .cval {
+      margin-top: 8px; font-family: var(--font-body); font-weight: 800;
+      font-size: clamp(1.22rem, 1.75vw, 1.52rem); letter-spacing: -.035em; line-height: 1.05;
+      font-variant-numeric: tabular-nums;
+    }
+    .cross-cell .cmeta {
+      margin-top: 6px; font-family: var(--font-mono); font-size: .72rem; color: var(--ink-mute);
+      display: flex; justify-content: space-between; gap: 6px;
+    }
+    .cross-cell .cbar {
+      margin-top: 8px; height: 3px; background: rgba(20,32,28,.07); overflow: hidden;
+    }
+    .cross-cell .cbar b { display: block; height: 100%; }
+
+    /* 2. 主体非对称账簿展开（左：分段柱图 + 时段热力带；右：渠道份额 + 结算日账卡） */
+    .spread {
+      display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(300px, .95fr);
+      gap: 32px; margin-top: 30px; align-items: start;
+    }
+    .spread > * { min-width: 0; }
+    .ledger-panel { min-width: 0; }
+    .panel-top {
+      display: flex; align-items: flex-end; justify-content: space-between; gap: 14px;
+      padding-bottom: 10px; border-bottom: 1px solid var(--line-strong); flex-wrap: wrap;
+    }
+    .panel-top h2 {
+      margin: 0; font-family: var(--font-display); font-size: 1.08rem; letter-spacing: -.02em;
+      display: inline-flex; align-items: baseline; gap: 10px;
+    }
+    .panel-top h2 small { font-family: var(--font-body); font-size: .74rem; color: var(--ink-mute); font-weight: 500; }
+    .legend-inline { display: flex; gap: 14px; font-size: .74rem; color: var(--ink-soft); align-items: center; }
+    .legend-inline span { display: inline-flex; align-items: center; gap: 5px; }
+    .legend-inline i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+
+    .bar-chart-box {
+      position: relative; margin-top: 14px; padding: 16px 14px 12px;
+      background: #fff; border: 1px solid var(--line);
+    }
+    .bar-chart-box svg { width: 100%; height: 240px; display: block; overflow: visible; }
+    .bar-chart-box .chart-tip { transform: translate(-50%, -115%); }
+    .chart-summary-strip {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+      margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line-strong);
+      font-size: .75rem; color: var(--ink-mute);
+    }
+    .chart-summary-strip b {
+      display: block; margin-top: 2px; font-family: var(--font-mono);
+      font-size: .86rem; color: var(--ink); font-weight: 700;
+    }
+
+    /* 24小时入账节律热力尺 */
+    .ribbon-box {
+      margin-top: 22px; padding: 14px 16px;
+      background: #fff; border: 1px solid var(--line);
+    }
+    .ribbon-head {
+      display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+      font-size: .8rem; font-weight: 700;
+    }
+    .ribbon-head small { font-weight: 500; color: var(--ink-mute); font-size: .74rem; }
+    .ribbon-grid {
+      display: grid; grid-template-columns: repeat(24, 1fr); gap: 3px;
+      margin-top: 12px; height: 42px; align-items: end;
+    }
+    .ribbon-cell {
+      height: 100%; display: flex; flex-direction: column; justify-content: flex-end; gap: 2px;
+      cursor: default; position: relative;
+    }
+    .ribbon-cell .bar {
+      width: 100%; border-radius: 2px 2px 0 0; min-height: 3px;
+      background: rgba(20, 32, 28, .08); transition: opacity .15s;
+    }
+    .ribbon-cell.hot .bar { box-shadow: 0 0 0 1px var(--ink); }
+    .ribbon-axis {
+      display: flex; justify-content: space-between; margin-top: 6px;
+      font-family: var(--font-mono); font-size: .66rem; color: var(--ink-mute);
+    }
+
+    /* 右侧账册卡片（渠道 + 结算日账） */
+    .side-folio {
+      background: #fff; border: 1px solid var(--line-strong);
+      padding: 18px 18px 14px;
+      box-shadow: 4px 4px 0 rgba(20, 32, 28, .05);
+    }
+    .ch-list { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 10px; }
+    .ch-item {
+      padding: 10px 12px; border: 1px solid var(--line); cursor: pointer;
+      transition: .16s var(--ease); background: var(--fog);
+    }
+    .ch-item:hover { border-color: var(--teal); background: #fff; }
+    .ch-item.on { border-color: var(--ink); background: var(--paper); box-shadow: inset 3px 0 0 var(--teal); }
+    .ch-item .top { display: flex; justify-content: space-between; align-items: baseline; font-size: .84rem; }
+    .ch-item .top b { font-weight: 700; }
+    .ch-item .top span { font-family: var(--font-mono); font-weight: 700; font-size: .82rem; }
+    .ch-item .bar-track { height: 4px; background: rgba(20,32,28,.08); margin-top: 7px; overflow: hidden; }
+    .ch-item .bar-track i { display: block; height: 100%; background: var(--teal); }
+    .ch-item .meta {
+      display: flex; justify-content: space-between; gap: 8px;
+      margin-top: 6px; font-size: .71rem; color: var(--ink-mute); font-family: var(--font-mono);
+    }
+
+    .daybook { max-height: 310px; overflow: auto; margin-top: 10px; }
+    .daybook table { width: 100%; border-collapse: collapse; }
+    .daybook th {
+      position: sticky; top: 0; z-index: 1; background: #fff; text-align: left;
+      font-size: .68rem; font-weight: 700; color: var(--ink-mute); padding: 0 6px 8px 0;
+      border-bottom: 1px solid var(--line-strong); white-space: nowrap;
+    }
+    .daybook td {
+      padding: 7px 6px 7px 0; border-top: 1px solid var(--line);
+      font-family: var(--font-mono); font-size: .75rem; white-space: nowrap;
+    }
+    .daybook th.num, .daybook td.num { text-align: right; }
+    .daybook td.date { color: var(--ink-mute); }
+    .daybook td.sum { font-weight: 700; color: var(--ink); }
+    .daybook tbody tr { cursor: pointer; }
+    .daybook tbody tr:hover td { background: rgba(232,241,238,.55); }
+    .daybook tbody tr.on td { background: var(--paper); font-weight: 700; }
+    .note { margin: 12px 0 0; color: var(--ink-mute); font-size: .74rem; line-height: 1.55; }
+
+    /* 3. 票据流水带（最近入账） */
+    .tape-section { margin-top: 34px; }
+    .tape-rail {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+      gap: 10px; margin-top: 12px;
+    }
+    .ticket {
+      position: relative; text-align: left; padding: 12px 14px;
+      background: #fff; border: 1px solid var(--line); border-left: 3px solid var(--teal);
+      transition: .16s var(--ease); display: flex; flex-direction: column; gap: 6px;
+    }
+    .ticket.bad { border-left-color: var(--danger); background: #fffafa; }
+    .ticket:hover { border-color: var(--ink); transform: translateY(-1px); }
+    .ticket.on { background: var(--paper); border-color: var(--ink); }
+    .ticket .t-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+    .ticket .t-kind { font-size: .7rem; font-weight: 800; letter-spacing: .04em; color: var(--teal); }
+    .ticket.bad .t-kind { color: var(--danger); }
+    .ticket .t-amt { font-family: var(--font-mono); font-weight: 700; font-size: .95rem; }
+    .ticket.bad .t-amt { color: var(--danger); }
+    .ticket .t-who { font-size: .82rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ticket .t-bot {
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+      padding-top: 6px; border-top: 1px dashed var(--line-strong);
+      font-family: var(--font-mono); font-size: .68rem; color: var(--ink-mute);
+    }
+
+    /* 4. 全宽订单与履约账簿 */
+    .chapter { margin-top: 44px; padding-top: 26px; border-top: 2px solid var(--ink); scroll-margin-top: 12px; }
+    .chapter-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .chapter-head h2 { margin: 0; font-family: var(--font-display); font-size: 1.6rem; letter-spacing: -.04em; line-height: 1.05; }
+    .chapter-head .sum { margin: 6px 0 0; color: var(--ink-mute); font-size: .82rem; }
+    .chapter-head .sum b { color: var(--teal); font-weight: 700; font-family: var(--font-mono); }
+
+    .order-toolbar {
+      display: flex; align-items: center; justify-content: space-between; gap: 14px;
+      flex-wrap: wrap; margin-top: 16px; padding: 10px 14px;
+      background: #fff; border: 1px solid var(--line);
+    }
+    .status-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+    .status-tabs button {
+      height: 28px; padding: 0 10px; border: 1px solid transparent; border-radius: 6px;
+      background: transparent; color: var(--ink-mute); font-size: .75rem; font-weight: 700;
+    }
+    .status-tabs button:hover { color: var(--ink); background: var(--fog); }
+    .status-tabs button.on { background: var(--ink); color: #fff; }
+    .status-tabs .cnt { font-family: var(--font-mono); font-size: .68rem; opacity: .72; margin-left: 4px; }
+    .quick-search {
+      display: flex; align-items: center; gap: 7px; min-width: 220px; flex: 0 1 280px;
+      border-bottom: 1px solid var(--line-strong); padding-bottom: 4px;
+    }
+    .quick-search:focus-within { border-color: var(--teal); }
+    .quick-search input { border: 0; outline: none; background: transparent; width: 100%; font-size: .82rem; }
+
+    .bridge { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .bridge:empty { display: none; }
+    .bridge button {
+      height: 28px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line-strong);
+      background: var(--paper); font-size: .74rem; font-weight: 700;
+    }
+    .table-wrap {
+      max-height: 620px; overflow: auto; margin-top: 12px;
+      background: #fff; border: 1px solid var(--line);
+    }
+    .table-wrap table { width: 100%; min-width: 820px; border-collapse: collapse; }
+    .table-wrap th {
+      position: sticky; top: 0; z-index: 1; background: #f8fbfa; text-align: left;
+      font-size: .69rem; font-weight: 700; letter-spacing: .06em; color: var(--ink-mute);
+      padding: 10px 12px; border-bottom: 1px solid var(--line-strong); white-space: nowrap;
+    }
+    .table-wrap td { padding: 11px 12px; border-top: 1px solid var(--line); font-size: .82rem; vertical-align: middle; }
+    .table-wrap tbody tr { cursor: pointer; }
+    .table-wrap tbody tr:hover td { background: rgba(232,241,238,.55); }
+    .table-wrap tr.on td { background: var(--paper); }
+    .clip { max-width: 280px; }
+    .clip b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+    .subline { display: block; margin-top: 2px; color: var(--ink-mute); font-size: .72rem; }
+    .nowrap { white-space: nowrap; }
+
+    /* 5. 凭单式右侧详情抽屉 */
+    #shade {
+      position: fixed; top: 48px; left: 232px; right: 0; bottom: 0; z-index: 40;
+      background: rgba(20,32,28,.24); border: 0; padding: 0;
+    }
+    #drawer {
+      position: fixed; top: 48px; right: 0; bottom: 0; z-index: 41; width: min(490px, 100%);
+      overflow: auto; background: #f7fbf9; border-left: 2px solid var(--ink); padding: 18px 20px 40px;
+    }
+    #shade[hidden], #drawer[hidden], #modal-back[hidden] { display: none !important; }
+    .icon-x { float: right; width: 32px; height: 32px; border: 0; background: transparent; color: var(--ink-mute); display: grid; place-items: center; }
+    .drawer-id { display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: .78rem; color: var(--ink-mute); clear: both; }
+    .drawer-id button, .inline-btn { border: 0; background: transparent; color: var(--ink-mute); padding: 0; display: inline-flex; }
+    .inline-btn:hover, .drawer-id button:hover { color: var(--teal); }
+    #drawer h2 { margin: 10px 0 0; font-family: var(--font-display); font-size: 1.45rem; letter-spacing: -.03em; line-height: 1.25; }
+    .drawer-meta { margin-top: 6px; color: var(--ink-mute); font-size: .8rem; }
+    .drawer-meta a { color: var(--teal); font-weight: 700; }
+    .voucher-box {
+      margin-top: 14px; padding: 14px 16px; background: #fff; border: 1px solid var(--line-strong);
+      box-shadow: 3px 3px 0 rgba(20,32,28,.06);
+    }
+    .money { font-family: var(--font-display); font-weight: 800; font-size: 2.35rem; letter-spacing: -.05em; line-height: 1; }
+    .money small { margin-left: 6px; font-size: .95rem; letter-spacing: 0; color: var(--ink-mute); font-weight: 650; }
+    .splits { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 14px; border-top: 1px dashed var(--line-strong); padding-top: 10px; }
+    .splits div { padding: 4px 10px 4px 0; }
+    .splits div + div { border-left: 1px solid var(--line); padding-left: 12px; }
+    .splits small { display: block; margin-bottom: 4px; color: var(--ink-mute); font-size: .7rem; letter-spacing: .04em; }
+    .splits b { font-family: var(--font-mono); font-size: .9rem; }
+    .splits b.ok { color: var(--teal); }
+    .splits b.wait { color: var(--warn); }
+    .flow { display: grid; grid-template-columns: repeat(4, 1fr); list-style: none; margin: 16px 0 0; padding: 0; }
+    .flow li { font-size: .74rem; color: var(--ink-mute); padding-right: 8px; }
+    .flow li.on { color: var(--ink); font-weight: 800; }
+    .flow i { display: block; width: 6px; height: 6px; border-radius: 50%; background: var(--line-strong); margin-bottom: 6px; }
+    .flow li.on i { background: var(--teal); }
+    .flow li.now i { box-shadow: 0 0 0 3px rgba(15,110,92,.18); }
+    .block { margin-top: 24px; }
+    .block h3 {
+      margin: 0; padding-bottom: 8px; border-bottom: 1px solid var(--line-strong);
+      display: flex; justify-content: space-between; align-items: baseline;
+      font-size: .76rem; font-weight: 800; letter-spacing: .08em; color: var(--ink-soft);
+    }
+    .block h3 small { font-weight: 600; letter-spacing: 0; color: var(--ink-mute); }
+    .kv2 { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; margin: 12px 0 0; }
+    .kv2 dt { color: var(--ink-mute); font-size: .8rem; }
+    .kv2 dd { margin: 0; text-align: right; font-weight: 700; font-size: .84rem; word-break: break-all; }
+    .kv2 dd.mono { font-family: var(--font-mono); font-size: .78rem; }
+    .payrow { padding: 12px 0; border-bottom: 1px solid var(--line); }
+    .payrow .top { display: flex; justify-content: space-between; align-items: baseline; }
+    .payrow .top b { font-size: .88rem; }
+    .payrow .top span { font-family: var(--font-mono); font-weight: 700; }
+    .payrow .bot { display: flex; justify-content: space-between; margin-top: 4px; font-size: .74rem; color: var(--ink-mute); }
+    .file { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+    .file .ic { width: 30px; height: 30px; display: grid; place-items: center; background: rgba(15,110,92,.1); color: var(--teal); flex-shrink: 0; }
+    .file .nm { min-width: 0; flex: 1; }
+    .file .nm b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .8rem; }
+    .file .nm small { color: var(--ink-mute); font-size: .7rem; }
+    .file .ops { display: flex; gap: 10px; flex-shrink: 0; }
+    .file .ops button { border: 0; background: transparent; padding: 0; font-size: .74rem; font-weight: 800; color: var(--teal); }
+    .file .ops button.danger { color: var(--danger); font-weight: 650; }
+    .payload { margin-top: 12px; font-size: .84rem; white-space: pre-wrap; line-height: 1.55; }
+    .uploader, .recall {
+      margin-top: 12px; width: 100%; padding: 12px; background: transparent; font-size: .78rem;
+    }
+    .uploader { border: 1px dashed var(--line-strong); color: var(--ink-mute); }
+    .uploader:hover { border-color: var(--teal); color: var(--teal); }
+    .recall { border: 1px solid var(--line); color: var(--danger); font-weight: 700; }
+    .recall:hover { border-color: var(--danger); }
+    .locknote { margin-top: 10px; background: var(--paper); padding: 10px 12px; font-size: .76rem; color: var(--ink-soft); display: flex; gap: 8px; line-height: 1.5; }
+    .acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+    #modal-back {
+      position: fixed; inset: 0; z-index: 80; background: rgba(20,32,28,.46);
+      display: grid; place-items: center; padding: 24px;
+    }
+    .modal {
+      width: min(720px, 100%); max-height: 86vh; overflow: auto;
+      background: #f7fbf9; border: 1px solid var(--line-strong); padding: 18px 20px 16px;
+    }
+    .modal.wide { width: min(880px, 100%); }
+    .modal-head { display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+    .modal-head h2 { margin: 0; font-family: var(--font-display); font-size: 1.2rem; letter-spacing: -.03em; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px; margin-top: 16px; }
+    .field span { display: block; margin-bottom: 4px; font-size: .76rem; font-weight: 700; color: var(--ink-soft); }
+    .field input { width: 100%; border: 0; border-bottom: 1px solid var(--line-strong); background: transparent; padding: 8px 0; outline: none; }
+    .field input:focus { border-color: var(--teal); }
+    .span2 { grid-column: 1 / -1; }
+    .chk { margin-top: 14px; }
+    .chk-t { font-size: .76rem; font-weight: 700; color: var(--ink-soft); }
+    .chk-row { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 8px; }
+    .chk-row label { display: inline-flex; align-items: center; gap: 6px; font-size: .84rem; font-weight: 650; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+
+    @media (max-width: 1120px) {
+      .folio-head, .spread { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 860px) {
+      #shade { left: 0; }
+      .chapter-head { align-items: flex-start; }
+      .grid2 { grid-template-columns: 1fr; }
+      .chart-summary-strip { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 560px) {
+      .cross-grid { grid-template-columns: 1fr; }
+      .cross-cell:nth-child(n) { border-left: 0; border-top: 1px solid var(--line); }
+      .cross-cell:first-child { border-top: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-bar">
+    <strong>领匣后台设计稿</strong>
+    <nav class="demo-links">
+      <a href="admin-dashboard.html">概览</a>
+      <a class="on" href="admin-revenue.html">营收</a>
+      <a href="admin-products.html">商品</a>
+      <a href="admin-users.html">用户</a>
+      <a href="admin-conversations.html">对话</a>
+      <a href="admin-settings.html">配置</a>
+    </nav>
+  </div>
+
+  <div class="admin">
+    <aside class="aside">
+      <div class="aside-brand"><span class="brand-mark"></span>领匣控制台</div>
+      <nav>
+        <div class="nav-cap">工作台</div>
+        <a href="admin-dashboard.html"><i data-lucide="layout-dashboard"></i>概览</a>
+        <div class="nav-cap">运营管理</div>
+        <a href="admin-products.html"><i data-lucide="package"></i>商品与分类</a>
+        <a href="admin-users.html"><i data-lucide="users"></i>用户管理</a>
+        <div class="nav-cap">交易履约</div>
+        <a class="active" href="admin-revenue.html"><i data-lucide="wallet"></i>营收<span class="n" id="nav-n">0</span></a>
+        <a href="admin-conversations.html"><i data-lucide="message-square"></i>约稿对话<span class="n">4</span></a>
+        <div class="nav-cap">站点配置</div>
+        <a href="admin-settings.html"><i data-lucide="credit-card"></i>支付接入</a>
+        <a href="admin-settings.html#system"><i data-lucide="settings-2"></i>系统设置</a>
+        <a href="admin-settings.html#website"><i data-lucide="globe"></i>网站设置</a>
+      </nav>
+      <div class="aside-foot">设计稿 · 不接真实数据<br />xinx.shop</div>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <span class="crumb">控制台 / <b>营收</b></span>
+        <div class="topbar-right">
+          <span class="date" id="today"></span>
+          <div class="avatar">店</div>
+        </div>
+      </div>
+      <main class="desk">
+        <div class="desk-inner">
+          <section class="folio-head" id="books">
+            <div>
+              <div class="folio-kicker">
+                <span class="pill">REVENUE FOLIO</span>
+                <span id="hint"></span>
+              </div>
+              <div class="folio-title-row">
+                <h1>实收总账</h1>
+              </div>
+              <div class="hero-money" id="hero-money">¥0</div>
+              <p class="hero-sub" id="lead"></p>
+              <div class="folio-controls">
+                <div class="range-pills" id="range-pills" aria-label="快捷时间范围">
+                  <button type="button" data-days="7">近 7 日</button>
+                  <button type="button" class="on" data-days="30">近 30 日</button>
+                  <button type="button" data-days="month">本月</button>
+                  <button type="button" data-days="90">近 90 日</button>
+                </div>
+                <div class="head-actions">
+                  <nav class="jumps" aria-label="本页章节">
+                    <a href="#books" data-jump="books" class="on">总账</a>
+                    <a href="#tape" data-jump="tape">流水</a>
+                    <a href="#orders" data-jump="orders">订单</a>
+                  </nav>
+                  <button type="button" class="ghost-btn" data-act="open-ledger"><i data-lucide="sliders-horizontal"></i>高级筛账</button>
+                </div>
+              </div>
+            </div>
+            <div class="cross-grid" id="cross-grid" aria-label="复式账目构成"></div>
+          </section>
+
+          <div class="spread">
+            <section class="ledger-panel">
+              <div class="panel-top">
+                <h2>日收款结构<small>成品 · 定金 · 尾款分段柱状</small></h2>
+                <div class="legend-inline">
+                  <span><i style="background:var(--teal)"></i>成品全款</span>
+                  <span><i style="background:var(--gold)"></i>约稿定金</span>
+                  <span><i style="background:var(--ink)"></i>约稿尾款</span>
+                </div>
+              </div>
+              <div class="bar-chart-box" id="chart-wrap">
+                <svg id="chart" viewBox="0 0 720 240" preserveAspectRatio="none"></svg>
+                <div class="chart-tip" id="tip" hidden></div>
+                <div class="chart-summary-strip" id="chart-strip"></div>
+              </div>
+
+              <div class="ribbon-box">
+                <div class="ribbon-head">
+                  <span>24 小时入账节律</span>
+                  <small id="hour-note"></small>
+                </div>
+                <div class="ribbon-grid" id="hours"></div>
+                <div class="ribbon-axis"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>23:00</span></div>
+              </div>
+            </section>
+
+            <aside class="side-folio">
+              <div class="panel-top" style="padding-bottom:8px">
+                <h2>收款渠道<small>点击联动下方订单</small></h2>
+                <a href="admin-settings.html" style="font-size:.76rem;font-weight:700;color:var(--teal)">支付接入</a>
+              </div>
+              <ul class="ch-list" id="channels"></ul>
+              <p class="note" id="stock-note"></p>
+
+              <div class="panel-top" style="margin-top:22px;padding-bottom:8px">
+                <h2>每日结算<small>点日期查当天订单</small></h2>
+              </div>
+              <div class="daybook" id="days"></div>
+            </aside>
+          </div>
+
+          <section class="tape-section" id="tape">
+            <div class="panel-top">
+              <h2>实时入账凭条<small id="ledger-cap"></small></h2>
+            </div>
+            <div class="tape-rail" id="ledger"></div>
+          </section>
+
+          <section class="chapter" id="orders">
+            <header class="chapter-head">
+              <div>
+                <h2>订单与交付台账</h2>
+                <p class="sum" id="order-sum"></p>
+              </div>
+              <div class="head-actions">
+                <button type="button" class="ghost-btn" data-act="open-orders"><i data-lucide="sliders-horizontal"></i>组合筛选</button>
+                <button type="button" class="ghost-btn" data-act="export"><i data-lucide="download"></i>导出</button>
+              </div>
+            </header>
+            <div class="order-toolbar">
+              <div class="status-tabs" id="status-tabs"></div>
+              <label class="quick-search">
+                <i data-lucide="search" style="width:15px;height:15px;color:var(--ink-mute)"></i>
+                <input id="quick-q" placeholder="搜索买家、订单号、商品名…" />
+              </label>
+            </div>
+            <div class="bridge" id="bridge"></div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>时间</th><th>订单号</th><th>买家</th><th>商品</th><th>金额</th><th>状态</th><th>发放</th>
+                  </tr>
+                </thead>
+                <tbody id="order-body"></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <button type="button" id="shade" hidden aria-label="关闭详情"></button>
+  <aside id="drawer" hidden></aside>
+  <div id="modal-back" hidden>
+    <div class="modal" id="modal" role="dialog" aria-modal="true"></div>
+  </div>
+  <div class="toast" id="toast"></div>
+  <script src="admin.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id)
+    const STATUS = [
+      ["pending", "待支付", "warn"],
+      ["deposit_paid", "已付定金", "teal"],
+      ["awaiting_balance", "待付尾款", "warn"],
+      ["paid", "已支付", "teal"],
+      ["completed", "已完成", "teal"],
+      ["failed", "支付失败", "danger"],
+      ["cancelled", "已取消", "danger"],
+    ]
+    const STATUS_MAP = Object.fromEntries(STATUS.map((s) => [s[0], s]))
+    const SHIPS = [["none", "未发放"], ["text", "文本"], ["file", "成品文件"], ["commission", "约稿稿件"]]
+    const MODES = [["normal", "成品"], ["commission", "约稿"]]
+    const KINDS = [["full", "成品全款"], ["deposit", "约稿定金"], ["balance", "约稿尾款"]]
+    const CHANNELS = ["支付宝", "易支付", "微信", "其他", "—"]
+    const FLOW = ["付定金", "沟通设定", "按章交稿", "付尾款"]
+    const KIND_LABEL = { deposit: "定金", balance: "尾款", full: "全款" }
+
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]))
+    }
+    function pad(n) { return String(n).padStart(2, "0") }
+    function iso(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` }
+    function at(ago, h, m) {
+      const d = new Date()
+      d.setSeconds(0, 0)
+      d.setDate(d.getDate() - ago)
+      d.setHours(h, m, 0, 0)
+      return `${iso(d)}T${pad(h)}:${pad(m)}:00`
+    }
+    function yuan(n) {
+      const v = Math.round(Number(n) * 100) / 100
+      const int = Math.trunc(v)
+      const frac = Math.round((v - int) * 100)
+      const head = int.toLocaleString("zh-CN")
+      return frac ? `¥${head}.${pad(frac)}` : `¥${head}`
+    }
+    function shortTime(s) { return s ? s.slice(5, 16).replace("T", " ") : "—" }
+    function fullTime(s) { return s ? s.slice(0, 16).replace("T", " ") : "—" }
+    function wordsText(n) {
+      const w = Math.round(Number(n) || 0)
+      if (!w) return "—"
+      if (w >= 10000 && w % 10000 === 0) return `${w / 10000} 万字`
+      if (w >= 10000) return `${(w / 10000).toFixed(1).replace(/\.0$/, "")} 万字`
+      return `${w.toLocaleString("zh-CN")} 字`
+    }
+    function kindName(k) {
+      if (k === "deposit") return "约稿定金"
+      if (k === "balance") return "约稿尾款"
+      return "成品全款"
+    }
+    function eachDay(from, to) {
+      const out = []
+      const a = from.split("-").map(Number)
+      const b = to.split("-").map(Number)
+      const cur = new Date(a[0], a[1] - 1, a[2])
+      const end = new Date(b[0], b[1] - 1, b[2])
+      while (cur <= end) {
+        out.push(iso(cur))
+        cur.setDate(cur.getDate() + 1)
+      }
+      return out
+    }
+    function daysBetween(from, to) {
+      return eachDay(from, to).length
+    }
+    function mulberry32(seed) {
+      let a = seed >>> 0
+      return function () {
+        a |= 0
+        a = (a + 0x6d2b79f5) | 0
+        let t = Math.imul(a ^ (a >>> 15), 1 | a)
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+      }
+    }
+    function shipTags(o) {
+      const tags = []
+      if ((o.payload || "").trim()) tags.push("text")
+      if (o.files.length && o.mode === "commission") tags.push("commission")
+      else if (o.files.length) tags.push("file")
+      if (!tags.length) tags.push("none")
+      return tags
+    }
+    function shipHTML(o) {
+      const tags = shipTags(o)
+      if (tags.length === 1 && tags[0] === "none") return `<span class="tag mute">未发放</span>`
+      return tags.map((k) => {
+        if (k === "text") return `<span class="tag">文本</span>`
+        if (k === "commission") return `<span class="tag gold">约稿</span>`
+        if (k === "file") return `<span class="tag">文件 ${o.files.length}</span>`
+        return ""
+      }).join(" ")
+    }
+    function isFollow(o) {
+      return o.status === "pending" || o.status === "deposit_paid" || o.status === "awaiting_balance"
+    }
+    function paidSum(list) {
+      return list.reduce((sum, o) => {
+        const paid = o.payments.filter((p) => p.paid).reduce((a, p) => a + p.amount, 0)
+        if (paid) return sum + paid
+        if (o.status === "paid" || o.status === "completed") return sum + o.total
+        if (o.status === "deposit_paid" || o.status === "awaiting_balance") return sum + (o.deposit || o.total / 2)
+        return sum
+      }, 0)
+    }
+    function defaultLedger() {
+      const to = new Date()
+      const from = new Date(to.getFullYear(), to.getMonth(), to.getDate() - 29)
+      return {
+        from: iso(from),
+        to: iso(to),
+        min: null,
+        max: null,
+        q: "",
+        kinds: new Set(KINDS.map((k) => k[0])),
+        channels: new Set(CHANNELS),
+        states: new Set(["ok", "fail"]),
+      }
+    }
+    function defaultOrder() {
+      return {
+        q: "",
+        statuses: new Set(STATUS.map((s) => s[0])),
+        ships: new Set(SHIPS.map((s) => s[0])),
+        modes: new Set(MODES.map((s) => s[0])),
+      }
+    }
+
+    function hydrate(raw) {
+      const o = {
+        files: [],
+        payload: "",
+        email: "",
+        words: 0,
+        trade: "",
+        channel: "—",
+        payments: [],
+        ...raw,
+      }
+      o.files = (raw.files || []).map((f) => ({ ...f }))
+      o.payments = (raw.payments || []).map((p) => ({ ...p }))
+      if (o.mode === "commission") {
+        o.deposit = o.deposit ?? Math.round(o.total / 2)
+        o.balance = o.balance ?? o.total - o.deposit
+      }
+      o.day = o.created.slice(0, 10)
+      return o
+    }
+
+    const ORDERS = []
+    function push(raw) { ORDERS.push(hydrate(raw)) }
+
+    push({
+      id: "LX260907-0118", buyer: "林晚", email: "linwan@mail.com", item: "长篇定制小说", mode: "commission",
+      status: "awaiting_balance", total: 1280, deposit: 640, balance: 640, words: 20000, channel: "支付宝",
+      trade: "20261106220014001118", created: at(1, 21, 2),
+      files: [{ id: "f118", name: "第一章.docx", image: false }],
+      payments: [
+        { kind: "deposit", amount: 640, paid: true, at: at(1, 21, 8) },
+        { kind: "balance", amount: 640, paid: false, at: "" },
+      ],
+    })
+    push({
+      id: "LX260907-0117", buyer: "苏澄", email: "sucheng@mail.com", item: "修仙短篇约稿", mode: "commission",
+      status: "pending", total: 960, deposit: 480, balance: 480, words: 15000, channel: "—",
+      created: at(0, 11, 5),
+      payments: [
+        { kind: "deposit", amount: 480, paid: false, at: "" },
+        { kind: "balance", amount: 480, paid: false, at: "" },
+      ],
+    })
+    push({
+      id: "LX260907-0115", buyer: "顾里", email: "guli@mail.com", item: "校园补课番外", mode: "commission",
+      status: "awaiting_balance", total: 512, deposit: 256, balance: 256, words: 8000, channel: "支付宝",
+      trade: "20261104220014001115", created: at(3, 9, 10),
+      files: [{ id: "f115a", name: "终章.docx", image: false }, { id: "f115b", name: "参考.png", image: true }],
+      payments: [
+        { kind: "deposit", amount: 256, paid: true, at: at(3, 9, 18) },
+        { kind: "balance", amount: 256, paid: false, at: "" },
+      ],
+    })
+    push({
+      id: "LX260907-0112", buyer: "小乔", email: "xq@mail.com", item: "《深夜维修工》", mode: "normal",
+      status: "completed", total: 38, channel: "支付宝", trade: "20261107220014001112", created: at(0, 12, 6),
+      files: [{ id: "f112", name: "深夜维修工.txt", image: false }],
+      payments: [{ kind: "full", amount: 38, paid: true, at: at(0, 12, 6) }],
+    })
+    push({
+      id: "LX260906-0106", buyer: "老周", email: "laoz@mail.com", item: "西幻长篇", mode: "commission",
+      status: "deposit_paid", total: 1440, deposit: 720, balance: 720, words: 30000, channel: "易支付",
+      trade: "20261106220014001060", created: at(1, 18, 20),
+      payments: [
+        { kind: "deposit", amount: 720, paid: true, at: at(1, 18, 24) },
+        { kind: "balance", amount: 720, paid: false, at: "" },
+      ],
+    })
+    push({
+      id: "LX260904-0093", buyer: "白鹿", email: "bailu@mail.com", item: "都市职场 3万字", mode: "commission",
+      status: "awaiting_balance", total: 1920, deposit: 960, balance: 960, words: 30000, channel: "支付宝",
+      trade: "2026110322001400093", created: at(4, 15, 2),
+      files: [{ id: "f093", name: "终稿.docx", image: false }],
+      payments: [
+        { kind: "deposit", amount: 960, paid: true, at: at(4, 15, 8) },
+        { kind: "balance", amount: 960, paid: false, at: "" },
+      ],
+    })
+    push({
+      id: "LX260901-0088", buyer: "孟凡", email: "mf@mail.com", item: "定制约稿", mode: "commission",
+      status: "completed", total: 3200, deposit: 1600, balance: 1600, words: 40000, channel: "易支付",
+      trade: "2026102922001400088", created: at(12, 10, 12),
+      files: [{ id: "f088a", name: "上卷.docx", image: false }, { id: "f088b", name: "下卷.docx", image: false }],
+      payments: [
+        { kind: "deposit", amount: 1600, paid: true, at: at(12, 10, 16) },
+        { kind: "balance", amount: 1600, paid: true, at: at(9, 16, 40) },
+      ],
+    })
+    push({
+      id: "LX260828-0074", buyer: "阿北", email: "abei@mail.com", item: "西幻章节", mode: "commission",
+      status: "completed", total: 1280, deposit: 640, balance: 640, words: 12000, channel: "支付宝",
+      trade: "2026102622001400074", created: at(16, 14, 8),
+      files: [{ id: "f074", name: "正文.docx", image: false }],
+      payments: [
+        { kind: "deposit", amount: 640, paid: true, at: at(16, 14, 12) },
+        { kind: "balance", amount: 640, paid: true, at: at(14, 11, 5) },
+      ],
+    })
+    push({
+      id: "LX260907-0110", buyer: "陈默", email: "chenmo@mail.com", item: "《雨夜租客》", mode: "normal",
+      status: "paid", total: 28, channel: "微信", trade: "2026110522001400110", created: at(2, 19, 12),
+      payments: [{ kind: "full", amount: 28, paid: true, at: at(2, 19, 12) }],
+    })
+    push({
+      id: "LX260902-0066", buyer: "何夕", email: "hexi@mail.com", item: "《玻璃海岸》", mode: "normal",
+      status: "completed", total: 50, channel: "支付宝", trade: "2026110222001400066", created: at(5, 11, 18),
+      payload: "打开订单，下载全文。番外在同一个包里。\n\n提取码 NX-188",
+      payments: [{ kind: "full", amount: 50, paid: true, at: at(5, 11, 18) }],
+    })
+    push({
+      id: "LX260907-0120", buyer: "匿名访客", email: "", item: "《合租日记》", mode: "normal",
+      status: "failed", total: 22, channel: "易支付", created: at(0, 10, 22),
+      payments: [{ kind: "full", amount: 22, paid: false, failed: true, at: at(0, 10, 22) }],
+    })
+    push({
+      id: "LX260901-0101", buyer: "小乔", email: "xq@mail.com", item: "校园番外", mode: "commission",
+      status: "cancelled", total: 480, deposit: 240, balance: 240, words: 8000, channel: "—", created: at(18, 9, 4),
+    })
+
+    const rng = mulberry32(20261107)
+    const poolC = [["定制约稿", 3200, 40000], ["修仙短篇", 960, 15000], ["都市长篇", 2560, 30000], ["校园番外", 480, 8000], ["西幻章节", 1440, 12000]]
+    const poolN = [["《深夜维修工》", 38], ["《雨夜租客》", 28], ["《合租日记》", 22], ["《玻璃海岸》", 50], ["《回声》", 36]]
+    const people = [["林晚", "linwan@mail.com"], ["孟凡", "mf@mail.com"], ["白鹿", "bailu@mail.com"], ["老周", "laoz@mail.com"], ["小乔", "xq@mail.com"], ["顾里", "guli@mail.com"], ["阿北", "abei@mail.com"], ["陈默", "chenmo@mail.com"], ["何夕", "hexi@mail.com"]]
+    let seq = 300
+    for (let ago = 28; ago >= 8; ago--) {
+      const date = new Date()
+      date.setDate(date.getDate() - ago)
+      const weekend = date.getDay() === 0 || date.getDay() === 6
+      const count = weekend ? 2 : 1
+      for (let k = 0; k < count; k++) {
+        if (rng() < 0.18) continue
+        seq += 1
+        const person = people[Math.floor(rng() * people.length)]
+        const failed = rng() < 0.07
+        const commission = !failed && rng() < 0.6
+        const chRoll = rng()
+        const channel = chRoll < 0.68 ? "支付宝" : chRoll < 0.9 ? "易支付" : chRoll < 0.97 ? "微信" : "其他"
+        const hour = 9 + Math.floor(rng() * 12)
+        const minute = Math.floor(rng() * 60)
+        const created = at(ago, hour, minute)
+        const id = `LX${String(date.getFullYear()).slice(2)}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${String(seq).padStart(4, "0")}`
+        if (failed || !commission) {
+          const goods = poolN[Math.floor(rng() * poolN.length)]
+          const status = failed ? "failed" : "paid"
+          const files = failed ? [] : [{ id: "g" + seq, name: goods[0].replace(/[《》]/g, "") + ".txt", image: false }]
+          push({
+            id, buyer: person[0], email: person[1], item: goods[0], mode: "normal", status, total: goods[1],
+            channel, trade: failed ? "" : `20${seq}220014`, created, files,
+            payments: [{ kind: "full", amount: goods[1], paid: !failed, failed, at: created }],
+          })
+        } else {
+          const goods = poolC[Math.floor(rng() * poolC.length)]
+          const dep = Math.round(goods[1] / 2)
+          const bal = goods[1] - dep
+          const later = Math.max(ago - 2, 0)
+          push({
+            id, buyer: person[0], email: person[1], item: goods[0], mode: "commission", status: "completed",
+            total: goods[1], deposit: dep, balance: bal, words: goods[2], channel, trade: `20${seq}220014`,
+            created, files: [{ id: "g" + seq, name: "正文.docx", image: false }],
+            payments: [
+              { kind: "deposit", amount: dep, paid: true, at: created },
+              { kind: "balance", amount: bal, paid: true, at: at(later, hour, Math.min(59, minute + 5)) },
+            ],
+          })
+        }
+      }
+    }
+    ORDERS.sort((a, b) => (a.created < b.created ? 1 : -1))
+
+    function ledgerOf(o) {
+      const rows = []
+      o.payments.forEach((p) => {
+        if (p.paid) rows.push({ ok: true, kind: p.kind, amount: p.amount, at: p.at })
+        else if (p.failed) rows.push({ ok: false, kind: p.kind, amount: p.amount, at: p.at || o.created })
+      })
+      return rows.map((r) => ({
+        ...r,
+        orderId: o.id,
+        day: r.at.slice(0, 10),
+        channel: o.channel,
+        buyer: o.buyer,
+        item: o.item,
+      }))
+    }
+
+    const state = {
+      ledger: defaultLedger(),
+      order: defaultOrder(),
+      bridge: { day: "", channel: "" },
+      id: "",
+    }
+    let draft = null
+    let draftKind = ""
+    let chartModel = null
+
+    function stock() {
+      const list = ORDERS.filter((o) => o.status === "awaiting_balance")
+      const money = list.reduce((a, o) => a + (o.balance || 0), 0)
+      const late = list.filter((o) => Date.now() - new Date(o.created).getTime() > 48 * 3600 * 1000).length
+      return { count: list.length, money, late }
+    }
+    function matchedLedger() {
+      const f = state.ledger
+      const q = f.q
+      return ORDERS.flatMap(ledgerOf).filter((r) => {
+        if (r.day < f.from || r.day > f.to) return false
+        if (!f.kinds.has(r.kind)) return false
+        if (!f.channels.has(r.channel)) return false
+        if (!f.states.has(r.ok ? "ok" : "fail")) return false
+        if (f.min != null && r.amount < f.min) return false
+        if (f.max != null && r.amount > f.max) return false
+        if (q && !(r.buyer + r.item + r.orderId).toLowerCase().includes(q)) return false
+        return true
+      }).sort((a, b) => (a.at < b.at ? 1 : -1))
+    }
+    function onDay(o, day) {
+      if (o.day === day) return true
+      return o.payments.some((p) => p.at && p.at.slice(0, 10) === day)
+    }
+    function matchedOrders() {
+      const f = state.order
+      return ORDERS.filter((o) => {
+        if (f.q) {
+          const hay = [o.id, o.buyer, o.email, o.item, o.payload].join(" ").toLowerCase()
+          if (!hay.includes(f.q)) return false
+        }
+        if (f.statuses.size < STATUS.length && !f.statuses.has(o.status)) return false
+        if (f.modes.size < MODES.length && !f.modes.has(o.mode)) return false
+        if (f.ships.size < SHIPS.length && !shipTags(o).some((t) => f.ships.has(t))) return false
+        if (state.bridge.day && !onDay(o, state.bridge.day)) return false
+        if (state.bridge.channel && o.channel !== state.bridge.channel) return false
+        return true
+      })
+    }
+
+    function renderBooks() {
+      const rows = matchedLedger()
+      const days = eachDay(state.ledger.from, state.ledger.to)
+      const paid = rows.filter((r) => r.ok)
+      const failed = rows.filter((r) => !r.ok)
+      const rev = paid.reduce((a, r) => a + r.amount, 0)
+      const failSum = failed.reduce((a, r) => a + r.amount, 0)
+      const fullSum = paid.filter((r) => r.kind === "full").reduce((a, r) => a + r.amount, 0)
+      const depSum = paid.filter((r) => r.kind === "deposit").reduce((a, r) => a + r.amount, 0)
+      const balSum = paid.filter((r) => r.kind === "balance").reduce((a, r) => a + r.amount, 0)
+      const comSum = depSum + balSum
+
+      const byDay = new Map(days.map((d) => [d, { full: 0, deposit: 0, balance: 0, fail: 0 }]))
+      rows.forEach((r) => {
+        const b = byDay.get(r.day)
+        if (!b) return
+        if (!r.ok) b.fail += r.amount
+        else if (r.kind === "deposit") b.deposit += r.amount
+        else if (r.kind === "balance") b.balance += r.amount
+        else b.full += r.amount
+      })
+      const st = stock()
+      const showFail = state.ledger.states.has("fail")
+
+      const v = Math.round(rev * 100) / 100
+      const intPart = Math.trunc(v).toLocaleString("zh-CN")
+      const fracPart = Math.round((v - Math.trunc(v)) * 100)
+      $("hero-money").innerHTML = fracPart ? `¥${intPart}<span class="frac">.${pad(fracPart)}</span>` : `¥${intPart}`
+      $("lead").innerHTML = `${state.ledger.from} 至 ${state.ledger.to}（共 ${days.length} 天），共入账 <b>${paid.length}</b> 笔，日均 <b>${yuan(days.length ? rev / days.length : 0)}</b>。当前账外另有待收尾款 <b>${yuan(st.money)}</b>。`
+      $("hint").textContent = `${state.ledger.from} ~ ${state.ledger.to} · ${rows.length} 条流水`
+
+      const fullPct = rev ? Math.round((fullSum / rev) * 100) : 0
+      const comPct = rev ? Math.round((comSum / rev) * 100) : 0
+      const failBase = rev + failSum
+      const failPct = failBase ? Math.round((failSum / failBase) * 100) : 0
+      const cells = [
+        {
+          lbl: "成品全款", color: "var(--teal)", val: yuan(fullSum),
+          left: `${paid.filter((r) => r.kind === "full").length} 笔`, right: `占实收 ${fullPct}%`,
+          pct: fullPct,
+        },
+        {
+          lbl: "约稿收款", color: "var(--gold)", val: yuan(comSum),
+          left: `定 ${yuan(depSum)}`, right: `尾 ${yuan(balSum)}`,
+          pct: comPct,
+        },
+        {
+          lbl: "待收尾款 · 挂账", color: "var(--warn)", val: yuan(st.money),
+          left: `${st.count} 笔待付`, right: `${st.late} 笔超48h`,
+          pct: Math.min(100, st.count * 14),
+        },
+        {
+          lbl: "未入账 · 损耗", color: "var(--danger)", val: showFail ? yuan(failSum) : "—",
+          left: `${failed.length} 笔失败`, right: showFail ? `损耗率 ${failPct}%` : "已隐藏",
+          pct: showFail ? failPct : 0,
+        },
+      ]
+      $("cross-grid").innerHTML = cells.map((c) => `
+        <article class="cross-cell">
+          <div class="clbl"><span>${c.lbl}</span><i style="background:${c.color}"></i></div>
+          <div class="cval">${c.val}</div>
+          <div class="cmeta"><span>${c.left}</span><span>${c.right}</span></div>
+          <div class="cbar"><b style="width:${c.pct}%;background:${c.color}"></b></div>
+        </article>
+      `).join("")
+
+      const step = days.length > 48 ? Math.ceil(days.length / 36) : 1
+      const chartDays = days.filter((_, i) => i % step === 0 || i === days.length - 1)
+      chartModel = {
+        days: chartDays,
+        full: chartDays.map((d) => byDay.get(d).full),
+        dep: chartDays.map((d) => byDay.get(d).deposit),
+        bal: chartDays.map((d) => byDay.get(d).balance),
+      }
+      drawChart()
+
+      let peakDay = days[0] || "—", peakVal = 0
+      days.forEach((d) => {
+        const b = byDay.get(d)
+        const s = b.full + b.deposit + b.balance
+        if (s > peakVal) { peakVal = s; peakDay = d }
+      })
+      $("chart-strip").innerHTML = `
+        <div>客单均价<b>${paid.length ? yuan(rev / paid.length) : "—"}</b></div>
+        <div>日均实收<b>${yuan(days.length ? rev / days.length : 0)}</b></div>
+        <div>约稿占比<b>${rev ? `${comPct}%` : "—"}</b></div>
+        <div>单日峰值<b>${peakVal ? `${peakDay.slice(5)} · ${yuan(peakVal)}` : "—"}</b></div>
+      `
+
+      const heads = ["日期"]
+      if (state.ledger.kinds.has("full")) heads.push("成品")
+      if (state.ledger.kinds.has("deposit")) heads.push("定金")
+      if (state.ledger.kinds.has("balance")) heads.push("尾款")
+      heads.push("实收")
+      if (showFail) heads.push("未入账")
+      const body = [...days].reverse().map((day) => {
+        const b = byDay.get(day)
+        const line = b.full + b.deposit + b.balance
+        const cellsHtml = [`<td class="date">${day.slice(5)}</td>`]
+        if (state.ledger.kinds.has("full")) cellsHtml.push(`<td class="num">${b.full ? yuan(b.full) : "—"}</td>`)
+        if (state.ledger.kinds.has("deposit")) cellsHtml.push(`<td class="num">${b.deposit ? yuan(b.deposit) : "—"}</td>`)
+        if (state.ledger.kinds.has("balance")) cellsHtml.push(`<td class="num">${b.balance ? yuan(b.balance) : "—"}</td>`)
+        cellsHtml.push(`<td class="num sum">${yuan(line)}</td>`)
+        if (showFail) cellsHtml.push(`<td class="num">${b.fail ? yuan(b.fail) : "—"}</td>`)
+        return `<tr data-act="day" data-day="${day}" class="${state.bridge.day === day ? "on" : ""}">${cellsHtml.join("")}</tr>`
+      }).join("")
+      $("days").innerHTML = `<table><thead><tr>${heads.map((h, i) => `<th class="${i ? "num" : ""}">${h}</th>`).join("")}</tr></thead><tbody>${body}</tbody></table>`
+
+      const channels = [...state.ledger.channels].map((name) => {
+        const list = rows.filter((r) => r.channel === name)
+        const got = list.filter((r) => r.ok)
+        const money = got.reduce((a, r) => a + r.amount, 0)
+        const rate = list.length ? Math.round((got.length / list.length) * 1000) / 10 : 0
+        const pct = rev && money ? (money / rev) * 100 : 0
+        const share = !pct ? "0%" : pct < 1 ? "<1%" : `${Math.round(pct)}%`
+        return { name, money, got: got.length, rate, pct, share }
+      }).sort((a, b) => b.money - a.money)
+      $("channels").innerHTML = channels.map((c) => `
+        <li class="ch-item ${state.bridge.channel === c.name ? "on" : ""}" data-act="channel" data-channel="${esc(c.name)}">
+          <div class="top"><b>${esc(c.name)}</b><span>${yuan(c.money)}</span></div>
+          <div class="bar-track"><i style="width:${Math.min(100, c.pct).toFixed(1)}%"></i></div>
+          <div class="meta"><span>占比 ${c.share}</span><span>${c.got} 笔</span><span>成功率 ${c.rate}%</span></div>
+        </li>
+      `).join("")
+      $("stock-note").textContent = `待收尾款 ${st.count} 笔，其中 ${st.late} 笔超过 48 小时未结清。`
+
+      const hours = Array.from({ length: 24 }, () => ({ full: 0, com: 0 }))
+      paid.forEach((r) => {
+        const h = Number(String(r.at).slice(11, 13))
+        if (h < 0 || h > 23) return
+        if (r.kind === "full") hours[h].full += r.amount
+        else hours[h].com += r.amount
+      })
+      const hourMax = Math.max(1, ...hours.map((h) => h.full + h.com))
+      let hot = 0
+      hours.forEach((h, i) => { if (h.full + h.com > hours[hot].full + hours[hot].com) hot = i })
+      $("hours").innerHTML = hours.map((h, i) => {
+        const sum = h.full + h.com
+        const pct = sum ? Math.max(12, Math.round((sum / hourMax) * 100)) : 7
+        const bg = !sum ? "rgba(20,32,28,.08)" : h.com >= h.full ? "var(--gold)" : "var(--teal)"
+        const op = !sum ? 1 : (0.35 + 0.65 * (sum / hourMax)).toFixed(2)
+        return `<div class="ribbon-cell${i === hot && sum ? " hot" : ""}" title="${i}:00 · 成品 ${yuan(h.full)} · 约稿 ${yuan(h.com)}">
+          <div class="bar" style="height:${pct}%;background:${bg};opacity:${op}"></div>
+        </div>`
+      }).join("")
+      const hotSum = hours[hot].full + hours[hot].com
+      $("hour-note").textContent = hotSum ? `峰值在 ${pad(hot)}:00（${yuan(hotSum)}）` : "暂无入账时段数据"
+
+      const shown = rows.slice(0, 12)
+      $("ledger-cap").textContent = `展示最新 ${shown.length} / ${rows.length} 张凭条 · 点击定位订单`
+      $("ledger").innerHTML = shown.length ? shown.map((r) => `
+        <button type="button" class="ticket ${r.ok ? "" : "bad"} ${state.id === r.orderId ? "on" : ""}" data-act="order" data-id="${esc(r.orderId)}">
+          <div class="t-top">
+            <span class="t-kind">${r.ok ? kindName(r.kind) : "未入账"}</span>
+            <span class="t-amt">${r.ok ? "" : "−"}${yuan(r.amount)}</span>
+          </div>
+          <div class="t-who">${esc(r.buyer)} · ${esc(r.item)}</div>
+          <div class="t-bot"><span>${esc(r.orderId)}</span><span>${esc(r.channel)} · ${shortTime(r.at)}</span></div>
+        </button>
+      `).join("") : `<p class="empty">没有符合条件的入账凭条</p>`
+    }
+
+    function drawChart() {
+      const m = chartModel
+      const n = Math.max(m.days.length, 1)
+      const w = 720, h = 240, padL = 44, padR = 14, padT = 14, padB = 26
+      const totals = m.full.map((v, i) => v + m.dep[i] + m.bal[i])
+      const max = Math.max(...totals, 1) * 1.15
+      const plotW = w - padL - padR
+      const slot = plotW / n
+      const barW = Math.max(4, Math.min(20, slot * 0.62))
+      const xCenter = (i) => padL + slot * (i + 0.5)
+      const y = (v) => padT + (h - padT - padB) * (1 - v / max)
+      const baseH = h - padB
+
+      const grid = [0, 0.5, 1].map((g) => {
+        const val = Math.round(max * g)
+        const yy = y(val)
+        const text = val >= 1000 ? `${(val / 1000).toFixed(val >= 10000 ? 0 : 1)}k` : String(val)
+        return `<line x1="${padL}" y1="${yy}" x2="${w - padR}" y2="${yy}" stroke="rgba(20,32,28,.08)" stroke-dasharray="${g ? "3 3" : "none"}"></line>
+          <text x="${padL - 8}" y="${yy + 3}" text-anchor="end" fill="#6b7c74" font-size="10" font-family="JetBrains Mono, sans-serif">${text}</text>`
+      }).join("")
+
+      const bars = m.days.map((_, i) => {
+        const cx = xCenter(i)
+        const bx = cx - barW / 2
+        const vFull = m.full[i], vDep = m.dep[i], vBal = m.bal[i]
+        const hFull = (baseH - padT) * (vFull / max)
+        const hDep = (baseH - padT) * (vDep / max)
+        const hBal = (baseH - padT) * (vBal / max)
+        const yFull = baseH - hFull
+        const yDep = yFull - hDep
+        const yBal = yDep - hBal
+        const sum = vFull + vDep + vBal
+        if (!sum) {
+          return `<rect x="${bx.toFixed(1)}" y="${baseH - 2}" width="${barW.toFixed(1)}" height="2" fill="rgba(20,32,28,.12)"></rect>`
+        }
+        return [
+          vFull ? `<rect x="${bx.toFixed(1)}" y="${yFull.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(1, hFull).toFixed(1)}" fill="#0f6e5c"></rect>` : "",
+          vDep ? `<rect x="${bx.toFixed(1)}" y="${yDep.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(1, hDep).toFixed(1)}" fill="#c4a574"></rect>` : "",
+          vBal ? `<rect x="${bx.toFixed(1)}" y="${yBal.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(1, hBal).toFixed(1)}" fill="#14201c"></rect>` : "",
+        ].join("")
+      }).join("")
+
+      const step = n > 14 ? Math.ceil(n / 6) : 1
+      const labels = m.days.map((d, i) => (i % step !== 0 && i !== n - 1) ? "" : `<text x="${xCenter(i)}" y="${h - 6}" text-anchor="middle" fill="#6b7c74" font-size="10" font-family="JetBrains Mono, sans-serif">${d.slice(5)}</text>`).join("")
+      $("chart").innerHTML = `
+        ${grid}
+        ${bars}
+        ${labels}
+        <rect id="cursor-band" x="0" y="${padT}" width="${slot.toFixed(1)}" height="${baseH - padT}" fill="rgba(15,110,92,.08)" opacity="0" pointer-events="none"></rect>
+      `
+    }
+
+    const STATUS_TABS = [
+      { key: "all", label: "全部", match: () => true },
+      { key: "follow", label: "待跟进", match: isFollow },
+      { key: "awaiting_balance", label: "待付尾款", match: (o) => o.status === "awaiting_balance" },
+      { key: "deposit_paid", label: "已付定金", match: (o) => o.status === "deposit_paid" },
+      { key: "completed", label: "已完成", match: (o) => o.status === "completed" || o.status === "paid" },
+      { key: "failed", label: "未入账/取消", match: (o) => o.status === "failed" || o.status === "cancelled" },
+    ]
+    function currentTabKey() {
+      const s = state.order.statuses
+      if (s.size === STATUS.length) return "all"
+      if (s.size === 3 && s.has("pending") && s.has("deposit_paid") && s.has("awaiting_balance")) return "follow"
+      if (s.size === 1 && s.has("awaiting_balance")) return "awaiting_balance"
+      if (s.size === 1 && s.has("deposit_paid")) return "deposit_paid"
+      if (s.size === 2 && s.has("completed") && s.has("paid")) return "completed"
+      if (s.size === 2 && s.has("failed") && s.has("cancelled")) return "failed"
+      return ""
+    }
+
+    function renderOrders() {
+      const list = matchedOrders()
+      const followN = ORDERS.filter(isFollow).length
+      const sentN = ORDERS.filter((o) => !shipTags(o).includes("none")).length
+      $("order-sum").innerHTML = `显示 <b>${list.length}</b> / ${ORDERS.length} 笔 · 待跟进 <b>${followN}</b> · 已到账 ${yuan(paidSum(ORDERS))} · 已发放 ${sentN}`
+
+      const activeTab = currentTabKey()
+      $("status-tabs").innerHTML = STATUS_TABS.map((t) => {
+        const cnt = ORDERS.filter(t.match).length
+        return `<button type="button" data-act="tab-status" data-tab="${t.key}" class="${activeTab === t.key ? "on" : ""}">${t.label}<span class="cnt">${cnt}</span></button>`
+      }).join("")
+      if ($("quick-q").value.trim().toLowerCase() !== state.order.q) {
+        $("quick-q").value = state.order.q
+      }
+
+      const chips = []
+      if (state.bridge.day) chips.push(`<button type="button" data-act="clear-day">日账 · ${state.bridge.day.slice(5)} ×</button>`)
+      if (state.bridge.channel) chips.push(`<button type="button" data-act="clear-channel">渠道 · ${esc(state.bridge.channel)} ×</button>`)
+      if (state.order.q) chips.push(`<button type="button" data-act="clear-q">搜索 · ${esc(state.order.q)} ×</button>`)
+      if (state.order.statuses.size < STATUS.length) {
+        const names = STATUS.filter((s) => state.order.statuses.has(s[0])).map((s) => s[1]).join("、")
+        chips.push(`<button type="button" data-act="clear-status">状态 · ${esc(names)} ×</button>`)
+      }
+      if (state.order.modes.size < MODES.length) {
+        const names = MODES.filter((s) => state.order.modes.has(s[0])).map((s) => s[1]).join("、")
+        chips.push(`<button type="button" data-act="clear-mode">类型 · ${esc(names)} ×</button>`)
+      }
+      if (state.order.ships.size < SHIPS.length) {
+        const names = SHIPS.filter((s) => state.order.ships.has(s[0])).map((s) => s[1]).join("、")
+        chips.push(`<button type="button" data-act="clear-ship">发放 · ${esc(names)} ×</button>`)
+      }
+      $("bridge").innerHTML = chips.join("")
+      $("order-body").innerHTML = list.length ? list.map((o) => {
+        const meta = STATUS_MAP[o.status]
+        return `<tr data-act="order" data-id="${esc(o.id)}" class="${state.id === o.id ? "on" : ""}">
+          <td class="nowrap mono" style="color:var(--ink-mute)">${shortTime(o.created)}</td>
+          <td class="nowrap mono">${esc(o.id)}</td>
+          <td class="nowrap">${esc(o.buyer)}${o.email ? `<span class="subline">${esc(o.email)}</span>` : ""}</td>
+          <td class="clip"><b>${esc(o.item)}</b></td>
+          <td class="nowrap mono" style="font-weight:700">${yuan(o.total)}</td>
+          <td class="nowrap"><span class="st ${meta[2]}"><i></i>${meta[1]}</span></td>
+          <td class="nowrap">${shipHTML(o)}</td>
+        </tr>`
+      }).join("") : `<tr><td colspan="7" style="color:var(--ink-mute);padding:28px 10px">没有符合条件的订单</td></tr>`
+    }
+
+    function findOrder(id) { return ORDERS.find((o) => o.id === id) }
+
+    function renderDrawer() {
+      const o = state.id ? findOrder(state.id) : null
+      $("shade").hidden = !o
+      $("drawer").hidden = !o
+      if (!o) { $("drawer").innerHTML = ""; return }
+      const meta = STATUS_MAP[o.status]
+      const commission = o.mode === "commission"
+      const done = o.status === "completed"
+      const canEdit = commission && (o.status === "deposit_paid" || o.status === "awaiting_balance")
+      const lockedForBuyer = commission && o.status !== "completed" && o.files.length > 0
+      const canReplenish = !commission && (o.status === "paid" || o.status === "completed") && !o.files.length
+      const depositPaid = o.payments.some((p) => p.kind === "deposit" && p.paid) || ["deposit_paid", "awaiting_balance", "completed"].includes(o.status)
+      const balancePaid = o.payments.some((p) => p.kind === "balance" && p.paid) || o.status === "completed"
+      const step = done ? 4 : o.status === "awaiting_balance" ? 3 : o.status === "deposit_paid" ? (o.files.length ? 2 : 1) : 0
+      const paidPay = o.payments.find((p) => p.paid && p.at)
+      const filesHTML = o.files.length ? `<ul style="list-style:none;margin:8px 0 0;padding:0">${o.files.map((f) => `
+        <li class="file">
+          <span class="ic"><i data-lucide="${f.image ? "image" : "file-text"}"></i></span>
+          <span class="nm"><b>${esc(f.name)}</b>${lockedForBuyer ? `<small>买家付尾款后解锁</small>` : done && commission ? `<small style="color:var(--teal)">已解锁</small>` : ""}</span>
+          <span class="ops">
+            <button type="button" data-act="download" data-name="${esc(f.name)}">下载</button>
+            ${canEdit ? `<button type="button" class="danger" data-act="del-file" data-file="${esc(f.id)}">删除</button>` : ""}
+          </span>
+        </li>`).join("")}</ul>` : (o.payload ? `<div class="payload">${esc(o.payload)}</div>` : `<p class="note">${commission ? "还未上传稿件" : "未发放"}</p>`)
+      $("drawer").innerHTML = `
+        <button type="button" class="icon-x" data-act="close" aria-label="关闭"><i data-lucide="x"></i></button>
+        <div class="drawer-id">${esc(o.id)}<button type="button" data-act="copy" data-text="${esc(o.id)}" aria-label="复制订单号"><i data-lucide="copy"></i></button></div>
+        <h2>${esc(o.item)}</h2>
+        <div class="drawer-meta">${esc(o.buyer)}${o.email ? ` · <a href="mailto:${esc(o.email)}">${esc(o.email)}</a>` : ""}${commission ? ` · <a href="admin-conversations.html">打开约稿对话</a>` : ""}</div>
+        <div style="margin-top:8px"><span class="st ${meta[2]}"><i></i>${commission ? `约稿 · ${meta[1]}` : meta[1]}</span></div>
+        <div class="voucher-box">
+          <div class="money">${yuan(o.total)}${commission ? `<small>合计</small>` : ""}</div>
+          ${commission ? `<div class="splits">
+            <div><small>字数</small><b>${wordsText(o.words)}</b></div>
+            <div><small>定金 ${depositPaid ? "已收" : "待收"}</small><b class="${depositPaid ? "ok" : "wait"}">${yuan(o.deposit || 0)}</b></div>
+            <div><small>尾款 ${balancePaid ? "已收" : "待收"}</small><b class="${balancePaid ? "ok" : "wait"}">${yuan(o.balance || 0)}</b></div>
+          </div>
+          <ol class="flow">${FLOW.map((label, i) => {
+            const on = i <= step
+            const now = i === step && step < 4
+            return `<li class="${on ? "on" : ""} ${now ? "now" : ""}"><i></i>${label}</li>`
+          }).join("")}</ol>` : ""}
+        </div>
+        <section class="block">
+          <h3>买家与支付</h3>
+          <dl class="kv2">
+            <dt>买家</dt><dd>${esc(o.buyer)}${o.email ? ` <span style="color:var(--ink-mute);font-weight:600">${esc(o.email)}</span>` : ""}</dd>
+            <dt>下单时间</dt><dd class="mono">${fullTime(o.created)}</dd>
+            <dt>支付渠道</dt><dd>${esc(o.channel)}</dd>
+            ${o.trade ? `<dt>渠道流水</dt><dd class="mono">${esc(o.trade)} <button type="button" class="inline-btn" data-act="copy" data-text="${esc(o.trade)}" aria-label="复制流水"><i data-lucide="copy"></i></button></dd>` : ""}
+            ${paidPay ? `<dt>支付时间</dt><dd class="mono">${fullTime(paidPay.at)}</dd>` : ""}
+          </dl>
+        </section>
+        <section class="block">
+          <h3>支付明细 <small>${o.payments.length} 笔</small></h3>
+          ${o.payments.length ? o.payments.map((p) => `
+            <div class="payrow">
+              <div class="top"><b>${KIND_LABEL[p.kind] || p.kind}</b><span>${yuan(p.amount)}</span></div>
+              <div class="bot"><span class="st ${p.paid ? "teal" : p.failed ? "danger" : "warn"}"><i></i>${p.paid ? "已到账" : p.failed ? "未入账" : "待支付"}</span><span class="mono">${p.paid ? shortTime(p.at) : "—"}</span></div>
+            </div>`).join("") : `<p class="note">暂无支付记录</p>`}
+        </section>
+        <section class="block">
+          <h3>${commission ? "稿件交付" : "发放内容"} <small>${o.files.length} 个文件</small></h3>
+          ${filesHTML}
+          ${canReplenish ? `<p class="note">买家还没有可下载的文件。请先到 <a href="admin-products.html" style="color:var(--teal);font-weight:700">商品</a> 里上传，再点补货。</p>` : ""}
+          ${canEdit ? `<button type="button" class="uploader" data-act="upload"><i data-lucide="upload"></i> 上传稿件（DOCX / TXT / 图片）</button>` : ""}
+          ${canEdit && o.files.length ? `<button type="button" class="recall" data-act="recall">撤回发货</button>` : ""}
+          ${lockedForBuyer ? `<div class="locknote"><i data-lucide="lock"></i><span>付尾款前可随时撤回。管理员可下载；买家需付清尾款后才能解锁。</span></div>` : ""}
+          ${done && commission ? `<div class="locknote"><i data-lucide="lock"></i><span>尾款已收，订单已锁定，不能再改稿件或撤回发货。</span></div>` : ""}
+        </section>
+        <div class="acts">
+          ${canReplenish ? `<button type="button" class="teal-btn" data-act="replenish"><i data-lucide="package-plus"></i>补货</button>` : ""}
+          ${commission ? `<a class="teal-btn" href="admin-conversations.html"><i data-lucide="message-square"></i>打开对话</a>` : ""}
+          <button type="button" class="ghost-btn" data-act="copy" data-text="${esc(o.id)}"><i data-lucide="copy"></i>复制单号</button>
+          ${o.email ? `<a class="ghost-btn" href="mailto:${esc(o.email)}"><i data-lucide="mail"></i>发邮件</a>` : ""}
+        </div>
+      `
+    }
+
+    function render() {
+      renderBooks()
+      renderOrders()
+      renderDrawer()
+      lxIcons()
+    }
+
+    function checks(title, group, options, selected) {
+      return `<div class="chk"><div class="chk-t">${title}</div><div class="chk-row">${options.map(([v, l]) => `
+        <label><input type="checkbox" data-group="${group}" value="${v}" ${selected.has(v) ? "checked" : ""}>${l}</label>
+      `).join("")}</div></div>`
+    }
+    function paintModal() {
+      const box = $("modal")
+      box.classList.toggle("wide", draftKind === "ledger")
+      if (draftKind === "ledger") {
+        box.innerHTML = `
+          <div class="modal-head"><h2>筛选账本</h2><button type="button" class="icon-x" data-act="close-modal" aria-label="关闭"><i data-lucide="x"></i></button></div>
+          <div class="grid2">
+            <label class="field"><span>开始日期</span><input type="date" data-field="from" value="${draft.from}"></label>
+            <label class="field"><span>结束日期</span><input type="date" data-field="to" value="${draft.to}"></label>
+            <label class="field"><span>最小金额</span><input type="number" min="0" data-field="min" placeholder="不限" value="${draft.min ?? ""}"></label>
+            <label class="field"><span>最大金额</span><input type="number" min="0" data-field="max" placeholder="不限" value="${draft.max ?? ""}"></label>
+            <label class="field span2"><span>买家、订单号或商品</span><input data-field="q" data-lower="1" placeholder="留空表示不限" value="${esc(draft.q)}"></label>
+          </div>
+          ${checks("入账状态", "states", [["ok", "已入账"], ["fail", "未入账"]], draft.states)}
+          ${checks("款项", "kinds", KINDS, draft.kinds)}
+          ${checks("渠道", "channels", CHANNELS.map((c) => [c, c]), draft.channels)}
+          <div class="modal-actions">
+            <button type="button" class="ghost-btn" data-act="reset-draft">恢复默认</button>
+            <button type="button" class="ghost-btn" data-act="close-modal">取消</button>
+            <button type="button" class="teal-btn" data-act="apply-draft">应用</button>
+          </div>`
+      } else {
+        box.innerHTML = `
+          <div class="modal-head"><h2>筛选订单</h2><button type="button" class="icon-x" data-act="close-modal" aria-label="关闭"><i data-lucide="x"></i></button></div>
+          <div class="grid2">
+            <label class="field span2"><span>买家、订单号或商品</span><input data-field="q" data-lower="1" placeholder="留空表示全部" value="${esc(draft.q)}"></label>
+          </div>
+          ${checks("订单状态", "statuses", STATUS.map((s) => [s[0], s[1]]), draft.statuses)}
+          ${checks("发放", "ships", SHIPS, draft.ships)}
+          ${checks("类型", "modes", MODES, draft.modes)}
+          <div class="modal-actions">
+            <button type="button" class="ghost-btn" data-act="reset-draft">恢复默认</button>
+            <button type="button" class="ghost-btn" data-act="close-modal">取消</button>
+            <button type="button" class="teal-btn" data-act="apply-draft">应用</button>
+          </div>`
+      }
+      $("modal-back").hidden = false
+      lxIcons()
+    }
+    function closeModal() { $("modal-back").hidden = true; draft = null; draftKind = "" }
+
+    function openOrder(id, force) {
+      if (!findOrder(id)) { lxToast("没有这笔订单"); return }
+      if (!force && state.id === id) {
+        state.id = ""
+        renderOrders()
+        renderDrawer()
+        document.querySelectorAll("#ledger .payline").forEach((el) => el.classList.remove("on"))
+        lxIcons()
+        return
+      }
+      state.id = id
+      renderOrders()
+      document.querySelectorAll("#ledger .ticket").forEach((el) => el.classList.toggle("on", el.dataset.id === id))
+      renderDrawer()
+      lxIcons()
+      const row = document.querySelector("#order-body tr[data-id='" + id + "']")
+      row?.scrollIntoView({ block: "nearest" })
+    }
+
+    $("chart-wrap").addEventListener("mousemove", (e) => {
+      if (!chartModel || !chartModel.days.length) return
+      const svg = $("chart")
+      const rect = svg.getBoundingClientRect()
+      const padL = 44, padR = 14, w = 720
+      const relX = ((e.clientX - rect.left) / rect.width) * w
+      const plotW = w - padL - padR
+      const n = chartModel.days.length
+      const slot = plotW / n
+      const i = Math.min(n - 1, Math.max(0, Math.floor((relX - padL) / slot)))
+      const band = svg.querySelector("#cursor-band")
+      if (band) {
+        band.setAttribute("x", (padL + slot * i).toFixed(1))
+        band.setAttribute("opacity", "1")
+      }
+      const tip = $("tip")
+      tip.hidden = false
+      tip.innerHTML = `<b>${chartModel.days[i]}</b><div>成品 ${yuan(chartModel.full[i] || 0)}</div><div>定金 ${yuan(chartModel.dep[i] || 0)} · 尾款 ${yuan(chartModel.bal[i] || 0)}</div>`
+      const box = $("chart-wrap").getBoundingClientRect()
+      tip.style.left = (e.clientX - box.left) + "px"
+      tip.style.top = (e.clientY - box.top) + "px"
+    })
+    $("chart-wrap").addEventListener("mouseleave", () => {
+      $("tip").hidden = true
+      const band = $("chart").querySelector("#cursor-band")
+      if (band) band.setAttribute("opacity", "0")
+    })
+
+    $("range-pills").addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-days]")
+      if (!btn) return
+      const mode = btn.dataset.days
+      const to = new Date()
+      let from
+      if (mode === "month") from = new Date(to.getFullYear(), to.getMonth(), 1)
+      else from = new Date(to.getFullYear(), to.getMonth(), to.getDate() - (Number(mode) - 1))
+      state.ledger.from = iso(from)
+      state.ledger.to = iso(to)
+      document.querySelectorAll("#range-pills button").forEach((b) => b.classList.toggle("on", b === btn))
+      render()
+    })
+
+    $("quick-q").addEventListener("input", (e) => {
+      state.order.q = e.target.value.trim().toLowerCase()
+      renderOrders()
+    })
+
+    document.addEventListener("click", (e) => {
+      if (e.target.id === "modal-back") { closeModal(); return }
+      if (e.target.id === "shade") { state.id = ""; render(); return }
+      const jump = e.target.closest("[data-jump]")
+      if (jump) {
+        e.preventDefault()
+        const desk = document.querySelector(".desk")
+        const key = jump.dataset.jump
+        if (key === "books") desk.scrollTo({ top: 0, behavior: "smooth" })
+        else $(key).scrollIntoView({ behavior: "smooth", block: "start" })
+        return
+      }
+      const t = e.target.closest("[data-act]")
+      if (!t) return
+      const act = t.dataset.act
+      if (act === "open-ledger") {
+        draftKind = "ledger"
+        const f = state.ledger
+        draft = { ...f, kinds: new Set(f.kinds), channels: new Set(f.channels), states: new Set(f.states) }
+        paintModal()
+      } else if (act === "open-orders") {
+        draftKind = "order"
+        const f = state.order
+        draft = { ...f, statuses: new Set(f.statuses), ships: new Set(f.ships), modes: new Set(f.modes) }
+        paintModal()
+      } else if (act === "tab-status") {
+        const key = t.dataset.tab
+        if (key === "all") state.order.statuses = new Set(STATUS.map((s) => s[0]))
+        else if (key === "follow") state.order.statuses = new Set(["pending", "deposit_paid", "awaiting_balance"])
+        else if (key === "completed") state.order.statuses = new Set(["completed", "paid"])
+        else if (key === "failed") state.order.statuses = new Set(["failed", "cancelled"])
+        else state.order.statuses = new Set([key])
+        renderOrders()
+      } else if (act === "close-modal") closeModal()
+      else if (act === "reset-draft") {
+        draft = draftKind === "ledger" ? defaultLedger() : defaultOrder()
+        paintModal()
+      } else if (act === "apply-draft") {
+        if (draftKind === "ledger") {
+          if (!draft.kinds.size || !draft.channels.size || !draft.states.size) { lxToast("款项、渠道、入账状态都至少留一项"); return }
+          if (draft.from > draft.to) { lxToast("开始日期不能晚于结束日期"); return }
+          if (daysBetween(draft.from, draft.to) > 800) { lxToast("一次最多筛选 800 天"); return }
+          if (draft.min != null && draft.max != null && draft.min > draft.max) { lxToast("最小金额不能大于最大金额"); return }
+          state.ledger = draft
+          document.querySelectorAll("#range-pills button").forEach((b) => b.classList.remove("on"))
+        } else {
+          if (!draft.statuses.size || !draft.ships.size || !draft.modes.size) { lxToast("状态、发放、类型都至少留一项"); return }
+          state.order = draft
+        }
+        closeModal()
+        render()
+      } else if (act === "day") {
+        const day = t.dataset.day
+        state.bridge.day = state.bridge.day === day ? "" : day
+        render()
+        if (state.bridge.day) $("orders").scrollIntoView({ behavior: "smooth", block: "start" })
+      } else if (act === "channel") {
+        const name = t.dataset.channel
+        state.bridge.channel = state.bridge.channel === name ? "" : name
+        render()
+        if (state.bridge.channel) $("orders").scrollIntoView({ behavior: "smooth", block: "start" })
+      } else if (act === "clear-day") { state.bridge.day = ""; render() }
+      else if (act === "clear-channel") { state.bridge.channel = ""; render() }
+      else if (act === "clear-q") { state.order.q = ""; $("quick-q").value = ""; render() }
+      else if (act === "clear-status") { state.order.statuses = new Set(STATUS.map((s) => s[0])); render() }
+      else if (act === "clear-mode") { state.order.modes = new Set(MODES.map((s) => s[0])); render() }
+      else if (act === "clear-ship") { state.order.ships = new Set(SHIPS.map((s) => s[0])); render() }
+      else if (act === "order") openOrder(t.dataset.id)
+      else if (act === "close") { state.id = ""; render() }
+      else if (act === "copy") {
+        const text = t.dataset.text || ""
+        navigator.clipboard?.writeText(text).then(() => lxToast("已复制")).catch(() => lxToast(text))
+      } else if (act === "download") lxToast("开始下载「" + t.dataset.name + "」")
+      else if (act === "upload") {
+        const o = findOrder(state.id)
+        if (!o) return
+        o.files.push({ id: "up" + Date.now(), name: "新稿件.docx", image: false })
+        lxToast("稿件已上传")
+        render()
+      } else if (act === "del-file") {
+        const o = findOrder(state.id)
+        if (!o) return
+        o.files = o.files.filter((f) => f.id !== t.dataset.file)
+        lxToast("已删除稿件")
+        render()
+      } else if (act === "recall") {
+        if (!window.confirm("撤回发货后，对话里的发货通知会一并撤回，订单回到待交稿。确定撤回？")) return
+        const o = findOrder(state.id)
+        if (!o) return
+        o.files = []
+        lxToast("已撤回发货")
+        render()
+      } else if (act === "replenish") {
+        if (!window.confirm("将把商品里当前已上传的文件补发到这个订单，买家刷新后即可下载。确定补货？")) return
+        const o = findOrder(state.id)
+        if (!o) return
+        o.files.push({ id: "re" + Date.now(), name: o.item.replace(/[《》]/g, "") + ".txt", image: false })
+        lxToast("已补货，买家现在可以下载")
+        render()
+      } else if (act === "export") {
+        const n = matchedOrders().length
+        lxToast(n ? `已导出 ${n} 笔` : "没有可导出的订单")
+      }
+    })
+    document.addEventListener("input", (e) => {
+      const el = e.target
+      if (!draft || !el.dataset || !el.dataset.field) return
+      const key = el.dataset.field
+      if (key === "min" || key === "max") draft[key] = el.value === "" ? null : Number(el.value)
+      else if (el.dataset.lower) draft[key] = el.value.trim().toLowerCase()
+      else draft[key] = el.value
+    })
+    document.addEventListener("change", (e) => {
+      const el = e.target
+      if (!draft || !el.dataset || !el.dataset.group) return
+      const set = draft[el.dataset.group]
+      if (el.checked) set.add(el.value)
+      else set.delete(el.value)
+    })
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return
+      if (!$("modal-back").hidden) closeModal()
+      else if (state.id) { state.id = ""; render() }
+    })
+    document.querySelector(".desk").addEventListener("scroll", () => {
+      const desk = document.querySelector(".desk")
+      const top = desk.getBoundingClientRect().top + 90
+      let cur = "books"
+      if ($("orders").getBoundingClientRect().top < top) cur = "orders"
+      else if ($("tape").getBoundingClientRect().top < top) cur = "tape"
+      document.querySelectorAll(".jumps a").forEach((a) => a.classList.toggle("on", a.dataset.jump === cur))
+    }, { passive: true })
+
+    const params = new URLSearchParams(location.search)
+    const status = params.get("status")
+    if (status === "commission") state.order.modes = new Set(["commission"])
+    else if (status) {
+      const parts = status.split(",").filter((p) => STATUS_MAP[p])
+      if (parts.length) state.order.statuses = new Set(parts)
+    }
+    const ship = params.get("ship")
+    if (ship) {
+      const parts = ship.split(",").filter((p) => SHIPS.some((s) => s[0] === p))
+      if (parts.length) state.order.ships = new Set(parts)
+    }
+    const mode = params.get("mode")
+    if (mode && status !== "commission") {
+      const parts = mode.split(",").filter((p) => p === "normal" || p === "commission")
+      if (parts.length) state.order.modes = new Set(parts)
+    }
+    if (params.get("q")) state.order.q = params.get("q").trim().toLowerCase()
+
+    const followN = ORDERS.filter(isFollow).length
+    $("nav-n").textContent = String(followN)
+    lxDate()
+    render()
+    if (params.get("id")) openOrder(params.get("id"), true)
+    if (location.hash === "#orders" || params.get("status") || params.get("q") || params.get("id")) {
+      requestAnimationFrame(() => $("orders").scrollIntoView({ block: "start" }))
+    }
+  </script>
+</body>
+</html>

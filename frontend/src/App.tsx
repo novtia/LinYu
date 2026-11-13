@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { ChatSocketProvider } from './context/ChatSocketContext'
 import { CartProvider } from './context/CartContext'
@@ -10,22 +10,25 @@ import { ProductDetailPage } from './pages/ProductDetailPage'
 import { CheckoutPage } from './pages/CheckoutPage'
 import { OrdersListPage } from './pages/OrdersListPage'
 import { OrderDetailPage } from './pages/OrderDetailPage'
+import { UsdtPayPage } from './pages/UsdtPayPage'
 import { AdminLayout } from './pages/admin/AdminLayout'
 import { DashboardPage } from './pages/admin/DashboardPage'
 import { ProductsPage } from './pages/admin/ProductsPage'
 import { ProductFormPage } from './pages/admin/ProductFormPage'
-import { CategoriesPage } from './pages/admin/CategoriesPage'
 import { UsersPage } from './pages/admin/UsersPage'
-import { OrdersPage } from './pages/admin/OrdersPage'
-import { DeliveriesPage } from './pages/admin/DeliveriesPage'
-import { PaymentPage } from './pages/admin/PaymentPage'
+import { RevenuePage } from './pages/admin/RevenuePage'
 import { PaymentChannelFormPage } from './pages/admin/PaymentChannelFormPage'
-import { SystemPage } from './pages/admin/SystemPage'
-import { WebsitePage } from './pages/admin/WebsitePage'
+import { SettingsDesk } from './pages/admin/SettingsDesk'
 import { ConversationsPage } from './pages/admin/ConversationsPage'
 import { MyCommissionsPage } from './pages/MyCommissionsPage'
 import { ShelfPage } from './pages/ShelfPage'
 import { ReaderPage } from './pages/ReaderPage'
+
+function ToRevenue() {
+  const { id } = useParams()
+  const { search, hash } = useLocation()
+  return <Navigate to={`/admin/revenue${id ? `/${encodeURIComponent(id)}` : ''}${search}${hash}`} replace />
+}
 
 export default function App() {
   return (
@@ -40,6 +43,7 @@ export default function App() {
                   <Route path="/" element={<ShopPage />} />
                   <Route path="/product/:id" element={<ProductDetailPage />} />
                   <Route path="/checkout" element={<CheckoutPage />} />
+                  <Route path="/pay/usdt/:paymentId" element={<UsdtPayPage />} />
                   <Route path="/orders" element={<OrdersListPage />} />
                   <Route path="/orders/:id" element={<OrderDetailPage />} />
                   <Route path="/commissions" element={<MyCommissionsPage />} />
@@ -51,18 +55,19 @@ export default function App() {
                   <Route path="products" element={<ProductsPage />} />
                   <Route path="products/new" element={<ProductFormPage />} />
                   <Route path="products/:id/edit" element={<ProductFormPage />} />
-                  <Route path="categories" element={<CategoriesPage />} />
+                  <Route path="categories" element={<Navigate to="/admin/products?focus=categories" replace />} />
                   <Route path="users" element={<UsersPage />} />
-                  <Route path="orders" element={<OrdersPage />} />
-                  <Route path="orders/:id" element={<OrdersPage />} />
+                  <Route path="orders" element={<ToRevenue />} />
+                  <Route path="orders/:id" element={<ToRevenue />} />
+                  <Route path="revenue/:id?" element={<RevenuePage />} />
                   <Route path="conversations" element={<ConversationsPage />} />
-                  <Route path="deliveries" element={<DeliveriesPage />} />
-                  <Route path="deliveries/:id" element={<DeliveriesPage />} />
-                  <Route path="payment" element={<PaymentPage />} />
+                  <Route path="deliveries" element={<Navigate to="/admin/revenue#orders" replace />} />
+                  <Route path="deliveries/:id" element={<Navigate to="/admin/revenue#orders" replace />} />
+                  <Route path="payment" element={<div className="lx-desk -m-4 min-h-full bg-fog px-5 py-6 md:-m-6 md:px-7 md:py-7"><SettingsDesk focus="payment" /></div>} />
                   <Route path="payment/new" element={<PaymentChannelFormPage />} />
                   <Route path="payment/:id" element={<PaymentChannelFormPage />} />
-                  <Route path="system" element={<SystemPage />} />
-                  <Route path="website" element={<WebsitePage />} />
+                  <Route path="system" element={<div className="lx-desk -m-4 min-h-full bg-fog px-5 py-6 md:-m-6 md:px-7 md:py-7"><SettingsDesk focus="system" /></div>} />
+                  <Route path="website" element={<div className="lx-desk -m-4 min-h-full bg-fog px-5 py-6 md:-m-6 md:px-7 md:py-7"><SettingsDesk focus="website" /></div>} />
                 </Route>
                 </Routes>
               </PurchaseResultProvider>

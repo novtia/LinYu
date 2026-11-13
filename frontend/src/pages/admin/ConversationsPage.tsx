@@ -1,25 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { PanelRightClose, PanelRightOpen, X } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { Search, Upload } from 'lucide-react'
 import { ApiError, api } from '../../lib/api'
 import { eventThread, upsertThread } from '../../lib/chatSocket'
 import { formatWords } from '../../lib/commission'
-import { allOrderFiles, AdminOrderDetail } from '../../components/AdminOrderDetail'
+import { AdminOrderDetail } from '../../components/AdminOrderDetail'
 import { orderStatusLabel } from '../../lib/orderStatus'
 import { fmtBeijingClock } from '../../lib/time'
 import { useChatSocket } from '../../context/ChatSocketContext'
 import { useToast } from '../../context/ToastContext'
 import { CommissionChat } from '../../components/CommissionChat'
-import type { CommissionThread, CommissionThreadList, Order } from '../../types'
+import { yuanText } from '../../lib/ledger'
+import type { Analytics, AnalyticsStock, CommissionThread, CommissionThreadList, Order } from '../../types'
 
-type Filter = 'all' | 'unread' | 'deposit'
+type Filter = 'all' | 'unread' | 'deposit' | 'late'
 
 function fmtTime(iso?: string | null) {
   return fmtBeijingClock(iso)
-}
-
-function shouldOpenDetail(order: Order) {
-  return order.status === 'awaiting_balance' || order.status === 'completed' || allOrderFiles(order).length > 0
 }
 
 function threadMatchesQuery(t: CommissionThread, q: string) {
@@ -28,10 +25,24 @@ function threadMatchesQuery(t: CommissionThread, q: string) {
   return [t.username, t.product_name, t.order_id, t.last_preview].some((x) => (x || '').toLowerCase().includes(s))
 }
 
+function isLate(t: CommissionThread) {
+  if (t.unread_admin <= 0 || !t.last_at) return false
+  return Date.now() - new Date(t.last_at).getTime() > 4 * 3600 * 1000
+}
+
 function threadMatchesFilter(t: CommissionThread, filter: Filter) {
   if (filter === 'unread') return t.unread_admin > 0
   if (filter === 'deposit') return t.has_deposit
+  if (filter === 'late') return isLate(t)
   return true
+}
+
+function stepOf(t: CommissionThread, o: Order | null) {
+  const status = o?.status || t.order_status || ''
+  if (status === 'completed') return 3
+  if (status === 'awaiting_balance') return 2
+  if (status === 'deposit_paid') return 1
+  return 0
 }
 
 export function ConversationsPage() {
@@ -41,13 +52,18 @@ export function ConversationsPage() {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
   const [threads, setThreads] = useState<CommissionThread[]>([])
+  const [stock, setStock] = useState<AnalyticsStock | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [order, setOrder] = useState<Order | null>(null)
-  const [detailOpen, setDetailOpen] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [recalling, setRecalling] = useState(false)
+  const [deletingOrder, setDeletingOrder] = useState(false)
   const [visible, setVisible] = useState(typeof document === 'undefined' ? true : document.visibilityState === 'visible')
   const fileRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    api.get<Analytics>('/api/analytics').then((a) => setStock(a.stock)).catch(() => setStock(null))
+  }, [])
 
   useEffect(() => {
     const onVis = () => setVisible(document.visibilityState === 'visible')
@@ -58,8 +74,8 @@ export function ConversationsPage() {
   const loadList = useCallback(async () => {
     const params = new URLSearchParams()
     if (query.trim()) params.set('q', query.trim())
-    if (filter !== 'all') params.set('filter', filter)
-    params.set('limit', '50')
+    if (filter === 'unread' || filter === 'deposit') params.set('filter', filter)
+    params.set('limit', '80')
     const res = await api.get<CommissionThreadList>(`/api/commission/threads?${params}`)
     setThreads(res.items)
     return res.items
@@ -116,30 +132,30 @@ export function ConversationsPage() {
 
   const active = useMemo(() => threads.find((t) => t.id === activeId) || null, [threads, activeId])
 
-  const reloadOrder = useCallback(async (orderId?: string | null) => {
-    const id = orderId || active?.order_id
-    if (!id) {
-      setOrder(null)
-      return null
-    }
-    const o = await api.get<Order>(`/api/orders/${encodeURIComponent(id)}`)
-    setOrder(o)
-    return o
-  }, [active?.order_id])
+  const reloadOrder = useCallback(
+    async (orderId?: string | null) => {
+      const id = orderId || active?.order_id
+      if (!id) {
+        setOrder(null)
+        return null
+      }
+      const o = await api.get<Order>(`/api/orders/${encodeURIComponent(id)}`)
+      setOrder(o)
+      return o
+    },
+    [active?.order_id],
+  )
 
   useEffect(() => {
     if (!active?.order_id) {
       setOrder(null)
-      setDetailOpen(false)
       return
     }
     let alive = true
     api
       .get<Order>(`/api/orders/${encodeURIComponent(active.order_id)}`)
       .then((o) => {
-        if (!alive) return
-        setOrder(o)
-        setDetailOpen(shouldOpenDetail(o))
+        if (alive) setOrder(o)
       })
       .catch(() => {
         if (alive) setOrder(null)
@@ -204,219 +220,280 @@ export function ConversationsPage() {
     }
   }
 
-  const canToggleDetail = Boolean(active?.order_id)
-  const paneOpen = Boolean(detailOpen && order && active?.order_id === order.id)
-
-  function toggleDetail() {
-    if (!active?.order_id) return
-    if (paneOpen) {
-      setDetailOpen(false)
-      return
+  async function handleDeleteOrder() {
+    if (!order) return
+    if (!window.confirm(`确定删除订单「${order.id}」？此操作会同步清理该笔约稿对话与交付记录，且不可恢复。`)) return
+    setDeletingOrder(true)
+    try {
+      await api.delete(`/api/orders/${encodeURIComponent(order.id)}`)
+      const deletedId = order.id
+      setOrder(null)
+      setThreads((prev) => prev.filter((t) => t.order_id !== deletedId))
+      setActiveId(null)
+      showToast('订单已删除')
+    } catch (e) {
+      showToast(e instanceof ApiError ? e.message : '删除订单失败')
+    } finally {
+      setDeletingOrder(false)
     }
-    if (order && order.id === active.order_id) {
-      setDetailOpen(true)
-      return
-    }
-    void reloadOrder(active.order_id)
-      .then((o) => {
-        if (o) setDetailOpen(true)
-        else showToast('订单详情加载失败')
-      })
-      .catch((e) => showToast(e instanceof ApiError ? e.message : '订单详情加载失败'))
   }
 
+  const shown = threads.filter((t) => threadMatchesFilter(t, filter))
+  const unreadThreads = threads.filter((t) => t.unread_admin > 0)
+  const lateThreads = threads.filter(isLate)
+  const depositN = threads.filter((t) => t.has_deposit).length
+  const curStep = active ? stepOf(active, order) : 0
+
   return (
-    <div className="relative flex h-full min-h-0 min-w-0 flex-1 overflow-hidden bg-white">
-      <section className="flex w-[300px] shrink-0 flex-col border-r border-[var(--line)]">
-        <div className="px-[18px] pt-[18px] pb-2">
-          <h3 className="mb-3 text-[0.95rem] font-bold">用户</h3>
-          <input
-            className="h-9 w-full border-0 border-b border-[var(--line)] bg-transparent outline-none"
-            placeholder="搜索用户、篇名或订单码"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
+    <div className="lx-desk absolute inset-0 flex flex-col overflow-hidden bg-fog">
+      <div className="studio-top">
+        <div className="studio-head">
+          <div className="studio-title">
+            <h1>约稿收件箱</h1>
+            <p className="lead">先回已付定金且等待最久的单，再接新问价</p>
+          </div>
+          <div className="sla-strip">
+            <span className={`sla-pill ${unreadThreads.length ? 'alert' : ''}`}>
+              {unreadThreads.length ? <i className="pulse" /> : null}
+              未读 <b>{unreadThreads.length}</b> 条
+            </span>
+            <span className={`sla-pill ${lateThreads.length ? 'alert' : ''}`}>
+              超 4h 未回 <b>{lateThreads.length}</b>
+            </span>
+            <span className="sla-pill">
+              已付定金在聊 <b>{depositN}</b>
+              {stock ? ` · 在制 ${stock.writing}` : ''}
+            </span>
+          </div>
         </div>
-        <div className="flex gap-3 px-[18px] py-3">
-          {(
-            [
-              ['all', '全部'],
-              ['unread', '未读'],
-              ['deposit', '已付定金'],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              className={`bg-transparent text-[0.78rem] font-semibold ${filter === id ? 'text-ink' : 'text-ink-mute'}`}
-              onClick={() => setFilter(id)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <div className="min-h-0 flex-1 overflow-auto">
-          {threads.length === 0 ? (
-            <p className="px-6 py-6 text-[0.86rem] text-ink-mute">没有匹配的对话</p>
-          ) : (
-            threads.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                className={`grid w-full grid-cols-[36px_minmax(0,1fr)_auto] items-center gap-2.5 px-[18px] py-3 text-left hover:bg-fog ${t.id === activeId ? 'bg-fog' : ''}`}
-                onClick={() => {
-                  setActiveId(t.id)
-                  setThreads((prev) => prev.map((x) => (x.id === t.id ? { ...x, unread_admin: 0 } : x)))
-                  setSearchParams(t.order_id ? { order: t.order_id } : { user: t.user_id, product: String(t.product_id) }, { replace: true })
-                }}
-              >
-                <div className="grid h-9 w-9 place-items-center rounded-full bg-ink text-[0.78rem] font-bold text-white">
-                  {t.username.slice(0, 1)}
-                </div>
-                <div className="min-w-0">
-                  <b className="block text-[0.88rem]">{t.username}</b>
-                  <div className="truncate font-[family-name:var(--font-mono)] text-[0.7rem] text-ink-mute">
-                    {t.order_id || `${t.product_name} · 商品沟通`}
-                  </div>
-                  <div className="truncate text-[0.74rem] text-ink-mute">{t.last_preview || t.product_name}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-[0.7rem] text-ink-mute">{fmtTime(t.last_at)}</div>
-                  {t.unread_admin > 0 ? (
-                    <span className="mt-1 inline-grid min-w-4 place-items-center rounded-full bg-danger px-1.5 text-[0.66rem] font-extrabold text-white">
-                      {t.unread_admin}
-                    </span>
-                  ) : (
-                    <span className="text-[0.72rem] font-bold text-teal">{t.has_deposit ? '已付定金' : '沟通中'}</span>
-                  )}
-                </div>
+
+        <div className="studio-filter">
+          <div className="chips">
+            {(
+              [
+                ['all', '全部会话'],
+                ['unread', '未读消息'],
+                ['deposit', '已付定金'],
+                ['late', '超过 4 小时'],
+              ] as const
+            ).map(([id, label]) => (
+              <button key={id} type="button" className={filter === id ? 'on' : ''} onClick={() => setFilter(id)}>
+                {label}
               </button>
-            ))
+            ))}
+          </div>
+          <label className="search">
+            <Search className="h-3.5 w-3.5 text-ink-mute" />
+            <input value={query} placeholder="搜索买家、商品名或订单号…" onChange={(e) => setQuery(e.target.value)} />
+          </label>
+        </div>
+      </div>
+
+      <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[312px_minmax(0,1fr)_308px]">
+        <div className="flex min-h-0 flex-col gap-1.5 overflow-y-auto border-[var(--line-strong)] bg-white p-2.5 xl:border-r">
+          {shown.length === 0 ? (
+            <p className="empty">没有符合条件的对话</p>
+          ) : (
+            shown.map((t) => {
+              const late = isLate(t)
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  className={`thread-card ${t.id === activeId ? 'on' : ''} ${late ? 'late' : ''}`}
+                  onClick={() => {
+                    setActiveId(t.id)
+                    setThreads((prev) => prev.map((x) => (x.id === t.id ? { ...x, unread_admin: 0 } : x)))
+                    setSearchParams(
+                      t.order_id ? { order: t.order_id } : { user: t.user_id, product: String(t.product_id) },
+                      { replace: true },
+                    )
+                  }}
+                >
+                  <div className="top">
+                    <span className="who">
+                      <span className="u-dot">{t.username.slice(0, 1).toUpperCase()}</span>
+                      <b>{t.username}</b>
+                    </span>
+                    <time>{fmtTime(t.last_at)}</time>
+                  </div>
+                  <div className="prod-line">
+                    {t.product_name}
+                    {t.order_id ? ` · ${t.order_id}` : ''}
+                  </div>
+                  <p>{t.last_preview || t.product_name}</p>
+                  <div className="meta">
+                    <span className={`tag ${t.has_deposit ? 'gold' : 'mute'}`}>{t.has_deposit ? '已付定金' : '未付定金'}</span>
+                    {late ? <span className="tag danger">超过 4h</span> : null}
+                    {t.unread_admin > 0 ? <span className="badge" style={{ marginLeft: 'auto' }}>{t.unread_admin}</span> : null}
+                  </div>
+                </button>
+              )
+            })
           )}
         </div>
-      </section>
 
-      <section className="flex min-h-0 min-w-0 flex-1 flex-col">
-        {active ? (
-          <CommissionChat
-            threadId={active.id}
-            viewer="admin"
-            active={visible}
-            mineAvatar="匣"
-            peerAvatar={active.username.slice(0, 1)}
-            orderId={active.order_id}
-            orderStatus={active.order_status}
-            balanceAmount={active.balance_amount}
-            deliveryLabel={active.product_name}
-            onUnread={(unread, threadId) => {
-              setThreads((prev) => prev.map((t) => (t.id === threadId ? { ...t, unread_admin: unread } : t)))
-            }}
-            onOrderChange={(status, meta) => {
-              setThreads((prev) =>
-                prev.map((t) =>
-                  t.id === active.id
-                    ? {
-                        ...t,
-                        order_status: status,
-                        last_preview:
-                          status === 'awaiting_balance'
-                            ? '[稿件已发货]'
-                            : meta?.recalled
-                              ? t.last_preview
-                              : t.last_preview,
-                      }
-                    : t,
-                ),
-              )
-              void reloadOrder(active.order_id).catch(() => {})
-              if (meta?.shipped || status === 'awaiting_balance' || status === 'completed') setDetailOpen(true)
-            }}
-            className="h-full min-h-0"
-            header={
-              <div className="cm-chat-head">
-                <div className="c-av mine">{active.username.slice(0, 1)}</div>
-                <div className="c-meta">
-                  <b>{active.username}</b>
-                  <small>
-                    {active.order_id ? `${active.order_id} · ` : '商品沟通 · '}
-                    {active.product_name}
+        <div className="admin-chat-pane flex min-h-0 flex-col overflow-hidden border-[var(--line-strong)] bg-[#f6f9f7] xl:border-r">
+          {active ? (
+            <>
+              <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--line)] bg-white px-5 py-3">
+                <div className="min-w-0">
+                  <h3 className="m-0 truncate font-[family-name:var(--font-display)] text-[1rem] font-bold tracking-tight">
+                    {active.username} · {active.product_name}
+                  </h3>
+                  <small className="mt-0.5 block font-[family-name:var(--font-mono)] text-[0.72rem] text-ink-mute">
+                    {active.order_id || '问价沟通'}
                     {active.word_count ? ` · ${formatWords(active.word_count)}` : ''}
                   </small>
                 </div>
-                <div className="c-right">
-                  {canToggleDetail ? (
-                    <button type="button" className="cm-order-toggle" onClick={toggleDetail}>
-                      {paneOpen ? <PanelRightClose className="h-3.5 w-3.5" strokeWidth={1.9} /> : <PanelRightOpen className="h-3.5 w-3.5" strokeWidth={1.9} />}
-                      {paneOpen ? '收起详情' : '订单详情'}
-                    </button>
-                  ) : null}
-                  <span className="cm-st-pill teal">
-                    <i />
-                    {active.order_status ? orderStatusLabel(active.order_status) : active.order_id ? '沟通中' : '商品沟通'}
-                  </span>
-                </div>
+                <span className={`tag ${active.has_deposit ? 'gold' : 'mute'}`}>
+                  {active.order_status ? orderStatusLabel(active.order_status) : '问价中'}
+                </span>
               </div>
-            }
-          />
-        ) : (
-          <div className="grid min-h-full place-items-center text-ink-mute">选择左侧用户</div>
-        )}
-      </section>
-
-      {canToggleDetail && !paneOpen ? (
-        <button type="button" className="cm-order-rail flex" onClick={toggleDetail} title="打开订单详情">
-          <PanelRightOpen className="h-4 w-4" strokeWidth={1.8} />
-          <span>订单详情</span>
-        </button>
-      ) : null}
-
-      {paneOpen && order ? (
-        <>
-          <button
-            type="button"
-            className="absolute inset-0 z-20 bg-[rgba(20,32,28,.28)] xl:hidden"
-            aria-label="关闭订单详情"
-            onClick={toggleDetail}
-          />
-          <button type="button" className="cm-order-rail cm-order-rail-on hidden xl:flex" onClick={toggleDetail} title="收起订单详情">
-            <PanelRightClose className="h-4 w-4" strokeWidth={1.8} />
-            <span>收起</span>
-          </button>
-          <aside className="absolute inset-y-0 right-0 z-30 flex w-[min(100%,400px)] flex-col border-l border-[var(--line)] bg-white xl:relative xl:z-0 xl:w-[400px] xl:shrink-0">
-            <div className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--line)] px-5">
-              <b className="text-[0.86rem]">订单详情</b>
-              <button
-                type="button"
-                className="grid h-8 w-8 place-items-center rounded-lg text-ink-mute hover:bg-paper hover:text-ink"
-                onClick={toggleDetail}
-                aria-label="收起订单"
-              >
-                <X className="h-4 w-4" strokeWidth={1.8} />
-              </button>
-            </div>
-            <div className="hover-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 md:px-7">
-              <AdminOrderDetail
-                order={order}
-                uploading={uploading}
-                recalling={recalling}
-                hideChatLink
-                onCopy={copyText}
-                onUploadClick={() => fileRef.current?.click()}
-                onDownload={async (url, name) => {
-                  try {
-                    await api.download(url, name)
-                  } catch (e) {
-                    showToast(e instanceof ApiError ? e.message : '下载失败')
-                  }
+              <CommissionChat
+                threadId={active.id}
+                viewer="admin"
+                active={visible}
+                mineAvatar="匣"
+                peerAvatar={active.username.slice(0, 1)}
+                orderId={active.order_id}
+                orderStatus={active.order_status}
+                balanceAmount={active.balance_amount}
+                deliveryLabel={active.product_name}
+                onUnread={(unread, threadId) => {
+                  setThreads((prev) => prev.map((t) => (t.id === threadId ? { ...t, unread_admin: unread } : t)))
                 }}
-                onDelete={handleDelete}
-                onRecallDelivery={handleRecallDelivery}
+                onOrderChange={(status) => {
+                  setThreads((prev) =>
+                    prev.map((t) =>
+                      t.id === active.id
+                        ? {
+                            ...t,
+                            order_status: status,
+                            last_preview: status === 'awaiting_balance' ? '[稿件已发货]' : t.last_preview,
+                          }
+                        : t,
+                    ),
+                  )
+                  void reloadOrder(active.order_id).catch(() => {})
+                }}
+                className="h-full min-h-0 flex-1"
               />
-            </div>
-          </aside>
-        </>
-      ) : null}
+            </>
+          ) : (
+            <div className="grid h-full place-items-center text-[0.86rem] text-ink-mute">从左边选一条对话</div>
+          )}
+        </div>
 
+        <aside className="hidden min-h-0 overflow-y-auto bg-white p-4 xl:block">
+          {active ? (
+            <>
+              <div className="rounded-[10px] border border-[var(--line)] bg-fog p-3.5">
+                <div className="text-[0.7rem] font-bold tracking-[0.06em] text-ink-mute">这笔约稿</div>
+                <h2 className="mt-1.5 font-[family-name:var(--font-display)] text-[1.15rem] leading-snug font-bold tracking-tight">
+                  {active.product_name}
+                </h2>
+                <div className="mt-1 text-[0.75rem] text-ink-mute">
+                  {active.username}
+                  {active.word_count ? ` · ${formatWords(active.word_count)}` : ''}
+                  {active.last_at ? ` · ${fmtTime(active.last_at)}` : ''}
+                </div>
+                <ol className="mt-3 grid list-none grid-cols-4 gap-1.5 border-t border-dashed border-[var(--line-strong)] pt-2.5">
+                  {(['付定金', '沟通设定', '按章交稿', '付尾款'] as const).map((lbl, idx) => {
+                    const on = idx <= curStep
+                    const now = idx === curStep
+                    return (
+                      <li key={lbl} className={`text-[0.68rem] ${on ? 'font-bold text-ink' : 'text-ink-mute'}`}>
+                        <i
+                          className={`mb-1 block h-1 rounded-full ${
+                            now ? 'bg-gold' : on ? 'bg-teal' : 'bg-[var(--line-strong)]'
+                          }`}
+                        />
+                        {lbl}
+                      </li>
+                    )
+                  })}
+                </ol>
+              </div>
+
+              <dl className="kv">
+                <dt>订单</dt>
+                <dd className="mono">
+                  {active.order_id ? (
+                    <Link to={`/admin/revenue/${encodeURIComponent(active.order_id)}`} style={{ color: 'var(--teal)' }}>
+                      {active.order_id}
+                    </Link>
+                  ) : (
+                    '还没有订单'
+                  )}
+                </dd>
+                <dt>状态</dt>
+                <dd>{active.order_status ? orderStatusLabel(active.order_status) : '商品沟通'}</dd>
+                <dt>款项</dt>
+                <dd>
+                  {active.order_status === 'pending'
+                    ? `定金 ${yuanText(active.deposit_amount || 0)} 还没付`
+                    : active.has_deposit && active.order_status === 'deposit_paid'
+                      ? `定金 ${yuanText(active.deposit_amount || 0)} 已收`
+                      : active.order_status === 'awaiting_balance'
+                        ? `尾款 ${yuanText(active.balance_amount || 0)} 未付`
+                        : active.order_status === 'completed'
+                          ? '已结清'
+                          : '问价中'}
+                </dd>
+              </dl>
+
+              {order ? (
+                <button
+                  type="button"
+                  disabled={uploading}
+                  onClick={() => fileRef.current?.click()}
+                  className="mt-4 w-full rounded-[10px] border border-dashed border-[var(--line-strong)] px-3 py-3 text-center text-[0.78rem] text-ink-mute transition hover:border-teal hover:bg-[rgba(232,241,238,.35)] hover:text-teal"
+                >
+                  <Upload className="mr-1.5 inline h-3.5 w-3.5" />
+                  {uploading ? '上传中…' : '上传交稿文件（DOCX / TXT / 图）'}
+                </button>
+              ) : null}
+
+              {active.order_id ? (
+                <div className="mt-3">
+                  <Link className="teal-btn w-full justify-center" to={`/admin/revenue/${encodeURIComponent(active.order_id)}`}>
+                    打开订单与交付明细
+                  </Link>
+                </div>
+              ) : null}
+
+              {order && active.order_id === order.id ? (
+                <div className="mt-5">
+                  <AdminOrderDetail
+                    order={order}
+                    uploading={uploading}
+                    recalling={recalling}
+                    deleting={deletingOrder}
+                    hideChatLink
+                    onCopy={copyText}
+                    onUploadClick={() => fileRef.current?.click()}
+                    onDownload={async (url, name) => {
+                      try {
+                        await api.download(url, name)
+                      } catch (e) {
+                        showToast(e instanceof ApiError ? e.message : '下载失败')
+                      }
+                    }}
+                    onDelete={handleDelete}
+                    onRecallDelivery={handleRecallDelivery}
+                    onDeleteOrder={() => void handleDeleteOrder()}
+                  />
+                </div>
+              ) : (
+                <p className="funnel-note">回复之后未读会清掉。稿件从这里上传，买家付清尾款才能下载。</p>
+              )}
+            </>
+          ) : (
+            <p className="empty">选一条对话后，订单和稿件会出现在这里。</p>
+          )}
+        </aside>
+      </div>
       <input
         ref={fileRef}
         type="file"

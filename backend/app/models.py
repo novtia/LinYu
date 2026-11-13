@@ -216,11 +216,38 @@ class PaymentChannel(Base):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     name: Mapped[str] = mapped_column(String(128))
-    provider: Mapped[str] = mapped_column(String(32), index=True)  # ezpay
+    provider: Mapped[str] = mapped_column(String(32), index=True)  # ezpay | alipay | usdt
     enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     config_json: Mapped[str] = mapped_column(Text, default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class UsdtInvoice(Base):
+    """自托管 USDT 虚拟尾数收款锁定单：按 (payment_id, chain) 分配唯一金额并监听链上入账。"""
+
+    __tablename__ = "usdt_invoices"
+    __table_args__ = (
+        Index("ix_usdt_invoices_chain_addr_status", "chain", "address_key", "status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    payment_id: Mapped[str] = mapped_column(String(64), index=True)
+    order_id: Mapped[str] = mapped_column(String(64), ForeignKey("orders.id"), index=True)
+    channel_id: Mapped[str] = mapped_column(String(64), index=True)
+    chain: Mapped[str] = mapped_column(String(24), index=True)
+    address: Mapped[str] = mapped_column(String(128))
+    address_key: Mapped[str] = mapped_column(String(128), index=True)
+    amount_cny: Mapped[float] = mapped_column(Float)
+    exchange_rate: Mapped[float] = mapped_column(Float)
+    amount_usdt: Mapped[str] = mapped_column(String(32))
+    # 18 位精度（如 BSC USDT）超过 SQLite 64 位有符号整数上限，必须存十进制字符串
+    amount_units: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)  # pending | paid | expired | closed
+    tx_hash: Mapped[Optional[str]] = mapped_column(String(128), unique=True, nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
 
 class Captcha(Base):

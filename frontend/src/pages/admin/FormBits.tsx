@@ -10,12 +10,12 @@ export function SwitchRow({
   onToggle: () => void
 }) {
   return (
-    <div className="flex items-center justify-between border-b border-[var(--line)] px-[18px] py-3.5">
-      <div>
-        <strong className="mb-0.5 block text-[0.95rem]">{title}</strong>
-        <span className="text-[0.82rem] text-ink-mute">{desc}</span>
+    <div className="flex items-center justify-between gap-3 border-b border-[var(--line)] py-3">
+      <div className="min-w-0">
+        <span className="text-[0.86rem]">{title}</span>
+        {desc ? <span className="mt-0.5 block text-[0.75rem] text-ink-mute">{desc}</span> : null}
       </div>
-      <button type="button" className={`switch ${on ? 'on' : ''}`} onClick={onToggle} aria-label={title} />
+      <button type="button" className={`switch shrink-0 ${on ? 'on' : ''}`} onClick={onToggle} aria-label={title} />
     </div>
   )
 }
@@ -38,17 +38,17 @@ export function Field({
   autoComplete?: string
 }) {
   return (
-    <label className="grid grid-rows-[auto_auto_1.1em] gap-1.5 content-start">
-      <span className="text-[0.82rem] font-semibold text-ink-soft">{label}</span>
+    <label className="grid gap-1.5 content-start">
+      <span className="text-[0.76rem] font-bold text-ink-soft">{label}</span>
       <input
         type={type}
         autoComplete={autoComplete}
-        className="box-border h-11 w-full rounded-xl border border-[var(--line-strong)] bg-white px-3.5 outline-none focus:border-teal"
+        className="w-full border-0 border-b border-[var(--line-strong)] bg-transparent py-2 outline-none focus:border-teal"
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
       />
-      <span className="text-[0.75rem] leading-[1.1em] text-ink-mute">{hint || '\u00a0'}</span>
+      {hint ? <span className="text-[0.72rem] leading-relaxed text-ink-mute">{hint}</span> : null}
     </label>
   )
 }

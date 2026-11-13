@@ -26,6 +26,7 @@ TREND_DAYS = 30
 PROVIDER_SHORT = {
     "alipay": "支付宝",
     "ezpay": "易支付",
+    "usdt": "USDT",
 }
 PAID_STATUSES = ("paid", "completed", "deposit_paid", "awaiting_balance")
 ACTION_STATUSES = ("pending", "deposit_paid", "awaiting_balance")
@@ -201,7 +202,7 @@ def _build_todos(
             label="待付尾款",
             count=awaiting_balance,
             hint="已成稿，等待买家支付",
-            to="/admin/orders?status=awaiting_balance",
+            to="/admin/revenue?status=awaiting_balance#orders",
             urgent=awaiting_balance > 0,
         ),
         DashboardTodoOut(
@@ -216,8 +217,8 @@ def _build_todos(
             key="pending",
             label="待支付订单",
             count=pending_pay,
-            hint="等待买家完成支付",
-            to="/admin/orders?status=pending",
+            hint="超过 24 小时未支付的会自动清除",
+            to="/admin/revenue?status=pending#orders",
             urgent=False,
         ),
         DashboardTodoOut(

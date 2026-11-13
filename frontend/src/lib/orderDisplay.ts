@@ -16,8 +16,21 @@ export const ORDER_LIST_FILTERS: { id: OrderListFilter; label: string }[] = [
   { id: 'done', label: '已完成' },
 ]
 
-const PROVIDER: Record<string, string> = { alipay: '支付宝', ezpay: '易支付', free: '免费', manual: '人工' }
-const METHOD: Record<string, string> = { alipay: '支付宝', wxpay: '微信', qqpay: 'QQ', free: '免费', manual: '人工' }
+const PROVIDER: Record<string, string> = { alipay: '支付宝', ezpay: '易支付', usdt: 'USDT', free: '免费', manual: '人工' }
+const METHOD: Record<string, string> = {
+  alipay: '支付宝',
+  wxpay: '微信',
+  qqpay: 'QQ',
+  usdt: 'USDT',
+  usdt_trc20: 'TRC20',
+  usdt_bep20: 'BEP20',
+  usdt_polygon: 'Polygon',
+  usdt_arbitrum: 'Arbitrum',
+  usdt_optimism: 'Optimism',
+  usdt_erc20: 'ERC20',
+  free: '免费',
+  manual: '人工',
+}
 
 export function fmtListTime(iso: string) {
   const text = fmtBeijingShort(iso)

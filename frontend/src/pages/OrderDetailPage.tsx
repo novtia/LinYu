@@ -11,6 +11,7 @@ import {
   PenLine,
   ShieldCheck,
   ShoppingBag,
+  Trash2,
   Upload,
   Zap,
 } from 'lucide-react'
@@ -54,6 +55,7 @@ export function OrderDetailPage() {
   const [balancePayment, setBalancePayment] = useState<PublicPaymentMethod | null>(null)
   const [payingBalance, setPayingBalance] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const navigate = useNavigate()
   const resultShown = useRef(false)
 
@@ -339,6 +341,23 @@ export function OrderDetailPage() {
     }
   }
 
+  const canDeleteOrder = isAdmin || order.status === 'pending' || order.status === 'failed' || order.status === 'cancelled'
+
+  async function handleDeleteOrder() {
+    if (!id) return
+    if (!window.confirm(`确定删除订单「${id}」？删除后无法恢复。`)) return
+    setDeleting(true)
+    try {
+      await api.delete(user ? `/api/orders/${encodeURIComponent(id)}` : orderPath(id))
+      showToast('订单已删除')
+      navigate('/orders')
+    } catch (e) {
+      showToast(e instanceof ApiError ? e.message : '删除订单失败')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const deliveryCaption = delivered
     ? `${allFiles.length} 个文件 · 永久有效`
     : hasLockedFiles
@@ -419,6 +438,26 @@ export function OrderDetailPage() {
             </li>
           ))}
         </ol>
+
+        {waitingPay && order.payment_provider === 'usdt' ? (
+          <section className="mt-[26px] flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-[rgba(38,161,123,.35)] bg-[linear-gradient(180deg,rgba(38,161,123,.08),#fff_65%)] px-6 py-5">
+            <div>
+              <b className="block font-[family-name:var(--font-display)] text-[1.06rem] tracking-[-0.02em]">
+                USDT 链上待付款
+              </b>
+              <p className="m-0 mt-1 text-[0.8rem] text-ink-mute">
+                请前往 USDT 收银台查看锁定金额与收款地址，到账后自动发货。
+              </p>
+            </div>
+            <Link
+              to={`/pay/usdt/${encodeURIComponent(commission ? `${order.id}D` : order.id)}`}
+              className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-[#26A17B] px-5 text-[0.86rem] font-bold text-white transition hover:bg-[#1E8866]"
+            >
+              前往 USDT 收银台
+              <ArrowRight className="h-3.5 w-3.5" strokeWidth={2} />
+            </Link>
+          </section>
+        ) : null}
 
         {awaitingBalance ? (
           <section className="mt-[30px] rounded-3xl border border-[rgba(15,110,92,.35)] bg-[linear-gradient(180deg,rgba(232,241,238,.65),#fff_55%)] px-[30px] py-[26px] max-[760px]:px-5">
@@ -542,7 +581,7 @@ export function OrderDetailPage() {
           </section>
         ) : null}
 
-        <div className="mt-[30px] flex gap-2.5">
+        <div className="mt-[30px] flex flex-wrap gap-2.5">
           <Link
             to="/"
             className="inline-flex h-[38px] items-center gap-1.5 rounded-[10px] border border-[var(--line-strong)] bg-white/60 px-[15px] text-[0.84rem] font-semibold text-ink transition hover:border-ink hover:bg-white"
@@ -550,6 +589,17 @@ export function OrderDetailPage() {
             <ShoppingBag className="h-3.5 w-3.5" strokeWidth={1.8} />
             返回商城
           </Link>
+          {canDeleteOrder ? (
+            <button
+              type="button"
+              disabled={deleting}
+              onClick={() => void handleDeleteOrder()}
+              className="inline-flex h-[38px] items-center gap-1.5 rounded-[10px] border border-[rgba(180,35,24,.35)] bg-white/60 px-[15px] text-[0.84rem] font-semibold text-danger transition hover:border-danger hover:bg-[rgba(180,35,24,.06)] disabled:opacity-60"
+            >
+              <Trash2 className="h-3.5 w-3.5" strokeWidth={1.8} />
+              {deleting ? '删除中…' : '删除订单'}
+            </button>
+          ) : null}
         </div>
       </div>
     </main>

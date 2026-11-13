@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { Copy, FileText, Image as ImageIcon, Lock, Mail, MessageSquare, PackagePlus, Upload } from 'lucide-react'
+import { Copy, FileText, Image as ImageIcon, Lock, Mail, MessageSquare, PackagePlus, Trash2, Upload } from 'lucide-react'
 import { formatWords } from '../lib/commission'
 import { channelLabel, isCommissionOrder, isDoneStatus, itemFiles, orderTitle } from '../lib/orderDisplay'
 import { orderCompactLabel, orderDotClass } from '../lib/orderStatus'
@@ -43,6 +43,7 @@ type Props = {
   uploading?: boolean
   recalling?: boolean
   replenishing?: boolean
+  deleting?: boolean
   hideChatLink?: boolean
   onCopy: (text: string, ok?: string) => void
   onUploadClick: () => void
@@ -50,6 +51,7 @@ type Props = {
   onDelete: (fileId: string) => void
   onRecallDelivery?: () => void
   onReplenish?: () => void
+  onDeleteOrder?: () => void
 }
 
 export function AdminOrderDetail({
@@ -57,6 +59,7 @@ export function AdminOrderDetail({
   uploading,
   recalling,
   replenishing,
+  deleting,
   hideChatLink,
   onCopy,
   onUploadClick,
@@ -64,6 +67,7 @@ export function AdminOrderDetail({
   onDelete,
   onRecallDelivery,
   onReplenish,
+  onDeleteOrder,
 }: Props) {
   const commission = isCommissionOrder(order)
   const files = allOrderFiles(order)
@@ -122,13 +126,13 @@ export function AdminOrderDetail({
         </span>
       </div>
 
-      <div className="mt-[18px]">
-        <div className="font-[family-name:var(--font-display)] text-[2.5rem] leading-none font-extrabold tracking-[-0.05em]">
+      <div className="voucher-box">
+        <div className="font-[family-name:var(--font-display)] text-[2.35rem] leading-none font-extrabold tracking-[-0.05em]">
           {yuan(order.total)}
           {commission ? <small className="ml-1 text-[1rem] tracking-normal text-ink-mute">合计</small> : null}
         </div>
         {commission ? (
-          <div className="mt-4 grid grid-cols-3 border-y border-[var(--line)]">
+          <div className="mt-4 grid grid-cols-3 border-t border-dashed border-[var(--line-strong)] pt-2">
             <SplitCell label="字数" value={order.word_count ? formatWords(order.word_count) : '—'} />
             <SplitCell label={`定金 ${depositPaid ? '已收' : '待收'}`} value={yuan(deposit)} tone={depositPaid ? 'ok' : 'wait'} />
             <SplitCell label={`尾款 ${balancePaid ? '已收' : '待收'}`} value={yuan(balance)} tone={balancePaid ? 'ok' : 'wait'} />
@@ -320,6 +324,17 @@ export function AdminOrderDetail({
             <Mail className="h-3.5 w-3.5" strokeWidth={1.8} />
             发邮件
           </a>
+        ) : null}
+        {onDeleteOrder ? (
+          <button
+            type="button"
+            disabled={deleting}
+            onClick={onDeleteOrder}
+            className="inline-flex h-[38px] items-center gap-1.5 rounded-[10px] border border-[rgba(180,35,24,.35)] px-3.5 text-[0.82rem] font-semibold text-danger transition hover:border-danger hover:bg-[rgba(180,35,24,.06)] disabled:opacity-60"
+          >
+            <Trash2 className="h-3.5 w-3.5" strokeWidth={1.8} />
+            {deleting ? '删除中…' : '删除订单'}
+          </button>
         ) : null}
       </div>
     </div>

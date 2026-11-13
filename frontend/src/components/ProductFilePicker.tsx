@@ -52,100 +52,71 @@ export function ProductFilePicker({
   }
 
   return (
-    <div className="md:col-span-2">
-      <div className="mb-2 text-[0.82rem] font-semibold text-ink-soft">商品文件</div>
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={() => inputRef.current?.click()}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            inputRef.current?.click()
-          }
-        }}
-        onDragOver={(e: DragEvent) => {
-          e.preventDefault()
-          setDragging(true)
-        }}
-        onDragLeave={(e: DragEvent) => {
-          e.preventDefault()
-          setDragging(false)
-        }}
-        onDrop={(e: DragEvent) => {
-          e.preventDefault()
-          setDragging(false)
-          addFiles(e.dataTransfer.files)
-        }}
-        className={`cursor-pointer rounded-xl border-2 border-dashed px-4 py-8 text-center transition ${
-          dragging ? 'border-teal bg-[rgba(15,110,92,.08)]' : 'border-[var(--line-strong)] bg-paper/60 hover:border-teal'
-        }`}
-      >
-        <div className="font-semibold text-ink">拖拽文件到此处，或点击选择</div>
-        <div className="mt-1 text-[0.8rem] text-ink-mute">可一次选择多个；图片显示缩略图，其它文件显示图标。最大 50MB</div>
+    <div
+      onDragOver={(e: DragEvent) => {
+        e.preventDefault()
+        setDragging(true)
+      }}
+      onDragLeave={(e: DragEvent) => {
+        e.preventDefault()
+        setDragging(false)
+      }}
+      onDrop={(e: DragEvent) => {
+        e.preventDefault()
+        setDragging(false)
+        addFiles(e.dataTransfer.files)
+      }}
+    >
+      <div className="flex items-baseline justify-between gap-3 border-b border-[var(--line)] pb-2">
+        <h2 className="font-[family-name:var(--font-display)] text-[1.05rem] font-bold tracking-[-0.02em]">
+          付款后给买家
+          <small className="ml-2 font-[family-name:var(--font-body)] text-[0.74rem] font-medium tracking-normal text-ink-mute">文本和文件分开</small>
+        </h2>
+        <button
+          type="button"
+          className="inline-flex h-8 items-center rounded-[10px] border border-[var(--line-strong)] px-2.5 text-[0.78rem] font-semibold"
+          onClick={() => inputRef.current?.click()}
+        >
+          添加文件
+        </button>
       </div>
-      <input
-        ref={inputRef}
-        type="file"
-        multiple
-        className="hidden"
-        onChange={(e) => addFiles(e.target.files)}
-      />
-
-      {files.length + pending.length > 0 ? (
-        <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-          {files.map((f) => (
-            <li key={f.id} className="flex items-center gap-3 rounded-xl border border-[var(--line)] bg-white px-3 py-2.5">
-              <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-paper">
-                {f.is_image && productId ? (
-                  <AuthImage
-                    src={`/api/products/${productId}/files/${f.id}/preview`}
-                    alt={f.file_name}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="grid h-full w-full place-items-center">
-                    <FileGlyph />
-                  </div>
-                )}
-              </div>
-              <div className="min-w-0 flex-1 truncate text-[0.86rem] font-semibold">{f.file_name}</div>
-              <button
-                type="button"
-                className="shrink-0 text-[0.8rem] font-semibold text-danger hover:underline"
-                onClick={() => onRemoveSaved(f.id)}
-              >
-                移除
-              </button>
-            </li>
-          ))}
-          {pending.map((file, i) => (
-            <li key={`pending-${file.name}-${file.size}-${file.lastModified}-${i}`} className="flex items-center gap-3 rounded-xl border border-dashed border-teal/40 bg-[rgba(15,110,92,.04)] px-3 py-2.5">
-              <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-paper">
-                {isImageName(file.name) ? (
-                  <LocalThumb file={file} />
-                ) : (
-                  <div className="grid h-full w-full place-items-center">
-                    <FileGlyph />
-                  </div>
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[0.86rem] font-semibold">{file.name}</div>
-                <div className="text-[0.75rem] text-ink-mute">待保存后上传</div>
-              </div>
-              <button
-                type="button"
-                className="shrink-0 text-[0.8rem] font-semibold text-danger hover:underline"
-                onClick={() => onPendingChange(pending.filter((_, idx) => idx !== i))}
-              >
-                移除
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      <p className="mt-1.5 text-[0.8rem] text-ink-mute">付款完成后随订单发放，通过鉴权接口下载，不会生成公开直链。</p>
+      <input ref={inputRef} type="file" multiple className="hidden" onChange={(e) => addFiles(e.target.files)} />
+      <ul className={`mt-1 ${dragging ? 'bg-[rgba(15,110,92,.06)]' : ''}`}>
+        {files.map((f) => (
+          <li key={f.id} className="flex items-center gap-3 border-b border-[var(--line)] py-2.5 text-[0.84rem]">
+            <div className="h-9 w-9 shrink-0 overflow-hidden bg-paper">
+              {f.is_image && productId ? (
+                <AuthImage src={`/api/products/${productId}/files/${f.id}/preview`} alt={f.file_name} className="h-full w-full object-cover" />
+              ) : (
+                <div className="grid h-full w-full place-items-center">
+                  <FileGlyph />
+                </div>
+              )}
+            </div>
+            <span className="min-w-0 flex-1 truncate font-semibold">{f.file_name}</span>
+            <button type="button" className="shrink-0 text-[0.75rem] font-bold text-danger" onClick={() => onRemoveSaved(f.id)}>
+              移除
+            </button>
+          </li>
+        ))}
+        {pending.map((file, i) => (
+          <li key={`pending-${file.name}-${file.size}-${file.lastModified}-${i}`} className="flex items-center gap-3 border-b border-[var(--line)] py-2.5 text-[0.84rem]">
+            <div className="h-9 w-9 shrink-0 overflow-hidden bg-paper">
+              {isImageName(file.name) ? <LocalThumb file={file} /> : <div className="grid h-full w-full place-items-center"><FileGlyph /></div>}
+            </div>
+            <span className="min-w-0 flex-1 truncate">
+              <b>{file.name}</b>
+              <em className="ml-2 text-[0.72rem] font-medium text-ink-mute not-italic">保存后上传</em>
+            </span>
+            <button type="button" className="shrink-0 text-[0.75rem] font-bold text-danger" onClick={() => onPendingChange(pending.filter((_, idx) => idx !== i))}>
+              移除
+            </button>
+          </li>
+        ))}
+        {!files.length && !pending.length ? (
+          <li className="border-b border-[var(--line)] py-3 text-[0.84rem] text-ink-mute">还没有文件。买家付款后只能看到发货文本。可拖文件到这里，最大 50MB。</li>
+        ) : null}
+      </ul>
     </div>
   )
 }

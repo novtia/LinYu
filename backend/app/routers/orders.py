@@ -19,6 +19,7 @@ from ..schemas import (
     CheckoutOut,
     DeliveryOut,
     MessageOut,
+    OrderBatchDeleteIn,
     OrderItemOut,
     OrderLookupIn,
     OrderOut,
@@ -38,6 +39,7 @@ from ..services.commission import (
     split_price,
 )
 from ..services.chat_push import emit_recalls
+from ..services.order_expiry import delete_orders, order_took_money, purge_expired_unpaid_orders
 from ..services.commission_chat import ensure_thread_for_order, notify_deposit_paid, recall_unused_delivery_notices
 from ..services.delivery import random_id
 from ..services.files import is_image_name, save_upload
@@ -522,6 +524,7 @@ def my_orders(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    purge_expired_unpaid_orders(db)
     user_email = _normalize_email(user.email)
     cond = [Order.user_id == user.id]
     if user_email:
@@ -546,6 +549,7 @@ def my_order_for_product(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    purge_expired_unpaid_orders(db)
     user_email = _normalize_email(user.email)
     cond = [Order.user_id == user.id]
     if user_email:
@@ -579,6 +583,7 @@ def lookup_orders(
     email = _normalize_email(body.email)
     if not email or not is_valid_email(email):
         raise HTTPException(status_code=400, detail="请填写有效的邮箱")
+    purge_expired_unpaid_orders(db)
     orders = (
         db.query(Order)
         .options(
@@ -593,6 +598,21 @@ def lookup_orders(
     return [_order_out(o, include_payload=True) for o in orders]
 
 
+@router.post("/batch-delete", response_model=MessageOut)
+def batch_delete_orders(
+    body: OrderBatchDeleteIn,
+    _: User = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    ids = [oid.strip() for oid in (body.ids or []) if oid and oid.strip()]
+    if not ids:
+        raise HTTPException(status_code=400, detail="请选择要删除的订单")
+    count = delete_orders(db, ids)
+    if not count:
+        raise HTTPException(status_code=404, detail="未找到可删除的订单")
+    return MessageOut(message=f"已删除 {count} 笔订单")
+
+
 @router.get("/{order_id}", response_model=OrderOut)
 def get_order(
     order_id: str,
@@ -600,6 +620,7 @@ def get_order(
     user: Optional[User] = Depends(get_optional_user),
     db: Session = Depends(get_db),
 ):
+    purge_expired_unpaid_orders(db)
     order = (
         db.query(Order)
         .options(
@@ -616,6 +637,23 @@ def get_order(
         _deny_order_access(user, email)
     unlock = bool(user and user.role == "admin")
     return _order_out(order, include_payload=True, unlock_download=unlock)
+
+
+@router.delete("/{order_id}", response_model=MessageOut)
+def delete_order(
+    order_id: str,
+    email: str = Query(default=""),
+    user: Optional[User] = Depends(get_optional_user),
+    db: Session = Depends(get_db),
+):
+    order = _get_order_or_404(db, order_id)
+    if not _can_access_order(order, user, email):
+        _deny_order_access(user, email, action="删除")
+    is_admin = bool(user and user.role == "admin")
+    if not is_admin and order_took_money(order):
+        raise HTTPException(status_code=400, detail="已付款的订单不能删除")
+    delete_orders(db, [order.id])
+    return MessageOut(message="订单已删除")
 
 
 def _get_order_or_404(db: Session, order_id: str) -> Order:
@@ -821,6 +859,7 @@ def admin_orders(
     _: User = Depends(get_admin_user),
     db: Session = Depends(get_db),
 ):
+    purge_expired_unpaid_orders(db)
     orders = (
         db.query(Order)
         .options(

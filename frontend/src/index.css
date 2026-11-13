@@ -1835,6 +1835,7 @@ button.switch.on::after { transform: translateX(20px); }
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
   padding: 12px 14px;
   border-top: 1px solid var(--line);
   background: #fff;

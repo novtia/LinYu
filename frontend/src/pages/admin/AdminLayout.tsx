@@ -2,22 +2,21 @@ import { useEffect, useRef, useState, type ComponentType } from 'react'
 import { Link, Navigate, Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   ChevronRight,
-  ClipboardList,
   CreditCard,
-  FolderTree,
   Globe,
   LayoutDashboard,
   Package,
   PanelLeftClose,
   PanelLeftOpen,
   MessageSquare,
-  Send,
   Settings2,
+  Wallet,
   ShoppingBag,
   Users,
   type LucideProps,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
+import '../../styles/admin.css'
 import { useChatSocket } from '../../context/ChatSocketContext'
 import { useToast } from '../../context/ToastContext'
 
@@ -50,8 +49,7 @@ const NAV_GROUPS: NavGroup[] = [
     title: '运营管理',
     icon: Package,
     items: [
-      { to: '/admin/products', label: '商品管理', short: '商品', icon: Package },
-      { to: '/admin/categories', label: '分类管理', short: '分类', icon: FolderTree },
+      { to: '/admin/products', label: '商品与分类', short: '商品', icon: Package },
       { to: '/admin/users', label: '用户管理', short: '用户', icon: Users },
     ],
   },
@@ -60,9 +58,8 @@ const NAV_GROUPS: NavGroup[] = [
     title: '交易履约',
     icon: ShoppingBag,
     items: [
-      { to: '/admin/orders', label: '订单管理', short: '订单', icon: ClipboardList },
+      { to: '/admin/revenue', label: '营收', short: '营收', icon: Wallet },
       { to: '/admin/conversations', label: '约稿对话', short: '对话', icon: MessageSquare },
-      { to: '/admin/deliveries', label: '发放记录', short: '发放', icon: Send },
     ],
   },
   {
@@ -79,13 +76,12 @@ const NAV_GROUPS: NavGroup[] = [
 
 const TITLES: Record<string, string> = {
   '/admin': '概览',
-  '/admin/products': '商品管理',
+  '/admin/products': '商品与分类',
   '/admin/products/new': '新增商品',
-  '/admin/categories': '分类管理',
+  '/admin/categories': '商品与分类',
   '/admin/users': '用户管理',
-  '/admin/orders': '订单管理',
+  '/admin/revenue': '营收',
   '/admin/conversations': '约稿对话',
-  '/admin/deliveries': '发放记录',
   '/admin/payment': '支付接入',
   '/admin/payment/new': '添加渠道',
   '/admin/system': '系统设置',
@@ -94,7 +90,7 @@ const TITLES: Record<string, string> = {
 
 const SIDEBAR_KEY = 'lingxia-admin-sidebar-collapsed'
 
-function isItemActive(path: string, item: NavItem) {
+function isItemActive(path: string, _search: string, item: NavItem) {
   if (item.end) return path === item.to
   if (item.to === '/admin/products') {
     return path === item.to || path.startsWith('/admin/products/')
@@ -105,26 +101,25 @@ function isItemActive(path: string, item: NavItem) {
   return path === item.to || path.startsWith(item.to + '/')
 }
 
-function isGroupActive(path: string, group: NavGroup) {
-  return group.items.some((item) => isItemActive(path, item))
+function isGroupActive(path: string, search: string, group: NavGroup) {
+  return group.items.some((item) => isItemActive(path, search, item))
 }
 
-function activeGroupId(path: string) {
-  return NAV_GROUPS.find((g) => isGroupActive(path, g))?.id
+function activeGroupId(path: string, search: string) {
+  return NAV_GROUPS.find((g) => isGroupActive(path, search, g))?.id
 }
 
-function pageTitle(path: string) {
+function pageTitle(path: string, _search: string) {
   if (TITLES[path]) return TITLES[path]
-  if (path.startsWith('/admin/orders')) return '订单管理'
-  if (path.startsWith('/admin/deliveries')) return '发放记录'
+  if (path.startsWith('/admin/orders') || path.startsWith('/admin/revenue')) return '营收'
   if (path.startsWith('/admin/payment/') && path !== '/admin/payment/new') return '编辑渠道'
   if (path.includes('/edit')) return '编辑商品'
   return '控制台'
 }
 
-function breadcrumbCrumbs(path: string) {
-  const group = NAV_GROUPS.find((g) => isGroupActive(path, g))
-  const title = pageTitle(path)
+function breadcrumbCrumbs(path: string, search: string) {
+  const group = NAV_GROUPS.find((g) => isGroupActive(path, search, g))
+  const title = pageTitle(path, search)
   const crumbs: { label: string; to?: string }[] = [{ label: '控制台', to: '/admin' }]
   if (group && group.id !== 'workspace') {
     crumbs.push({ label: group.title, to: group.items[0]?.to })
@@ -162,10 +157,12 @@ export function AdminLayout() {
   const { unreadAdmin } = useChatSocket()
   const { showToast } = useToast()
   const navigate = useNavigate()
-  const path = useLocation().pathname
+  const loc = useLocation()
+  const path = loc.pathname
+  const search = loc.search
   const lockPane =
-    path.startsWith('/admin/orders') || path.startsWith('/admin/deliveries') || path.startsWith('/admin/conversations')
-  const currentGroupId = activeGroupId(path)
+    path.startsWith('/admin/conversations')
+  const currentGroupId = activeGroupId(path, search)
 
   const [collapsed, setCollapsed] = useState(readCollapsed)
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
@@ -175,7 +172,7 @@ export function AdminLayout() {
   })
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
-  const crumbs = breadcrumbCrumbs(path)
+  const crumbs = breadcrumbCrumbs(path, search)
 
   useEffect(() => {
     if (!currentGroupId) return
@@ -240,7 +237,7 @@ export function AdminLayout() {
             {collapsed
               ? NAV_GROUPS.flatMap((group) =>
                   group.items.map((item) => {
-                    const active = isItemActive(path, item)
+                    const active = isItemActive(path, search, item)
                     const Icon = item.icon
                     return (
                       <NavLink
@@ -265,7 +262,7 @@ export function AdminLayout() {
                 )
               : NAV_GROUPS.map((group) => {
                   const open = !!openGroups[group.id]
-                  const groupActive = isGroupActive(path, group)
+                  const groupActive = isGroupActive(path, search, group)
                   const GroupIcon = group.icon
                   return (
                     <div
@@ -302,7 +299,7 @@ export function AdminLayout() {
                         <div className="overflow-hidden">
                           <div className="flex flex-col gap-0.5 px-1 pb-1.5">
                             {group.items.map((item) => {
-                              const active = isItemActive(path, item)
+                              const active = isItemActive(path, search, item)
                               const Icon = item.icon
                               return (
                                 <NavLink
@@ -433,7 +430,7 @@ export function AdminLayout() {
               <div key={group.id} className="flex shrink-0 items-center gap-1 rounded-xl bg-paper p-1">
                 <span className="px-1.5 text-[0.68rem] font-semibold text-ink-mute">{group.title}</span>
                 {group.items.map((item) => {
-                  const active = isItemActive(path, item)
+                  const active = isItemActive(path, search, item)
                   const Icon = item.icon
                   return (
                     <NavLink
@@ -457,7 +454,7 @@ export function AdminLayout() {
           <div
             className={
               lockPane
-                ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
+                ? 'relative flex min-h-0 flex-1 flex-col overflow-hidden'
                 : 'min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 md:p-6'
             }
           >

@@ -354,6 +354,40 @@ class DashboardOut(BaseModel):
     system: DashboardSystemOut
 
 
+class LedgerRowOut(BaseModel):
+    order_id: str
+    at: datetime
+    kind: str  # full | deposit | balance
+    ok: bool
+    channel: str
+    amount: float
+    buyer: str
+    item: str
+    sale_mode: str
+    product_id: Optional[int] = None
+    payment_channel_id: Optional[str] = None
+
+
+class AnalyticsStockOut(BaseModel):
+    writing: int
+    writing_late: int
+    balance_count: int
+    balance_money: float
+    balance_late: int
+    pending_pay: int
+    users: int
+    paying_users: int
+    repeat_users: int
+    products_on: int
+    products_off: int
+    commission_on: int
+
+
+class AnalyticsOut(BaseModel):
+    rows: List[LedgerRowOut]
+    stock: AnalyticsStockOut
+
+
 class MailSettings(BaseModel):
     """腾讯云邮件推送（SES）配置。模板变量见系统设置页说明。"""
 
@@ -415,6 +449,10 @@ class PublicSettingsOut(BaseModel):
     domain: str = "xinx.shop"
     debugMode: bool = False
     mailEnabled: bool = False
+
+
+class OrderBatchDeleteIn(BaseModel):
+    ids: List[str] = Field(default_factory=list)
 
 
 class MessageOut(BaseModel):

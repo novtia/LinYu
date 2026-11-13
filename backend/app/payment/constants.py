@@ -5,4 +5,5 @@ METHOD_LABELS = {
     "alipay": "支付宝",
     "wxpay": "微信支付",
     "qqpay": "QQ 钱包",
+    "usdt": "USDT",
 }

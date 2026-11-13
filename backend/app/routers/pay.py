@@ -1,23 +1,27 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from datetime import datetime
 from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import PlainTextResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Order, OrderPayment, PaymentChannel
+from ..models import Order, OrderPayment, PaymentChannel, UsdtInvoice
 from ..payment.providers import get_provider
 from ..payment.providers.alipay_page import AlipayPageProvider
 from ..payment.providers.ezpay import EzpayProvider
+from ..payment.providers.usdt import USDT_CHAIN_SPECS
 from ..payment.service import parse_config
 from ..services.commission import is_commission_mode
 from ..services.fulfillment import fulfill_order
+from ..services.ratelimit import rate_limit
+from ..services.usdt_payment import build_usdt_session_payload, trigger_manual_check
 
 router = APIRouter(prefix="/api/pay", tags=["pay"])
 
@@ -205,6 +209,10 @@ def _process_payment(db: Session, params: Dict[str, Any], *, expect_provider: Op
         return False
 
     trade_no = (params.get("trade_no") or "").strip() or None
+    db.query(UsdtInvoice).filter(
+        UsdtInvoice.payment_id == out_trade_no,
+        UsdtInvoice.status == "pending",
+    ).update({"status": "closed"}, synchronize_session=False)
     if is_commission_mode(order.sale_mode) and payment and payment.kind in ("deposit", "balance"):
         return _apply_commission_payment(db, order, payment, trade_no)
 
@@ -257,3 +265,76 @@ async def alipay_return(request: Request, db: Session = Depends(get_db)):
         return RedirectResponse(_frontend_order_url(db, _order_id_from_out_trade_no(db, out_trade_no)), status_code=302)
     base = (os.getenv("FRONTEND_URL") or "http://127.0.0.1:5173").rstrip("/")
     return RedirectResponse(f"{base}/orders", status_code=302)
+
+
+@router.get("/usdt/chains")
+def list_usdt_chains():
+    """返回系统内置支持的全部 USDT 区块链网络规格。"""
+    return [
+        {
+            "id": c["id"],
+            "name": c["name"],
+            "full_name": c["full_name"],
+            "kind": c["kind"],
+            "contract": c["contract"],
+            "decimals": c["decimals"],
+            "badge": c["badge"],
+            "hint": c["hint"],
+        }
+        for c in USDT_CHAIN_SPECS
+    ]
+
+
+@router.get(
+    "/usdt/session/{payment_id}",
+    dependencies=[Depends(rate_limit("usdt_session", limit=90, window=60))],
+)
+def get_usdt_session(
+    payment_id: str,
+    chain: str = Query(default=""),
+    db: Session = Depends(get_db),
+):
+    """获取或切换自托管 USDT 收银台订单会话与唯一锁定金额。"""
+    return build_usdt_session_payload(
+        db,
+        payment_id.strip(),
+        preferred_chain=chain.strip() or None,
+    )
+
+
+@router.post(
+    "/usdt/session/{payment_id}/check",
+    dependencies=[Depends(rate_limit("usdt_check", limit=30, window=60))],
+)
+async def check_usdt_session(
+    payment_id: str,
+    chain: str = Query(default=""),
+    db: Session = Depends(get_db),
+):
+    """买家点击「我已转账」时即时查询链上流水并返回最新订单状态。"""
+    pid = payment_id.strip()
+    await asyncio.to_thread(trigger_manual_check, pid)
+    db.expire_all()
+    return build_usdt_session_payload(
+        db,
+        pid,
+        preferred_chain=chain.strip() or None,
+    )
+
+
+@router.post(
+    "/usdt/session/{payment_id}/refresh",
+    dependencies=[Depends(rate_limit("usdt_refresh", limit=15, window=300))],
+)
+def refresh_usdt_session(
+    payment_id: str,
+    chain: str = Query(default=""),
+    db: Session = Depends(get_db),
+):
+    """锁定倒计时结束后重新分配新的有效期与唯一金额。"""
+    return build_usdt_session_payload(
+        db,
+        payment_id.strip(),
+        preferred_chain=chain.strip() or None,
+        force_refresh=True,
+    )

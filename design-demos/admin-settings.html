@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>领匣 · 站点配置</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230f6e5c'/></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+SC:wght@400;500;600;700&family=Sora:wght@500;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@0.544.0/dist/umd/lucide.min.js"></script>
+  <link rel="stylesheet" href="admin.css" />
+  <style>
+    .desk-inner { width: min(1260px, 100%); }
+
+    /* 1. 顶部运行态横幅 + 分段锚点导航 */
+    .cfg-hero {
+      display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(320px, 1fr);
+      gap: 24px; padding-bottom: 22px; border-bottom: 2px solid var(--ink);
+      align-items: end;
+    }
+    .cfg-hero > * { min-width: 0; }
+    .cfg-kicker {
+      display: flex; align-items: center; gap: 8px;
+      font-family: var(--font-mono); font-size: .72rem; color: var(--ink-mute);
+    }
+    .cfg-kicker .badge {
+      padding: 2px 8px; border-radius: 99px; background: var(--ink); color: var(--mint);
+      font-weight: 700; font-size: .66rem; letter-spacing: .06em;
+    }
+    .cfg-hero h1 {
+      margin: 8px 0 0; font-family: var(--font-display);
+      font-size: clamp(1.7rem, 2.4vw, 2.2rem); letter-spacing: -.04em; line-height: 1.05;
+    }
+    .cfg-hero .lead { margin: 8px 0 0; color: var(--ink-mute); font-size: .85rem; line-height: 1.55; }
+
+    .anchor-tabs {
+      display: inline-flex; gap: 4px; margin-top: 16px; padding: 3px; border-radius: 10px;
+      background: rgba(20, 32, 28, .055); border: 1px solid var(--line);
+    }
+    .anchor-tabs a {
+      height: 30px; padding: 0 12px; border-radius: 7px; display: inline-flex; align-items: center; gap: 6px;
+      font-size: .76rem; font-weight: 700; color: var(--ink-mute); transition: .16s var(--ease);
+    }
+    .anchor-tabs a:hover { color: var(--ink); }
+    .anchor-tabs a.on { background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgba(20,32,28,.08); }
+
+    .health-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
+    }
+    .h-box {
+      background: #fff; border: 1px solid var(--line-strong); border-radius: 10px;
+      padding: 11px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    }
+    .h-box small { display: block; font-size: .69rem; color: var(--ink-mute); }
+    .h-box b { display: block; margin-top: 2px; font-family: var(--font-mono); font-size: .95rem; }
+    .h-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--teal); flex-shrink: 0;
+      box-shadow: 0 0 0 3px rgba(15, 110, 92, .16);
+    }
+    .h-dot.warn { background: var(--gold); box-shadow: 0 0 0 3px rgba(196, 165, 116, .22); }
+
+    /* 2. 区块卡片布局 */
+    .sec-band { margin-top: 28px; scroll-margin-top: 16px; }
+    .band-head {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+      margin-bottom: 14px;
+    }
+    .band-head h2 {
+      margin: 0; font-family: var(--font-display); font-size: 1.25rem; letter-spacing: -.03em;
+      display: inline-flex; align-items: baseline; gap: 10px;
+    }
+    .band-head h2 small { font-family: var(--font-body); font-size: .76rem; color: var(--ink-mute); font-weight: 500; }
+
+    .pay-grid {
+      display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(300px, .95fr); gap: 20px; align-items: start;
+    }
+    .pay-grid > * { min-width: 0; }
+    .ch-cards { display: grid; gap: 12px; }
+    .ch-card {
+      background: #fff; border: 1px solid var(--line-strong); border-radius: 12px;
+      padding: 16px 18px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px 16px;
+      box-shadow: 3px 3px 0 rgba(20, 32, 28, .04);
+    }
+    .ch-card h3 { margin: 0; font-size: 1rem; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+    .ch-card p { margin: 4px 0 0; font-size: .75rem; color: var(--ink-mute); font-family: var(--font-mono); }
+    .ch-figs {
+      display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px;
+      margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line-strong);
+    }
+    .ch-figs small { display: block; font-size: .68rem; color: var(--ink-mute); }
+    .ch-figs b { display: block; margin-top: 2px; font-family: var(--font-mono); font-size: .88rem; }
+    .ch-add-card {
+      border: 1.5px dashed var(--line-strong); border-radius: 12px; padding: 14px 18px;
+      background: transparent; display: flex; align-items: center; justify-content: space-between;
+      font-size: .84rem; font-weight: 700; color: var(--ink-soft); transition: .16s var(--ease);
+    }
+    .ch-add-card:hover { border-color: var(--teal); color: var(--teal); background: #fff; }
+
+    .card-panel {
+      background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; min-width: 0;
+    }
+    .card-panel h3 {
+      margin: 0; padding-bottom: 10px; border-bottom: 1px solid var(--line);
+      font-family: var(--font-display); font-size: 1rem; letter-spacing: -.02em;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .fail-list { list-style: none; margin: 6px 0 0; padding: 0; }
+    .fail-list li {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 10px 0; border-bottom: 1px solid var(--line);
+    }
+    .fail-list li:last-child { border-bottom: 0; }
+    .fail-list b { display: block; font-size: .83rem; }
+    .fail-list small { display: block; margin-top: 2px; font-size: .71rem; color: var(--ink-mute); }
+
+    /* 系统与网站双栏 */
+    .two-cards { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(300px, .95fr); gap: 20px; align-items: start; }
+    .two-cards > * { min-width: 0; }
+    .telemetry-list { list-style: none; margin: 6px 0 0; padding: 0; }
+    .telemetry-list li {
+      display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+      padding: 9px 0; border-bottom: 1px solid var(--line); font-size: .81rem;
+    }
+    .telemetry-list li:last-child { border-bottom: 0; }
+    .telemetry-list b { font-family: var(--font-mono); font-weight: 700; }
+
+    /* 模拟浏览器窗口预览 */
+    .browser-mock {
+      margin-top: 12px; border: 1px solid var(--line-strong); border-radius: 12px; overflow: hidden;
+      background: #fff; box-shadow: 4px 4px 0 rgba(20, 32, 28, .05);
+    }
+    .browser-bar {
+      height: 34px; padding: 0 12px; background: var(--ink); color: #eef8f4;
+      display: flex; align-items: center; gap: 10px; font-family: var(--font-mono); font-size: .72rem;
+    }
+    .browser-dots { display: inline-flex; gap: 5px; }
+    .browser-dots i { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,.28); }
+    .browser-url {
+      flex: 1; padding: 3px 10px; border-radius: 5px; background: rgba(255,255,255,.1);
+      color: var(--mint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .browser-body { padding: 16px 18px 20px; background: var(--fog); }
+    .mock-notice {
+      padding: 9px 12px; border-radius: 8px; background: var(--paper); border: 1px solid rgba(15,110,92,.2);
+      font-size: .78rem; color: var(--teal-deep); display: flex; align-items: center; gap: 8px;
+    }
+    .mock-title {
+      margin: 16px 0 0; font-family: var(--font-display); font-size: 1.35rem;
+      font-weight: 800; letter-spacing: -.03em; line-height: 1.25;
+    }
+    .mock-desc { margin: 8px 0 0; font-size: .8rem; color: var(--ink-soft); line-height: 1.55; }
+    .mock-seo {
+      margin-top: 14px; padding-top: 10px; border-top: 1px dashed var(--line-strong);
+      font-family: var(--font-mono); font-size: .7rem; color: var(--ink-mute);
+    }
+
+    @media (max-width: 1080px) {
+      .cfg-hero, .pay-grid, .two-cards { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 600px) {
+      .health-grid { grid-template-columns: 1fr; }
+      .ch-figs { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-bar">
+    <strong>领匣后台设计稿</strong>
+    <nav class="demo-links">
+      <a href="admin-dashboard.html">概览</a>
+      <a href="admin-revenue.html">营收</a>
+      <a href="admin-products.html">商品</a>
+      <a href="admin-users.html">用户</a>
+      <a href="admin-conversations.html">对话</a>
+      <a class="on" href="admin-settings.html">配置</a>
+    </nav>
+  </div>
+
+  <div class="admin">
+    <aside class="aside">
+      <div class="aside-brand"><span class="brand-mark"></span>领匣控制台</div>
+      <nav>
+        <div class="nav-cap">工作台</div>
+        <a href="admin-dashboard.html"><i data-lucide="layout-dashboard"></i>概览</a>
+        <div class="nav-cap">运营管理</div>
+        <a href="admin-products.html"><i data-lucide="package"></i>商品与分类</a>
+        <a href="admin-users.html"><i data-lucide="users"></i>用户管理</a>
+        <div class="nav-cap">交易履约</div>
+        <a href="admin-revenue.html"><i data-lucide="wallet"></i>营收<span class="n">5</span></a>
+        <a href="admin-conversations.html"><i data-lucide="message-square"></i>约稿对话<span class="n">4</span></a>
+        <div class="nav-cap">站点配置</div>
+        <a class="active" href="admin-settings.html"><i data-lucide="credit-card"></i>支付接入</a>
+        <a href="admin-settings.html#system"><i data-lucide="settings-2"></i>系统设置</a>
+        <a href="admin-settings.html#website"><i data-lucide="globe"></i>网站设置</a>
+      </nav>
+      <div class="aside-foot">设计稿 · 不接真实数据<br />xinx.shop</div>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <span class="crumb">控制台 / 站点配置 / <b>支付 · 系统 · 网站</b></span>
+        <div class="topbar-right"><span class="date" id="today"></span><div class="avatar">店</div></div>
+      </div>
+
+      <main class="desk">
+        <div class="desk-inner">
+          <header class="cfg-hero">
+            <div>
+              <div class="cfg-kicker">
+                <span class="badge">SYSTEM &amp; GATEWAY</span>
+                <span>先看这 30 天通道跑得稳不稳，再改密钥与公告</span>
+              </div>
+              <h1>站点配置中心</h1>
+              <p class="lead">支付通道、发信服务与前台公告集中在这里维护；密钥不直接平铺，仅保留在渠道二级表单与服务器环境变量中。</p>
+              <nav class="anchor-tabs" id="anchor-tabs" aria-label="配置分段">
+                <a href="#payment" class="on" data-sec="payment">支付接入</a>
+                <a href="#system" data-sec="system">系统与安全</a>
+                <a href="#website" data-sec="website">网站与公告</a>
+              </nav>
+            </div>
+
+            <div class="health-grid">
+              <div class="h-box">
+                <div><small>30 日双通道实收</small><b>¥64,820</b></div>
+                <span class="h-dot" title="正常"></span>
+              </div>
+              <div class="h-box">
+                <div><small>支付成功率</small><b>97.2% <span style="color:var(--danger);font-size:.72rem">(11 笔败)</span></b></div>
+                <span class="h-dot warn" title="易支付微信偏低"></span>
+              </div>
+              <div class="h-box">
+                <div><small>最近回调</small><b>2 分钟前</b></div>
+                <span class="h-dot" title="支付宝正常"></span>
+              </div>
+              <div class="h-box">
+                <div><small>腾讯云邮件</small><b>正常 · ap-hongkong</b></div>
+                <span class="h-dot" title="畅通"></span>
+              </div>
+            </div>
+          </header>
+
+          <!-- 1. 支付接入 -->
+          <section class="sec-band" id="payment">
+            <div class="band-head">
+              <h2>支付渠道与异常监测 <small>密钥留在编辑二级页，概览只看实收与成功率</small></h2>
+            </div>
+
+            <div class="pay-grid">
+              <div class="ch-cards">
+                <article class="ch-card">
+                  <div>
+                    <h3>支付宝官方 <span class="st teal"><i></i>启用中</span></h3>
+                    <p>电脑网站支付 · 商户号 2088••••4421 · /api/pay/alipay/notify</p>
+                    <div class="ch-figs">
+                      <div><small>30 日实收</small><b>¥46,022</b></div>
+                      <div><small>占全店</small><b>71%</b></div>
+                      <div><small>成功率</small><b style="color:var(--teal)">98.6%</b></div>
+                      <div><small>最近一笔</small><b>12:20</b></div>
+                    </div>
+                  </div>
+                  <div style="display:flex;align-items:flex-start">
+                    <a class="line-btn" href="admin-channel-form.html?provider=alipay">编辑配置</a>
+                  </div>
+                </article>
+
+                <article class="ch-card">
+                  <div>
+                    <h3>易支付网关 <span class="st teal"><i></i>启用中</span></h3>
+                    <p>支付宝 + 微信 · pay.example · /api/pay/ezpay/notify</p>
+                    <div class="ch-figs">
+                      <div><small>30 日实收</small><b>¥18,798</b></div>
+                      <div><small>占全店</small><b>29%</b></div>
+                      <div><small>成功率</small><b>94.1%</b></div>
+                      <div><small>失败偏多</small><b style="color:var(--danger)">6 笔</b></div>
+                    </div>
+                  </div>
+                  <div style="display:flex;align-items:flex-start">
+                    <a class="line-btn" href="admin-channel-form.html?provider=ezpay">编辑配置</a>
+                  </div>
+                </article>
+
+                <button type="button" class="ch-add-card" id="add-ch">
+                  <span><i data-lucide="plus-circle" style="width:16px;height:16px;vertical-align:-3px;margin-right:8px;color:var(--teal)"></i>接入新的支付渠道（支付宝 / 易支付）</span>
+                  <i data-lucide="arrow-right" style="width:16px;height:16px"></i>
+                </button>
+              </div>
+
+              <div class="card-panel">
+                <h3>近 7 天失败订单 <a href="admin-revenue.html?status=failed" style="font-size:.75rem;color:var(--teal);font-family:var(--font-body)">去营收排查</a></h3>
+                <ul class="fail-list">
+                  <li>
+                    <div><b>《雨夜租客》</b><small>匿名 · 易支付 · 昨天</small></div>
+                    <span class="mono" style="color:var(--danger);font-weight:700">¥28</span>
+                  </li>
+                  <li>
+                    <div><b>《深夜维修工》</b><small>匿名 · 微信 · 7 天前</small></div>
+                    <span class="mono" style="color:var(--danger);font-weight:700">¥38</span>
+                  </li>
+                  <li>
+                    <div><b>《合租日记》</b><small>未登录 · 微信 · 6 天前</small></div>
+                    <span class="mono" style="color:var(--danger);font-weight:700">¥22</span>
+                  </li>
+                </ul>
+                <p class="funnel-note">失败单集中在易支付通道的微信子方式；改完网关或密钥后建议用 0.01 元调试单验证回调。</p>
+              </div>
+            </div>
+          </section>
+
+          <!-- 2. 系统与安全 -->
+          <section class="sec-band" id="system">
+            <div class="band-head">
+              <h2>系统参数与运行遥测 <small>发信配置、调试开关与管理员凭据</small></h2>
+            </div>
+
+            <div class="two-cards">
+              <div class="card-panel">
+                <h3>调试与邮件推送</h3>
+                <div class="switch" style="margin-top:6px">
+                  <span>调试模式 <small style="color:var(--ink-mute)">仅管理员下单时可见支付原文</small></span>
+                  <button type="button" id="debug" aria-label="调试模式"><i></i></button>
+                </div>
+                <div class="switch">
+                  <span>腾讯云邮件推送 <small style="color:var(--ink-mute)">发货与验证码邮件</small></span>
+                  <button type="button" class="on" id="mail" aria-label="邮件"><i></i></button>
+                </div>
+                <div class="fields">
+                  <label class="field"><span>发信地址</span><input value="notice@xinx.shop" /></label>
+                  <label class="field"><span>发信别名</span><input value="领匣" /></label>
+                  <label class="field"><span>服务地域</span><input value="ap-hongkong" /></label>
+                </div>
+                <p class="funnel-note">腾讯云 Secret 仅保留在服务器 `.env` 中，不回传到前端界面。</p>
+                <button class="teal-btn" type="button" id="save-sys" style="margin-top:12px">保存系统设置</button>
+              </div>
+
+              <div style="display:grid;gap:16px">
+                <div class="card-panel">
+                  <h3>运行状态 <span class="tag">在线</span></h3>
+                  <ul class="telemetry-list">
+                    <li><span>SQLite 数据库</span><b>lingxia.db · 18.4 MB</b></li>
+                    <li><span>后端进程</span><b>uvicorn · 1 worker</b></li>
+                    <li><span>最近自动备份</span><b>今天 03:00</b></li>
+                    <li><span>邮件模板状态</span><b>发货 / 注册 / 找回 全就绪</b></li>
+                  </ul>
+                </div>
+
+                <div class="card-panel">
+                  <h3>管理员安全凭据</h3>
+                  <div class="fields" style="margin-top:10px">
+                    <label class="field"><span>管理员邮箱</span><input value="admin@xinx.shop" /></label>
+                    <label class="field"><span>当前密码</span><input type="password" placeholder="修改账号或密码时才填" /></label>
+                    <label class="field"><span>新密码</span><input type="password" placeholder="留空则不修改" /></label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 3. 网站与公告 -->
+          <section class="sec-band" id="website">
+            <div class="band-head">
+              <h2>网站信息与首页公告 <small>右侧实时预览保存后的前台效果</small></h2>
+            </div>
+
+            <div class="two-cards">
+              <div class="card-panel">
+                <h3>站点文案设置</h3>
+                <div class="fields">
+                  <label class="field"><span>站点域名</span><input id="domain" value="xinx.shop" /><small>页脚展示，只写域名</small></label>
+                  <label class="field"><span>SEO 标题</span><input id="title" value="领匣 · 深夜故事与定制约稿" /></label>
+                  <label class="field"><span>关键词</span><input id="keywords" value="小说, 约稿, 电子书" /></label>
+                  <label class="field"><span>站点描述</span><textarea id="desc" rows="2">买现成的，或者把梗交给我。付完就能在书架里读。</textarea></label>
+                  <label class="field"><span>首页公告</span><textarea id="notice" rows="3">约稿排期到下周三。成品付款后立刻发放。</textarea></label>
+                </div>
+                <button class="teal-btn" type="button" id="save-site" style="margin-top:14px">保存网站设置</button>
+              </div>
+
+              <div class="card-panel">
+                <h3>前台实时预览</h3>
+                <div class="browser-mock">
+                  <div class="browser-bar">
+                    <span class="browser-dots"><i></i><i></i><i></i></span>
+                    <span class="browser-url" id="pv-url">https://xinx.shop</span>
+                  </div>
+                  <div class="browser-body">
+                    <div class="mock-notice">
+                      <i data-lucide="megaphone" style="width:14px;height:14px;flex-shrink:0"></i>
+                      <span id="pv-notice"></span>
+                    </div>
+                    <h4 class="mock-title" id="pv-title"></h4>
+                    <p class="mock-desc" id="pv-desc"></p>
+                    <div class="mock-seo" id="pv-seo"></div>
+                  </div>
+                </div>
+                <p class="funnel-note">保存前可直接核对公告条是否换行过长或遮挡首屏标题。</p>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <script src="admin.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id)
+    lxDate()
+    lxIcons()
+
+    function syncPreview() {
+      const dom = $("domain").value.trim() || "xinx.shop"
+      $("pv-url").textContent = "https://" + dom
+      $("pv-notice").textContent = $("notice").value.trim() || "（当前未设置首页公告）"
+      $("pv-title").textContent = $("title").value.trim() || "未命名站点"
+      $("pv-desc").textContent = $("desc").value.trim() || "暂无站点描述"
+      $("pv-seo").textContent = `META: ${$("keywords").value.trim() || "—"} · © ${dom}`
+    }
+    ["notice", "title", "domain", "desc", "keywords"].forEach((id) => $(id).addEventListener("input", syncPreview))
+    syncPreview()
+
+    $("debug").onclick = function () { this.classList.toggle("on"); lxToast(this.classList.contains("on") ? "调试模式已开" : "调试模式已关") }
+    $("mail").onclick = function () { this.classList.toggle("on"); lxToast(this.classList.contains("on") ? "邮件推送已开" : "邮件推送已关") }
+    $("save-sys").onclick = () => lxToast("Demo：系统设置已保存")
+    $("save-site").onclick = () => lxToast("Demo：网站设置已保存")
+    $("add-ch").onclick = () => { location.href = "admin-channel-form.html" }
+
+    function updateActiveSection(sec) {
+      document.querySelectorAll("#anchor-tabs a").forEach((a) => a.classList.toggle("on", a.dataset.sec === sec))
+      document.querySelectorAll(".aside a").forEach((a) => {
+        const href = a.getAttribute("href") || ""
+        a.classList.toggle("active", href.endsWith("#" + sec) || (sec === "payment" && href.endsWith("admin-settings.html")))
+      })
+    }
+    const hash = location.hash.replace("#", "")
+    if (hash === "system" || hash === "website" || hash === "payment") updateActiveSection(hash)
+
+    document.querySelector(".desk").addEventListener("scroll", () => {
+      const top = document.querySelector(".desk").getBoundingClientRect().top + 120
+      let cur = "payment"
+      if ($("website").getBoundingClientRect().top < top) cur = "website"
+      else if ($("system").getBoundingClientRect().top < top) cur = "system"
+      updateActiveSection(cur)
+    }, { passive: true })
+  </script>
+</body>
+</html>

@@ -36,6 +36,13 @@ function MethodMark({ method }: { method: string }) {
       </span>
     )
   }
+  if (method === 'usdt') {
+    return (
+      <span className="grid h-6 w-6 shrink-0 place-items-center rounded-[6px] bg-[#26A17B] font-[family-name:var(--font-mono)] text-[0.78rem] font-extrabold leading-none text-white">
+        ₮
+      </span>
+    )
+  }
   return (
     <span className="grid h-6 w-6 shrink-0 place-items-center rounded-[6px] bg-teal text-[0.7rem] font-extrabold text-white">
       付
@@ -47,6 +54,7 @@ function methodTone(method: string) {
   if (method === 'alipay') return 'border-[#1677FF] bg-[rgba(22,119,255,.08)] text-[#0B4FBF]'
   if (method === 'wxpay') return 'border-[#07C160] bg-[rgba(7,193,96,.08)] text-[#057A3D]'
   if (method === 'qqpay') return 'border-[#12B7F5] bg-[rgba(18,183,245,.1)] text-[#0A7EAB]'
+  if (method === 'usdt') return 'border-[#26A17B] bg-[rgba(38,161,123,.09)] text-[#15694F]'
   return 'border-teal bg-[rgba(15,110,92,.08)] text-teal-deep'
 }
 

@@ -120,7 +120,7 @@ function DeliveryCard({
   const { showToast } = useToast()
   const [method, setMethod] = useState<PublicPaymentMethod | null>(null)
   const [paying, setPaying] = useState(false)
-  const orderHref = viewer === 'admin' ? `/admin/orders/${encodeURIComponent(orderId)}` : `/orders/${encodeURIComponent(orderId)}`
+  const orderHref = viewer === 'admin' ? `/admin/revenue?order=${encodeURIComponent(orderId)}` : `/orders/${encodeURIComponent(orderId)}`
   const filesHint = fileNames?.length ? fileNames.join('、') : fileCount ? `${fileCount} 个文件` : ''
   const hint = [label, filesHint].filter(Boolean).join(' · ')
 

@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>领匣 · 支付渠道</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230f6e5c'/></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+SC:wght@400;500;600;700&family=Sora:wght@500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@0.544.0/dist/umd/lucide.min.js"></script>
+  <link rel="stylesheet" href="admin.css" />
+  <style>
+    .pick { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); margin-top: 18px; }
+    .pick button { text-align: left; border: 0; background: none; padding: 18px 18px 18px 0; }
+    .pick button + button { border-left: 1px solid var(--line); padding-left: 18px; }
+    .pick b { display: block; font-family: var(--font-display); font-size: 1.25rem; letter-spacing: -.03em; }
+    .pick p { margin: 6px 0 0; color: var(--ink-mute); font-size: .8rem; line-height: 1.5; }
+    .pick .tag { margin-top: 10px; }
+    .checks { list-style: none; margin: 12px 0 0; padding: 0; }
+    .checks li { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: .82rem; }
+    .checks b { font-weight: 700; }
+    .ok { color: var(--teal); }
+    .bad { color: var(--danger); }
+    @media (max-width: 860px) {
+      .pick { grid-template-columns: 1fr; }
+      .pick button + button { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); }
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-bar">
+    <strong>领匣后台设计稿</strong>
+    <nav class="demo-links">
+      <a href="admin-dashboard.html">概览</a>
+      <a href="admin-revenue.html">营收</a>
+      <a href="admin-products.html">商品</a>
+      <a href="admin-users.html">用户</a>
+      <a href="admin-conversations.html">对话</a>
+      <a class="on" href="admin-settings.html">配置</a>
+    </nav>
+  </div>
+  <div class="admin">
+    <aside class="aside">
+      <div class="aside-brand"><span class="brand-mark"></span>领匣控制台</div>
+      <nav>
+        <div class="nav-cap">工作台</div>
+        <a href="admin-dashboard.html"><i data-lucide="layout-dashboard"></i>概览</a>
+        <div class="nav-cap">运营管理</div>
+        <a href="admin-products.html"><i data-lucide="package"></i>商品与分类</a>
+        <a href="admin-users.html"><i data-lucide="users"></i>用户管理</a>
+        <div class="nav-cap">交易履约</div>
+        <a href="admin-revenue.html"><i data-lucide="wallet"></i>营收<span class="n">6</span></a>
+        <a href="admin-conversations.html"><i data-lucide="message-square"></i>约稿对话<span class="n">4</span></a>
+        <div class="nav-cap">站点配置</div>
+        <a class="active" href="admin-settings.html"><i data-lucide="credit-card"></i>支付接入</a>
+        <a href="admin-settings.html#system"><i data-lucide="settings-2"></i>系统设置</a>
+        <a href="admin-settings.html#website"><i data-lucide="globe"></i>网站设置</a>
+      </nav>
+      <div class="aside-foot">设计稿 · 密钥是示意<br />xinx.shop</div>
+    </aside>
+    <div class="main">
+      <div class="topbar">
+        <span class="crumb">控制台 / 站点配置 / 支付 / <b id="crumb">添加渠道</b></span>
+        <div class="topbar-right"><span class="date" id="today"></span><div class="avatar">店</div></div>
+      </div>
+      <main class="desk">
+        <div class="desk-inner">
+          <header class="page-head">
+            <div>
+              <h1 id="title">添加渠道</h1>
+              <p class="lead" id="lead">先选渠道商。密钥留在这一页，列表上只看实收和失败。</p>
+            </div>
+            <div class="head-actions">
+              <a class="ghost-btn" href="admin-settings.html">返回配置</a>
+              <button class="line-btn" type="button" id="repick" hidden>重选渠道商</button>
+            </div>
+          </header>
+
+          <section id="pick">
+            <div class="pick">
+              <button type="button" data-provider="alipay">
+                <b>支付宝官方</b>
+                <p>电脑网站支付。开放平台签「电脑网站支付」，用 RSA2。回调必须公网能访问，否则付了也不会自动发货。</p>
+                <span class="tag">官方</span>
+              </button>
+              <button type="button" data-provider="ezpay">
+                <b>易支付</b>
+                <p>一个网关里带支付宝、微信、QQ 钱包。走 submit.php 跳转。微信失败偏多时先看这里的密钥和网关。</p>
+                <span class="tag gold">网关</span>
+              </button>
+            </div>
+          </section>
+
+          <div class="layout-side" id="cfg" hidden>
+            <form id="form">
+              <section>
+                <h2 class="sec-title">渠道</h2>
+                <div class="fields">
+                  <div class="pair-fields" style="display:grid;grid-template-columns:1fr 1fr;gap:8px 32px">
+                    <label class="field"><span>渠道名称</span><input id="ch-name" /></label>
+                    <label class="field"><span>渠道商</span><input id="ch-provider" readonly /></label>
+                  </div>
+                  <div class="switch"><span>启用 <small style="color:var(--ink-mute)">启用后，买家结算时可以走这条通道</small></span><button type="button" id="enabled" aria-label="启用"><i></i></button></div>
+                </div>
+              </section>
+
+              <section class="block" id="ali" hidden>
+                <h2 class="sec-title">支付宝开放平台 <small>alipay.trade.page.pay</small></h2>
+                <div class="fields">
+                  <label class="field"><span>应用 APPID</span><input id="app-id" placeholder="开放平台应用的 APPID" /></label>
+                  <label class="field"><span>异步通知 notify_url</span><input id="ali-notify" /><small>可留空，保存时填成当前站点。必须公网可访问。</small></label>
+                  <label class="field"><span>同步回跳 return_url</span><input id="ali-return" /><small>可留空，买家付完跳回订单。</small></label>
+                  <label class="field"><span>应用私钥（RSA2）</span><textarea id="ali-priv" rows="4" placeholder="已保存的私钥保持掩码。要换就整段粘贴新的。"></textarea></label>
+                  <label class="field"><span>支付宝公钥</span><textarea id="ali-pub" rows="3" placeholder="开放平台里的「支付宝公钥」，不是应用公钥"></textarea><small>用来验签通知。</small></label>
+                  <div class="switch"><span>沙箱 <small style="color:var(--ink-mute)">只走沙箱网关，用来联调</small></span><button type="button" id="sandbox" aria-label="沙箱"><i></i></button></div>
+                  <div class="switch"><span>支付宝 <small style="color:var(--ink-mute)">电脑网站支付 FAST_INSTANT_TRADE_PAY</small></span><button type="button" id="ali-method" class="on" aria-label="支付宝"><i></i></button></div>
+                </div>
+              </section>
+
+              <section class="block" id="ez" hidden>
+                <h2 class="sec-title">易支付 <small>submit.php</small></h2>
+                <div class="fields">
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 32px">
+                    <label class="field"><span>网关地址</span><input id="ez-gw" placeholder="https://www.ezfpy.cn" /><small>发起时请求 {网关}/submit.php</small></label>
+                    <label class="field"><span>网站名称</span><input id="ez-site" placeholder="领匣" /></label>
+                    <label class="field"><span>商户 ID (pid)</span><input id="ez-pid" /></label>
+                    <label class="field"><span>商户密钥 (key)</span><input id="ez-key" type="password" placeholder="已保存则保持掩码" /></label>
+                  </div>
+                  <label class="field"><span>异步通知 notify_url</span><input id="ez-notify" /><small>留空则用 https://xinx.shop/api/pay/ezpay/notify</small></label>
+                  <label class="field"><span>跳转通知 return_url</span><input id="ez-return" /><small>留空则用当前站点回跳。</small></label>
+                  <div class="switch"><span>支付宝 <small style="color:var(--ink-mute)">type=alipay</small></span><button type="button" class="on" data-method="alipay" aria-label="支付宝"><i></i></button></div>
+                  <div class="switch"><span>微信 <small style="color:var(--ink-mute)">type=wxpay</small></span><button type="button" class="on" data-method="wxpay" aria-label="微信"><i></i></button></div>
+                  <div class="switch"><span>QQ 钱包 <small style="color:var(--ink-mute)">type=qqpay</small></span><button type="button" data-method="qqpay" aria-label="QQ 钱包"><i></i></button></div>
+                </div>
+              </section>
+
+              <div class="form-bar" style="display:flex;justify-content:flex-end;gap:8px;margin-top:22px;padding-top:14px;border-top:1px solid var(--line)">
+                <a class="line-btn" href="admin-settings.html">取消</a>
+                <button class="teal-btn" type="submit" id="save">添加渠道</button>
+              </div>
+            </form>
+            <aside class="side-card">
+              <div class="lbl" style="color:var(--ink-mute);font-size:.72rem;letter-spacing:.06em">接入检查</div>
+              <h3 id="side-title" style="margin-top:8px">还没选</h3>
+              <ul class="checks" id="checks"></ul>
+              <p class="funnel-note" id="side-note"></p>
+            </aside>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+  <script src="admin.js"></script>
+  <script>
+    lxDate()
+    const SAVED = {
+      alipay: {
+        name: "支付宝官方", appId: "2021••••4418",
+        notify: "https://xinx.shop/api/pay/alipay/notify",
+        ret: "https://xinx.shop/api/pay/alipay/return",
+        priv: "•••••••• 已保存", pub: "•••••••• 已保存",
+        enabled: true, sandbox: false,
+      },
+      ezpay: {
+        name: "易支付", gw: "https://pay.example", site: "领匣", pid: "10086",
+        key: "••••••••", notify: "https://xinx.shop/api/pay/ezpay/notify",
+        ret: "https://xinx.shop/api/pay/ezpay/return", enabled: true,
+      },
+    }
+    const q = new URLSearchParams(location.search).get("provider")
+    let provider = q === "alipay" || q === "ezpay" ? q : ""
+
+    function val(id) { return document.getElementById(id).value.trim() }
+    function row(label, ok, text) {
+      return `<li><span>${label}</span><b class="${ok ? "ok" : "bad"}">${text}</b></li>`
+    }
+    function paint() {
+      const editing = Boolean(provider && q === provider)
+      document.getElementById("pick").hidden = Boolean(provider)
+      document.getElementById("cfg").hidden = !provider
+      document.getElementById("repick").hidden = !provider || editing
+      document.getElementById("ali").hidden = provider !== "alipay"
+      document.getElementById("ez").hidden = provider !== "ezpay"
+      const title = !provider ? "添加渠道" : (editing ? "编辑" : "添加") + (provider === "alipay" ? "支付宝" : "易支付")
+      document.getElementById("title").textContent = title
+      document.getElementById("crumb").textContent = title
+      document.getElementById("save").textContent = editing ? "保存修改" : "添加渠道"
+      document.getElementById("side-title").textContent = provider === "alipay" ? "支付宝官方" : provider === "ezpay" ? "易支付" : "还没选"
+      if (provider === "alipay") {
+        const app = val("app-id")
+        const priv = val("ali-priv")
+        const pub = val("ali-pub")
+        const notify = val("ali-notify")
+        document.getElementById("checks").innerHTML = [
+          row("APPID", Boolean(app), app ? "已填" : "缺"),
+          row("应用私钥", Boolean(priv), priv ? "已填" : "缺"),
+          row("支付宝公钥", Boolean(pub), pub ? "已填" : "缺"),
+          row("异步通知", !notify || notify.startsWith("https://"), notify ? "已填" : "保存时自动填"),
+          row("沙箱", true, document.getElementById("sandbox").classList.contains("on") ? "开着" : "关"),
+          row("买家可选", document.getElementById("enabled").classList.contains("on") && document.getElementById("ali-method").classList.contains("on"), document.getElementById("enabled").classList.contains("on") ? "结算里会出现" : "还没启用"),
+        ].join("")
+        document.getElementById("side-note").textContent = "30 日这条渠道实收 ¥46,022，成功率 98.6%。私钥不会回到列表页。"
+      } else if (provider === "ezpay") {
+        document.getElementById("checks").innerHTML = [
+          row("网关", Boolean(val("ez-gw")), val("ez-gw") ? "已填" : "缺"),
+          row("商户 ID", Boolean(val("ez-pid")), val("ez-pid") ? "已填" : "缺"),
+          row("密钥", Boolean(val("ez-key")), val("ez-key") ? "已填" : "缺"),
+          row("支付宝", document.querySelector('[data-method="alipay"]').classList.contains("on"), "type=alipay"),
+          row("微信", document.querySelector('[data-method="wxpay"]').classList.contains("on"), "type=wxpay"),
+          row("QQ 钱包", document.querySelector('[data-method="qqpay"]').classList.contains("on"), document.querySelector('[data-method="qqpay"]').classList.contains("on") ? "开" : "关"),
+        ].join("")
+        document.getElementById("side-note").textContent = "30 日实收 ¥18,798，失败 6 笔，多半在微信。网关和密钥改完再看下一笔回调。"
+      }
+      lxIcons()
+    }
+    function fill(p) {
+      provider = p
+      const saved = q === p ? SAVED[p] : null
+      if (p === "alipay") {
+        document.getElementById("ch-name").value = saved ? saved.name : "支付宝官方"
+        document.getElementById("ch-provider").value = "支付宝官方"
+        document.getElementById("app-id").value = saved ? saved.appId : ""
+        document.getElementById("ali-notify").value = saved ? saved.notify : "https://xinx.shop/api/pay/alipay/notify"
+        document.getElementById("ali-return").value = saved ? saved.ret : "https://xinx.shop/api/pay/alipay/return"
+        document.getElementById("ali-priv").value = saved ? saved.priv : ""
+        document.getElementById("ali-pub").value = saved ? saved.pub : ""
+        document.getElementById("enabled").classList.toggle("on", saved ? saved.enabled : false)
+        document.getElementById("sandbox").classList.toggle("on", saved ? saved.sandbox : false)
+      } else {
+        document.getElementById("ch-name").value = saved ? saved.name : "易支付"
+        document.getElementById("ch-provider").value = "易支付"
+        document.getElementById("ez-gw").value = saved ? saved.gw : "https://www.ezfpy.cn"
+        document.getElementById("ez-site").value = saved ? saved.site : "领匣"
+        document.getElementById("ez-pid").value = saved ? saved.pid : ""
+        document.getElementById("ez-key").value = saved ? saved.key : ""
+        document.getElementById("ez-notify").value = saved ? saved.notify : "https://xinx.shop/api/pay/ezpay/notify"
+        document.getElementById("ez-return").value = saved ? saved.ret : "https://xinx.shop/api/pay/ezpay/return"
+        document.getElementById("enabled").classList.toggle("on", saved ? saved.enabled : false)
+      }
+      paint()
+    }
+    document.getElementById("pick").onclick = (e) => {
+      const b = e.target.closest("[data-provider]")
+      if (b) fill(b.dataset.provider)
+    }
+    document.getElementById("repick").onclick = () => { provider = ""; paint() }
+    document.getElementById("form").addEventListener("input", paint)
+    document.getElementById("form").addEventListener("click", (e) => {
+      const sw = e.target.closest(".switch button")
+      if (!sw) return
+      sw.classList.toggle("on")
+      paint()
+    })
+    document.getElementById("form").onsubmit = (e) => {
+      e.preventDefault()
+      if (provider === "alipay" && (!val("app-id") || !val("ali-priv") || !val("ali-pub"))) {
+        lxToast("APPID、私钥、支付宝公钥都要有")
+        return
+      }
+      if (provider === "ezpay" && (!val("ez-pid") || !val("ez-key"))) {
+        lxToast("商户 ID 和密钥都要有")
+        return
+      }
+      lxToast(q === provider ? "Demo：渠道已保存" : "Demo：渠道已添加")
+    }
+    if (provider) fill(provider)
+    else paint()
+    lxIcons()
+  </script>
+</body>
+</html>

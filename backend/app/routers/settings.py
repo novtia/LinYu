@@ -10,6 +10,7 @@ from ..deps import get_admin_user, get_optional_user
 from ..models import User
 from ..payment.service import SECRET_MASK
 from ..schemas import (
+    AnalyticsOut,
     DashboardOut,
     PublicSettingsOut,
     SettingsOut,
@@ -17,6 +18,7 @@ from ..schemas import (
     SysSettings,
 )
 from ..seed import load_settings, save_settings
+from ..services.analytics import build_analytics
 from ..services.dashboard import build_dashboard
 
 router = APIRouter(prefix="/api", tags=["settings"])
@@ -101,3 +103,11 @@ def dashboard(
     db: Session = Depends(get_db),
 ):
     return build_dashboard(db)
+
+
+@router.get("/analytics", response_model=AnalyticsOut)
+def analytics(
+    _: User = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    return build_analytics(db)

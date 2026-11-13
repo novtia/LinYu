@@ -400,7 +400,7 @@ function DeliveryDetail({
               </>
             ) : null}
             {' · '}
-            <Link to={`/admin/orders/${encodeURIComponent(row.order_id)}`} className="font-semibold text-teal hover:underline">
+            <Link to={`/admin/revenue/${encodeURIComponent(row.order_id)}`} className="font-semibold text-teal hover:underline">
               查看订单
             </Link>
           </div>
@@ -492,7 +492,7 @@ function DeliveryDetail({
 
       <div className="mt-7 flex flex-wrap gap-2">
         <Link
-          to={`/admin/orders/${encodeURIComponent(row.order_id)}`}
+          to={`/admin/revenue/${encodeURIComponent(row.order_id)}`}
           className="inline-flex h-[38px] items-center gap-1.5 rounded-[10px] bg-teal px-4 text-[0.84rem] font-bold text-white hover:bg-teal-deep"
         >
           <ClipboardList className="h-3.5 w-3.5" strokeWidth={1.9} />

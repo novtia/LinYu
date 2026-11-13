@@ -1,0 +1,708 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>领匣 · 商品表单</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230f6e5c'/></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+SC:wght@400;500;600;700&family=Sora:wght@500;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@0.544.0/dist/umd/lucide.min.js"></script>
+  <link rel="stylesheet" href="admin.css" />
+  <style>
+    .desk-inner { width: min(1240px, 100%); }
+
+    .form-head {
+      display: flex; align-items: flex-end; justify-content: space-between; gap: 20px;
+      padding-bottom: 18px; border-bottom: 2px solid var(--ink);
+    }
+    .form-kicker {
+      display: flex; align-items: center; gap: 8px;
+      font-family: var(--font-mono); font-size: .72rem; color: var(--ink-mute);
+    }
+    .form-kicker .badge {
+      padding: 2px 8px; border-radius: 99px; background: var(--teal); color: #fff;
+      font-weight: 700; font-size: .66rem; letter-spacing: .06em;
+    }
+    .form-head h1 {
+      margin: 8px 0 0; font-family: var(--font-display);
+      font-size: clamp(1.65rem, 2.3vw, 2.15rem); letter-spacing: -.04em; line-height: 1.05;
+    }
+    .form-head .lead { margin: 8px 0 0; color: var(--ink-mute); font-size: .86rem; line-height: 1.55; }
+
+    /* 双栏主区：左表单工作卡 + 右侧前台预览 */
+    .form-layout {
+      display: grid; grid-template-columns: minmax(0, 1fr) 310px;
+      gap: 28px; margin-top: 24px; align-items: start;
+    }
+    .form-layout > * { min-width: 0; }
+    .form-sections { display: grid; gap: 20px; }
+
+    .f-card {
+      background: #fff; border: 1px solid var(--line); border-radius: 12px;
+      padding: 20px 22px;
+    }
+    .f-card-head {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+      padding-bottom: 10px; border-bottom: 1px solid var(--line);
+    }
+    .f-card-head h2 {
+      margin: 0; font-family: var(--font-display); font-size: 1.05rem; letter-spacing: -.02em;
+    }
+    .f-card-head small { color: var(--ink-mute); font-size: .74rem; }
+
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 24px; margin-top: 14px; }
+    .field select {
+      width: 100%; border: 0; border-bottom: 1px solid var(--line-strong);
+      background: transparent; padding: 8px 0; outline: none; border-radius: 0;
+    }
+    .field select:focus { border-color: var(--teal); }
+
+    .mode-pick {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px;
+    }
+    .mode-pick button {
+      text-align: left; border: 1px solid var(--line-strong); border-radius: 10px;
+      background: var(--fog); padding: 12px 14px; transition: .16s var(--ease);
+    }
+    .mode-pick button:hover { border-color: var(--teal); background: #fff; }
+    .mode-pick button.on {
+      border-color: var(--ink); background: var(--paper);
+      box-shadow: inset 3px 0 0 var(--teal);
+    }
+    .mode-pick button b { display: block; font-size: .9rem; }
+    .mode-pick button.on b { color: var(--teal); }
+    .mode-pick button span { display: block; margin-top: 3px; color: var(--ink-mute); font-size: .73rem; }
+
+    .split-hint {
+      margin: 12px 0 0; padding: 10px 12px; border-radius: 8px;
+      background: var(--fog); border: 1px solid var(--line);
+      font-size: .78rem; color: var(--ink-soft); line-height: 1.55;
+    }
+    .split-hint b { color: var(--ink); font-family: var(--font-mono); }
+
+    /* 封面上传与色块 */
+    .drop {
+      margin-top: 14px; height: 220px; border-radius: 10px; display: grid; place-items: center;
+      text-align: center; color: #fff; cursor: pointer; position: relative; overflow: hidden;
+      background: linear-gradient(165deg, rgba(255,255,255,.28), transparent 46%), hsl(var(--h), 34%, 30%);
+      border: 1px solid var(--line-strong);
+    }
+    .drop.drag { outline: 2px solid var(--teal); outline-offset: 2px; }
+    .drop img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .drop .overlay {
+      position: relative; z-index: 1; padding: 12px 16px;
+    }
+    .drop strong { font-family: var(--font-display); font-size: 1.15rem; letter-spacing: -.03em; display: block; }
+    .drop p { margin: 6px 0 0; font-size: .78rem; opacity: .88; }
+    .drop .img-bar {
+      position: absolute; inset: auto 0 0; z-index: 2;
+      background: rgba(20, 32, 28, .64); padding: 7px 12px; font-size: .76rem;
+    }
+    .cover-ops {
+      display: flex; justify-content: flex-end; gap: 14px; margin-top: 8px;
+    }
+    .cover-ops button { border: 0; background: none; padding: 0; font-size: .78rem; font-weight: 700; color: var(--teal); }
+    .cover-ops button.danger { color: var(--danger); }
+
+    .swatches { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-top: 12px; }
+    .swatches button {
+      border: 2px solid transparent; border-radius: 7px; padding: 0; background: none; overflow: hidden;
+    }
+    .swatches button.on { border-color: var(--teal); }
+    .swatches .swatch-block {
+      aspect-ratio: 16 / 10; width: 100%;
+      background: linear-gradient(165deg, rgba(255,255,255,.32), transparent 50%), hsl(var(--h), 34%, 32%);
+    }
+
+    /* 成品文件 + Markdown 发货文本 */
+    .file-drop {
+      margin-top: 12px; border: 1px dashed var(--line-strong); border-radius: 10px;
+      padding: 16px; text-align: center; cursor: pointer; background: var(--fog);
+      font-size: .8rem; color: var(--ink-mute); transition: .15s var(--ease);
+    }
+    .file-drop:hover { border-color: var(--teal); color: var(--teal); background: #fff; }
+    .files { list-style: none; margin: 10px 0 0; padding: 0; }
+    .files li {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 9px 2px; border-bottom: 1px solid var(--line); font-size: .82rem;
+    }
+    .files li .fn { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .files li .fn b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .files li .fn small { color: var(--ink-mute); font-family: var(--font-mono); font-size: .7rem; }
+    .files button { border: 0; background: none; color: var(--danger); font-size: .74rem; font-weight: 700; }
+
+    .text-head {
+      display: flex; align-items: flex-end; justify-content: space-between; gap: 12px;
+      margin-top: 18px;
+    }
+    .tabs { display: flex; gap: 14px; }
+    .tabs button {
+      border: 0; background: none; padding: 0 0 6px; color: var(--ink-mute);
+      font-weight: 700; font-size: .78rem; border-bottom: 2px solid transparent;
+    }
+    .tabs button.on { color: var(--ink); border-bottom-color: var(--ink); }
+    .md {
+      margin-top: 8px; min-height: 150px;
+      font-family: var(--font-mono); font-size: .82rem; line-height: 1.65;
+    }
+    .preview-box {
+      margin-top: 8px; min-height: 150px; padding: 12px 14px; border-radius: 8px;
+      background: var(--fog); border: 1px solid var(--line); font-size: .86rem; line-height: 1.65;
+    }
+    .preview-box h2, .preview-box h3 { font-family: var(--font-display); margin: 0 0 8px; font-size: 1.02rem; }
+    .preview-box code { font-family: var(--font-mono); background: var(--paper); padding: 1px 5px; border-radius: 4px; }
+
+    .form-bar {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+      padding: 14px 20px; background: #fff; border: 1px solid var(--line-strong); border-radius: 12px;
+    }
+    .err { color: var(--danger); font-size: .82rem; min-height: 1.2em; font-weight: 600; }
+
+    /* 右侧前台实时预览卡片 */
+    .preview-card {
+      position: sticky; top: 14px;
+      background: #fff; border: 1px solid var(--line-strong); border-radius: 12px;
+      padding: 18px; box-shadow: 4px 4px 0 rgba(20, 32, 28, .05);
+    }
+    .preview-card .kicker { font-size: .72rem; letter-spacing: .06em; color: var(--ink-mute); font-weight: 700; }
+    .shop-cover {
+      margin-top: 12px; aspect-ratio: 16 / 10; border-radius: 8px; overflow: hidden;
+      background: linear-gradient(165deg, rgba(255,255,255,.32), transparent 50%), hsl(var(--h), 34%, 32%);
+      position: relative;
+    }
+    .shop-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .shop-name {
+      margin: 12px 0 0; font-family: var(--font-display);
+      font-size: 1.32rem; font-weight: 800; letter-spacing: -.03em; line-height: 1.25;
+    }
+    .shop-price { margin-top: 8px; font-family: var(--font-mono); font-weight: 700; font-size: .98rem; color: var(--teal); }
+    .shop-meta { margin-top: 6px; font-size: .78rem; color: var(--ink-mute); }
+    .shop-desc {
+      margin: 12px 0 0; padding-top: 12px; border-top: 1px dashed var(--line-strong);
+      color: var(--ink-soft); font-size: .82rem; line-height: 1.6; white-space: pre-wrap;
+    }
+
+    /* 16:10 封面裁切模态框 */
+    .modal {
+      position: fixed; inset: 0; z-index: 90; display: grid; place-items: center;
+      background: rgba(20, 32, 28, .5); padding: 20px;
+    }
+    .modal[hidden] { display: none; }
+    .dialog {
+      width: min(560px, 100%); background: #f7fbf9;
+      border: 1px solid var(--line-strong); border-radius: 12px; padding: 20px;
+    }
+    .dialog h2 { margin: 0; font-family: var(--font-display); font-size: 1.2rem; letter-spacing: -.03em; }
+    .crop-frame {
+      margin: 14px 0; height: 240px; position: relative; overflow: hidden; border-radius: 8px;
+      background: #14201c; display: grid; place-items: center;
+    }
+    .crop-frame img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    .crop-frame i {
+      position: absolute; left: 10%; right: 10%; top: 14%; bottom: 14%;
+      border: 1.5px solid #fff; box-shadow: 0 0 0 999px rgba(20, 32, 28, .45); pointer-events: none;
+    }
+    .dialog-acts { display: flex; justify-content: flex-end; gap: 8px; }
+
+    @media (max-width: 1080px) {
+      .form-layout { grid-template-columns: 1fr; }
+      .preview-card { position: static; }
+    }
+    @media (max-width: 720px) {
+      .form-head { flex-direction: column; align-items: flex-start; }
+      .pair, .mode-pick { grid-template-columns: 1fr; }
+      .swatches { grid-template-columns: repeat(3, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-bar">
+    <strong>领匣后台设计稿</strong>
+    <nav class="demo-links">
+      <a href="admin-dashboard.html">概览</a>
+      <a href="admin-revenue.html">营收</a>
+      <a class="on" href="admin-products.html">商品</a>
+      <a href="admin-users.html">用户</a>
+      <a href="admin-conversations.html">对话</a>
+      <a href="admin-settings.html">配置</a>
+    </nav>
+  </div>
+
+  <div class="admin">
+    <aside class="aside">
+      <div class="aside-brand"><span class="brand-mark"></span>领匣控制台</div>
+      <nav>
+        <div class="nav-cap">工作台</div>
+        <a href="admin-dashboard.html"><i data-lucide="layout-dashboard"></i>概览</a>
+        <div class="nav-cap">运营管理</div>
+        <a class="active" href="admin-products.html"><i data-lucide="package"></i>商品与分类</a>
+        <a href="admin-users.html"><i data-lucide="users"></i>用户管理</a>
+        <div class="nav-cap">交易履约</div>
+        <a href="admin-revenue.html"><i data-lucide="wallet"></i>营收<span class="n">5</span></a>
+        <a href="admin-conversations.html"><i data-lucide="message-square"></i>约稿对话<span class="n">4</span></a>
+        <div class="nav-cap">站点配置</div>
+        <a href="admin-settings.html"><i data-lucide="credit-card"></i>支付接入</a>
+        <a href="admin-settings.html#system"><i data-lucide="settings-2"></i>系统设置</a>
+        <a href="admin-settings.html#website"><i data-lucide="globe"></i>网站设置</a>
+      </nav>
+      <div class="aside-foot">设计稿 · 不接真实数据<br />xinx.shop</div>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <span class="crumb">控制台 / 商品与分类 / <b id="crumb-title">新增商品</b></span>
+        <div class="topbar-right">
+          <span class="date" id="today"></span>
+          <div class="avatar">店</div>
+        </div>
+      </div>
+
+      <main class="desk">
+        <div class="desk-inner">
+          <header class="form-head">
+            <div>
+              <div class="form-kicker">
+                <span class="badge">PRODUCT EDITOR</span>
+                <span id="mode-kicker">新建商品档案</span>
+              </div>
+              <h1 id="page-title">新增商品</h1>
+              <p class="lead">成品一次付清就发货。约稿先收定金，稿件在订单里交，尾款付清才能下载。</p>
+            </div>
+            <div class="head-actions">
+              <a class="ghost-btn" href="admin-products.html"><i data-lucide="arrow-left"></i>返回商品与分类</a>
+            </div>
+          </header>
+
+          <form class="form-layout" id="prod-form" novalidate>
+            <div class="form-sections">
+              <!-- 1. 卖什么 -->
+              <section class="f-card">
+                <div class="f-card-head">
+                  <h2>卖什么</h2>
+                  <small>基础定价、分类归属与上架状态</small>
+                </div>
+                <label class="field" style="margin-top:14px">
+                  <span>商品名称</span>
+                  <input id="f-name" placeholder="例如：《深夜维修工》全文 + 番外" required />
+                </label>
+
+                <div class="mode-pick" id="mode-pick">
+                  <button type="button" class="on" data-mode="normal">
+                    <b>成品</b>
+                    <span>一次付清，自动发货</span>
+                  </button>
+                  <button type="button" data-mode="commission">
+                    <b>约稿</b>
+                    <span>按千字计价，定金开工，尾款取稿</span>
+                  </button>
+                </div>
+
+                <div class="pair">
+                  <label class="field">
+                    <span id="price-lbl">价格（元）</span>
+                    <input id="f-price" type="number" min="0" step="0.01" placeholder="例如 38" required />
+                  </label>
+                  <label class="field">
+                    <span>所属分类</span>
+                    <select id="f-cat">
+                      <option value="">未分类</option>
+                      <option value="约稿">约稿</option>
+                      <option value="都市">都市</option>
+                      <option value="短篇">短篇</option>
+                      <option value="校园">校园</option>
+                      <option value="古风">古风（已停用）</option>
+                    </select>
+                  </label>
+                </div>
+
+                <p class="split-hint" id="price-hint"></p>
+
+                <div class="switch" style="margin-top:10px;border-bottom:0;padding-bottom:2px">
+                  <span>上架 <small style="color:var(--ink-mute)">关掉后前台看不到，已买的订单不受影响</small></span>
+                  <button type="button" id="f-on" class="on" aria-label="上架"><i></i></button>
+                </div>
+              </section>
+
+              <!-- 2. 封面 -->
+              <section class="f-card">
+                <div class="f-card-head">
+                  <h2>封面</h2>
+                  <small>没有图时用下面的色块</small>
+                </div>
+                <div class="drop" id="drop" tabindex="0" role="button" style="--h:164">
+                  <img id="cover-img" alt="封面预览" hidden />
+                  <div class="overlay" id="drop-empty">
+                    <strong>拖封面到这里，或点击选择图片</strong>
+                    <p>支持 png / jpg / webp，最大 5MB。选图后按 16:10 比例裁切。</p>
+                  </div>
+                  <div class="img-bar" id="drop-bar" hidden>拖拽或点击更换封面，先裁成 16:10</div>
+                </div>
+                <div class="cover-ops" id="cover-ops" hidden>
+                  <button type="button" id="recrop">重新裁切</button>
+                  <button type="button" class="danger" id="rem-cover">移除封面</button>
+                </div>
+                <input id="cover-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" hidden />
+
+                <div class="swatches" id="swatches"></div>
+              </section>
+
+              <!-- 3. 前台介绍 -->
+              <section class="f-card">
+                <div class="f-card-head">
+                  <h2>前台介绍</h2>
+                  <small>买家下单前看得到</small>
+                </div>
+                <label class="field" style="margin-top:14px">
+                  <span>商品描述</span>
+                  <textarea id="f-desc" rows="4" placeholder="写给人看的介绍，不要放下载链接"></textarea>
+                </label>
+              </section>
+
+              <!-- 4. 交付内容 / 稿件提示 -->
+              <section class="f-card" id="sec-commission" hidden>
+                <div class="f-card-head">
+                  <h2>稿件交付说明</h2>
+                  <small>约稿模式专用流程</small>
+                </div>
+                <p style="margin:12px 0 0;font-size:.86rem;line-height:1.65;color:var(--ink-soft)">
+                  约稿不在这里传文件。买家付定金后，到对应订单里交稿。尾款付清，买家才能下载。
+                </p>
+              </section>
+
+              <section class="f-card" id="sec-normal">
+                <div class="f-card-head">
+                  <h2>商品文件与发货文本</h2>
+                  <small>付款后自动鉴权发放</small>
+                </div>
+                <div class="file-drop" id="file-drop">
+                  点击或拖拽添加成品文件（TXT / DOCX / EPUB / PDF / ZIP / 图片）
+                </div>
+                <input id="file-input" type="file" multiple hidden />
+                <ul class="files" id="file-list"></ul>
+
+                <div class="text-head">
+                  <span style="font-size:.76rem;font-weight:700;color:var(--ink-soft)">发货文本（支持 Markdown）</span>
+                  <div class="tabs" id="text-tabs">
+                    <button type="button" class="on" data-tab="edit">编辑</button>
+                    <button type="button" data-tab="preview">预览</button>
+                  </div>
+                </div>
+                <div class="field" id="tab-edit" style="margin-top:4px">
+                  <textarea id="f-delivery" class="md" placeholder="## 发货说明&#10;&#10;正文与番外已放在上方附件中，下载即可阅读。提取码：`NX-188`"></textarea>
+                </div>
+                <div class="preview-box" id="tab-preview" hidden></div>
+                <p style="margin:8px 0 0;font-size:.74rem;color:var(--ink-mute)">
+                  支持 Markdown。文件走上面的附件列表，付款后鉴权下载，不要把直链写进文本。
+                </p>
+              </section>
+
+              <!-- 5. 底部提交栏 -->
+              <div class="form-bar">
+                <div class="err" id="form-err"></div>
+                <div class="head-actions">
+                  <a class="ghost-btn" href="admin-products.html">取消</a>
+                  <button type="submit" class="teal-btn" id="submit-btn">创建商品</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 右栏：前台会看到 -->
+            <aside class="preview-card" aria-label="前台商品预览">
+              <div class="kicker">前台会看到</div>
+              <div class="shop-cover" id="pv-cover" style="--h:164">
+                <img id="pv-img" alt="" hidden />
+              </div>
+              <h3 class="shop-name" id="pv-name">未命名商品</h3>
+              <div class="shop-price" id="pv-price">¥0</div>
+              <div class="shop-meta" id="pv-meta">未分类 · 成品 · 在售</div>
+              <p class="shop-desc" id="pv-desc">还没有介绍。</p>
+            </aside>
+          </form>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- 16:10 封面裁切弹窗 -->
+  <div class="modal" id="crop-modal" hidden>
+    <div class="dialog" role="dialog" aria-modal="true">
+      <h2>裁切封面（16:10）</h2>
+      <div class="crop-frame">
+        <img id="crop-img" alt="待裁切封面" />
+        <i></i>
+      </div>
+      <div class="dialog-acts">
+        <button type="button" class="ghost-btn" id="crop-cancel">取消</button>
+        <button type="button" class="teal-btn" id="crop-ok">确认裁切</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <script src="admin.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id)
+    lxDate()
+
+    const PRESETS = {
+      8: {
+        name: "定制约稿 · 你来点梗我来写", mode: "commission", price: 64, cat: "约稿", on: true, h: 164,
+        desc: "你给设定、性格与雷点，我按千字定制正文与番外。先付 50% 定金排期，成稿后付尾款解锁下载。",
+        delivery: "", files: [],
+      },
+      21: {
+        name: "修仙长篇约稿", mode: "commission", price: 64, cat: "约稿", on: true, h: 28,
+        desc: "长篇修仙师徒 / 宿敌定制约稿，支持大纲分卷沟通。", delivery: "", files: [],
+      },
+      3: {
+        name: "《深夜维修工》全文 + 番外", mode: "normal", price: 38, cat: "都市", on: true, h: 188,
+        desc: "九万字都市中篇全文精校版，附两篇售后番外。付款后自动发货，支持 TXT 与 EPUB。",
+        delivery: "## 阅读说明\n\n全文与番外都在附件里，解压密码：`LX2026`。",
+        files: [{ name: "深夜维修工_全文精校.txt", size: "312 KB" }, { name: "深夜维修工_番外合集.epub", size: "640 KB" }],
+      },
+      4: {
+        name: "《雨夜租客》", mode: "normal", price: 28, cat: "都市", on: true, h: 210,
+        desc: "雨夜合租引发的都市暧昧短中篇，约五万字，已完结。",
+        delivery: "直接下载附件里的 TXT 即可阅读。",
+        files: [{ name: "雨夜租客.txt", size: "198 KB" }],
+      },
+      6: {
+        name: "《玻璃海岸》全文精校版", mode: "normal", price: 50, cat: "短篇", on: true, h: 196,
+        desc: "含正篇与三篇未公开番外，精校排版。",
+        delivery: "打开订单即可下载全文。提取码：`NX-188`",
+        files: [{ name: "玻璃海岸_精校.epub", size: "520 KB" }],
+      },
+      16: {
+        name: "古风师徒约稿", mode: "commission", price: 64, cat: "古风", on: false, h: 40,
+        desc: "古风权谋师徒线定制，目前暂休下架。", delivery: "", files: [],
+      },
+    }
+
+    const HUES = [164, 28, 200, 188, 340, 222]
+    const params = new URLSearchParams(location.search)
+    const editId = params.get("id")
+    const presetCat = params.get("cat")
+
+    const form = {
+      name: "",
+      mode: "normal",
+      price: "",
+      cat: presetCat || "",
+      on: true,
+      h: 164,
+      coverUrl: "",
+      desc: "",
+      delivery: "",
+      files: [],
+    }
+    let textTab = "edit"
+    let pendingCropUrl = ""
+
+    if (editId) {
+      const p = PRESETS[editId] || {
+        name: `示例商品 #${editId}`, mode: "normal", price: 32, cat: "都市", on: true, h: 188,
+        desc: "这是已上架商品的编辑示例内容。", delivery: "付款后在订单里直接下载。",
+        files: [{ name: `商品_${editId}.txt`, size: "140 KB" }],
+      }
+      Object.assign(form, p, { price: String(p.price), files: p.files.map((f) => ({ ...f })) })
+      $("crumb-title").textContent = `编辑 #${editId}`
+      $("mode-kicker").textContent = `正在编辑 #${editId}`
+      $("page-title").textContent = "编辑商品"
+      $("submit-btn").textContent = "保存修改"
+    }
+
+    function yuanNum(v) {
+      const n = Number(v) || 0
+      return "¥" + (Math.round(n * 100) / 100).toLocaleString("zh-CN")
+    }
+
+    function renderMd(md) {
+      const s = String(md || "").trim()
+      if (!s) return `<span style="color:var(--ink-mute)">暂无发货文本</span>`
+      return s
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/^## (.+)$/gm, "<h2>$1</h2>")
+        .replace(/^### (.+)$/gm, "<h3>$1</h3>")
+        .replace(/`([^`]+)`/g, "<code>$1</code>")
+        .replace(/\n/g, "<br>")
+    }
+
+    function syncUI() {
+      $("f-name").value = form.name
+      $("f-price").value = form.price
+      $("f-cat").value = form.cat
+      $("f-desc").value = form.desc
+      $("f-delivery").value = form.delivery
+      $("f-on").classList.toggle("on", form.on)
+
+      document.querySelectorAll("#mode-pick button").forEach((b) => b.classList.toggle("on", b.dataset.mode === form.mode))
+      $("price-lbl").textContent = form.mode === "commission" ? "单价（元 / 千字）" : "价格（元）"
+      const priceNum = Number(form.price) || 0
+      if (form.mode === "commission") {
+        const dep = Math.round(priceNum * 50) / 100
+        const bal = Math.round((priceNum - dep) * 100) / 100
+        $("price-hint").innerHTML = `按千字计价。1000 字合计 <b>${yuanNum(priceNum)}</b>，定金 <b>${yuanNum(dep)}</b>，尾款 <b>${yuanNum(bal)}</b>。单价至少 0.02，才拆得开定金和尾款。`
+      } else {
+        $("price-hint").textContent = "填 0 表示免费，买家点购买后直接发货。"
+      }
+
+      $("sec-commission").hidden = form.mode !== "commission"
+      $("sec-normal").hidden = form.mode === "commission"
+
+      $("drop").style.setProperty("--h", form.h)
+      $("pv-cover").style.setProperty("--h", form.h)
+      if (form.coverUrl) {
+        $("cover-img").src = form.coverUrl
+        $("cover-img").hidden = false
+        $("drop-empty").hidden = true
+        $("drop-bar").hidden = false
+        $("cover-ops").hidden = false
+        $("pv-img").src = form.coverUrl
+        $("pv-img").hidden = false
+      } else {
+        $("cover-img").hidden = true
+        $("drop-empty").hidden = false
+        $("drop-bar").hidden = true
+        $("cover-ops").hidden = true
+        $("pv-img").hidden = true
+      }
+
+      $("swatches").innerHTML = HUES.map((h) => `
+        <button type="button" data-hue="${h}" class="${form.h === h && !form.coverUrl ? "on" : ""}" aria-label="色块 ${h}">
+          <div class="swatch-block" style="--h:${h}"></div>
+        </button>
+      `).join("")
+
+      $("file-list").innerHTML = form.files.length ? form.files.map((f, i) => `
+        <li>
+          <span class="fn"><i data-lucide="file-text" style="width:15px;height:15px;color:var(--teal);flex-shrink:0"></i><b>${f.name}</b><small>${f.size}</small></span>
+          <button type="button" data-del-file="${i}">移除</button>
+        </li>
+      `).join("") : `<li style="color:var(--ink-mute);border:0;padding:6px 0">暂未添加附件</li>`
+
+      $("tab-edit").hidden = textTab !== "edit"
+      $("tab-preview").hidden = textTab !== "preview"
+      if (textTab === "preview") $("tab-preview").innerHTML = renderMd(form.delivery)
+
+      $("pv-name").textContent = form.name.trim() || "未命名商品"
+      $("pv-price").textContent = form.mode === "commission" ? `${yuanNum(priceNum)} / 千字` : yuanNum(priceNum)
+      $("pv-meta").textContent = `${form.cat || "未分类"} · ${form.mode === "commission" ? "约稿" : "成品"} · ${form.on ? "在售" : "下架"}`
+      $("pv-desc").textContent = form.desc.trim() || "还没有介绍。"
+      lxIcons()
+    }
+
+    $("f-name").addEventListener("input", (e) => { form.name = e.target.value; syncLiveText() })
+    $("f-price").addEventListener("input", (e) => { form.price = e.target.value; syncLiveText() })
+    $("f-cat").addEventListener("change", (e) => { form.cat = e.target.value; syncLiveText() })
+    $("f-desc").addEventListener("input", (e) => { form.desc = e.target.value; syncLiveText() })
+    $("f-delivery").addEventListener("input", (e) => { form.delivery = e.target.value })
+
+    function syncLiveText() {
+      const priceNum = Number(form.price) || 0
+      if (form.mode === "commission") {
+        const dep = Math.round(priceNum * 50) / 100
+        const bal = Math.round((priceNum - dep) * 100) / 100
+        $("price-hint").innerHTML = `按千字计价。1000 字合计 <b>${yuanNum(priceNum)}</b>，定金 <b>${yuanNum(dep)}</b>，尾款 <b>${yuanNum(bal)}</b>。单价至少 0.02，才拆得开定金和尾款。`
+      }
+      $("pv-name").textContent = form.name.trim() || "未命名商品"
+      $("pv-price").textContent = form.mode === "commission" ? `${yuanNum(priceNum)} / 千字` : yuanNum(priceNum)
+      $("pv-meta").textContent = `${form.cat || "未分类"} · ${form.mode === "commission" ? "约稿" : "成品"} · ${form.on ? "在售" : "下架"}`
+      $("pv-desc").textContent = form.desc.trim() || "还没有介绍。"
+    }
+
+    $("mode-pick").addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-mode]")
+      if (!btn) return
+      form.mode = btn.dataset.mode
+      syncUI()
+    })
+    $("f-on").addEventListener("click", () => { form.on = !form.on; syncUI() })
+    $("swatches").addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-hue]")
+      if (!btn) return
+      form.h = Number(btn.dataset.hue)
+      form.coverUrl = ""
+      syncUI()
+    })
+
+    function openCrop(file) {
+      if (!file) return
+      if (!/\.(png|jpe?g|gif|webp|bmp)$/i.test(file.name)) {
+        $("form-err").textContent = "封面仅支持 png / jpg / jpeg / gif / webp / bmp"
+        return
+      }
+      $("form-err").textContent = ""
+      pendingCropUrl = URL.createObjectURL(file)
+      $("crop-img").src = pendingCropUrl
+      $("crop-modal").hidden = false
+    }
+    $("drop").addEventListener("click", () => $("cover-input").click())
+    $("drop").addEventListener("dragover", (e) => { e.preventDefault(); $("drop").classList.add("drag") })
+    $("drop").addEventListener("dragleave", () => $("drop").classList.remove("drag"))
+    $("drop").addEventListener("drop", (e) => {
+      e.preventDefault()
+      $("drop").classList.remove("drag")
+      openCrop(e.dataTransfer.files?.[0])
+    })
+    $("cover-input").addEventListener("change", (e) => openCrop(e.target.files?.[0]))
+    $("recrop").addEventListener("click", () => {
+      if (!form.coverUrl) return
+      pendingCropUrl = form.coverUrl
+      $("crop-img").src = pendingCropUrl
+      $("crop-modal").hidden = false
+    })
+    $("rem-cover").addEventListener("click", () => { form.coverUrl = ""; syncUI(); lxToast("已移除封面") })
+    $("crop-cancel").addEventListener("click", () => { $("crop-modal").hidden = true })
+    $("crop-ok").addEventListener("click", () => {
+      form.coverUrl = pendingCropUrl
+      $("crop-modal").hidden = true
+      syncUI()
+      lxToast("封面已按 16:10 裁切")
+    })
+
+    $("file-drop").addEventListener("click", () => $("file-input").click())
+    $("file-input").addEventListener("change", (e) => {
+      Array.from(e.target.files || []).forEach((f) => {
+        const kb = Math.max(1, Math.round(f.size / 1024))
+        form.files.push({ name: f.name, size: `${kb} KB` })
+      })
+      e.target.value = ""
+      syncUI()
+    })
+    $("file-list").addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-del-file]")
+      if (!btn) return
+      form.files.splice(Number(btn.dataset.delFile), 1)
+      syncUI()
+    })
+
+    $("text-tabs").addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-tab]")
+      if (!btn) return
+      textTab = btn.dataset.tab
+      document.querySelectorAll("#text-tabs button").forEach((b) => b.classList.toggle("on", b === btn))
+      syncUI()
+    })
+
+    $("prod-form").addEventListener("submit", (e) => {
+      e.preventDefault()
+      const price = Number(form.price)
+      if (!form.name.trim() || form.price === "" || Number.isNaN(price) || price < 0) {
+        $("form-err").textContent = "请填写完整且有效的商品名称和价格"
+        return
+      }
+      if (form.mode === "commission" && price < 0.02) {
+        $("form-err").textContent = "约稿单价须至少 0.02 元/千字，以便拆分定金与尾款"
+        return
+      }
+      $("form-err").textContent = ""
+      lxToast(editId ? "商品修改已保存，正在返回列表" : "商品已创建，正在返回列表")
+      setTimeout(() => { location.href = "admin-products.html" }, 700)
+    })
+
+    syncUI()
+  </script>
+</body>
+</html>
